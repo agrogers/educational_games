@@ -8,10 +8,9 @@
                     <p class="mb-0">Fix the missing 's' in each sentence!</p>
                 </div>
                 <div class="card-body">
-                    <div t-foreach="state.sentences" t-as="item" t-key="item.id" class="mb-4 p-3 border-bottom">
+                    <div t-foreach="state.sentences" t-as="item" t-key="item.uniqueId" class="mb-4 p-3 border-bottom">
                         <p class="fs-5">
-                            <span t-esc="item.id"/>. 
-                            <span t-attf-class="{{state.checked and 'text-danger fw-bold' or ''}}">
+                            <span t-attf-class="{{state.checked and !item.isCorrect and 'text-danger fw-bold' or ''}}">
                                 <t t-esc="item.text"/>
                             </span>
                         </p>
@@ -23,11 +22,11 @@
                                    t-att-disabled="state.checked"/>
                             
                             <span t-if="state.checked" class="ms-3">
-                                <t t-if="item.userAnswer.toLowerCase() === item.correctWord.toLowerCase()">
+                                <t t-if="item.isCorrect">
                                     <span class="text-success fs-4">✅</span>
                                 </t>
                                 <t t-else="">
-                                    <span class="text-danger">❌ Correct: <strong t-esc="item.correctWord"/></span>
+                                    <span class="text-danger">❌ Correct: <strong t-esc="item.correctWords"/></span>
                                 </t>
                             </span>
                         </div>
@@ -43,6 +42,9 @@
                         <button t-if="state.checked" class="btn btn-lg btn-outline-primary" t-on-click="resetGame">
                             Try Again
                         </button>
+                    </div>
+                    <div class="text-center mt-3">
+                        <p class="text-muted">Total Difficulty: <strong t-esc="state.totalDifficulty"/></p>
                     </div>
                 </div>
             </div>
