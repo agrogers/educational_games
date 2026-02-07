@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="student_game.GameTemplate" owl="1">
+        <div class="o_action_manager o_content p-4 bg-dark text-white h-100">
+            <div class="text-center">
+                <h2>Odoo Classroom Challenge</h2>
+                <p>Score: <t t-esc="state.score"/></p>
+                
+                <div class="game-container border border-primary mb-3" 
+                     style="width: 800px; height: 300px; margin: 0 auto; background: #222; position: relative;">
+                    <canvas t-ref="gameCanvas" width="800" height="300"></canvas>
+                </div>
+
+                <button class="btn btn-primary" t-on-click="addPoints">Click to Score!</button>
+                <button class="btn btn-success" t-on-click="submitScore">Finish &amp; Save</button>
+            </div>
+        </div>
+    </t>
+</templates>

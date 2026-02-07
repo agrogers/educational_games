@@ -1,0 +1,8 @@
+<odoo>
+    <record id="action_student_game" model="ir.actions.client">
+        <field name="name">Student Game</field>
+        <field name="tag">action_student_game_js</field>
+    </record>
+
+
+</odoo>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="ClickGame" name="Click Game">
+        <t t-call="web.layout">
+            <t t-set="title">Click Game</t>
+            <div id="click-game-container" class="container mt-4">
+                <h1 class="text-center mb-4">Click Game</h1>
+                <p class="text-center">Click the button as fast as you can for 10 seconds!</p>
+                <div class="text-center">
+                    <button id="click-button" class="btn btn-primary btn-lg">Click Me!</button>
+                    <p id="score" class="mt-3">Clicks: 0</p>
+                    <p id="time" class="mt-3">Time: 10</p>
+                    <p id="message" class="mt-3"></p>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="EducationalGamesDashboard" name="Educational Games Dashboard">
+        <t t-call="web.layout">
+            <t t-set="title">Educational Games Dashboard</t>
+            <div class="container mt-4">
+                <h1 class="text-center mb-4">Welcome to Educational Games</h1>
+                <p class="text-center mb-4">Select a game or demo from the menu or click below:</p>
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="list-group">
+                            <a href="/educational_games/glowing_circle" class="list-group-item list-group-item-action">
+                                <h5 class="mb-1">Glowing Circle Demo</h5>
+                                <p class="mb-1">Watch a glowing circle animation.</p>
+                            </a>
+                            <a href="/educational_games/click_game" class="list-group-item list-group-item-action">
+                                <h5 class="mb-1">Click Game</h5>
+                                <p class="mb-1">Test your clicking speed in 10 seconds!</p>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+    <!-- Glowing Circle Demo menu will be added by glowing_circle_client_action.xml -->
+</odoo>

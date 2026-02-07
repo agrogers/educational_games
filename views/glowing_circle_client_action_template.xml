@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="EducationalGamesGlowingCircle" name="Glowing Circle Client Action">
+        <div class="eg-glowing-circle"></div>
+    </template>
+</odoo>
