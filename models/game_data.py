@@ -23,18 +23,24 @@ class GameData(models.Model):
     @api.model
     def get_lonely_s_sentences(self, num_sentences=10, difficulty_level=None):
         domain = [('game_name', '=', 'Lonely S'), ('data_category', '=', 'sentence')]
-        records = self.search(domain, order='usage asc')
-        if not records:
+        all_ids = self.search(domain).ids
+        if not all_ids:
             # If no records, generate some first
-            self.generate_sentences_ai(10)
-            records = self.search(domain, order='usage asc')
+            self.generate_sentences_ai(40)
+            all_ids = self.search(domain).ids
         
         if difficulty_level is not None:
-            # Get records with difficulty close to requested (within 2)
-            filtered_records = records.filtered(lambda r: abs(r.difficulty - difficulty_level) <= 2)
-            selected_records = filtered_records[:num_sentences] if len(filtered_records) >= num_sentences else filtered_records
+            # Filter IDs by difficulty
+            all_records = self.browse(all_ids)
+            candidate_ids = [r.id for r in all_records if abs(r.difficulty - difficulty_level) <= 2]
         else:
-            selected_records = records[:num_sentences] if len(records) >= num_sentences else records
+            candidate_ids = all_ids
+        
+        # Shuffle the candidate IDs
+        random.shuffle(candidate_ids)
+        # Get the first num_sentences
+        selected_ids = candidate_ids[:num_sentences]
+        selected_records = self.browse(selected_ids)
         
         sentences = []
         for record in selected_records:
@@ -50,12 +56,15 @@ class GameData(models.Model):
         return sentences   
                 
     @api.model
-    def generate_sentences_ai(self, num_sentences=2):
+    def generate_sentences_ai(self, num_sentences=2, sentence_count_limit=1000):
         """
         Generates grammar sentences using a fast model (8B) and 
         verifies them using a smart model (70B) for 100% accuracy.
-        """
-        # 1. Fetch Configuration
+        """        # Check if we have reached the sentence limit
+        domain = [('game_name', '=', 'Lonely S'), ('data_category', '=', 'sentence')]
+        if self.search_count(domain) >= sentence_count_limit:
+            return []  # Do not generate more
+                # 1. Fetch Configuration
         icp_sudo = self.env['ir.config_parameter'].sudo()
         api_key = icp_sudo.get_param('groq.api_key')
         if not api_key:
@@ -67,29 +76,67 @@ class GameData(models.Model):
             "Content-Type": "application/json"
         }
 
-        # --- STEP A: GENERATE (The Teacher) ---
-        gen_prompt = (
-            f"You are an English teacher. Generate {num_sentences * 2} sentences "
-            "where 3rd person singular 's' is missing or has been added incorrectly. "
-            "Vary complexity from very short sentences to long sentences. "
-            "Include sentences with multiple missing 's' verbs. "
-            "Include some correct sentences where there are no mistakes. "
-            "Return ONLY JSON array with keys: id, text, correctWords. "
-            "Example: [{'id': 1, 'text': 'He run fast.', 'correctWords': 'runs'}]"
-            "Example: [{'id': 2, 'text': 'What did she runs fast?', 'correctWords': 'run'}]"
-            "Example: [{'id': 3, 'text': 'It runs fast.', 'correctWords': ''}]"
-        )
+
+        # --- STEP 1: Generate Correct "Seed" Sentences ---
+        if num_sentences < 3:
+            category = random.choice(["4-8 words", "9-15 words", "16-25 words"])
+            sentence_lengths = f"Generate {num_sentences} sentences with {category}."
+        else:
+            base = num_sentences // 3
+            extra = num_sentences % 3
+            counts = [base] * 3
+            for i in range(extra):
+                counts[i] += 1
+            sentence_lengths = f"Generate {counts[0]} sentences with 4-8 words, {counts[1]} sentences with 9-15 words, {counts[2]} sentences with 16-25 words."
         
-        gen_data = {
+        seed_prompt = (
+            f"Generate {num_sentences} diverse English sentences in third-person singular. "
+            f"{sentence_lengths} "
+            "Include a mix of simple, compound, and complex sentences. "
+            "Use mostly singular subjects but occasionally include  plural subjects."
+            "Include different sentence types like statements and questions. "
+            "Every sentence MUST end with exactly one appropriate terminal mark (period, question mark, or exclamation point)."
+            "Example: 'He runs fast.'; 'Why does she run fast?'; 'She walks to the library every single afternoon because she wants to study for her final history exam."
+            "Return a JSON object with EXACTLY one key called 'sentences' which contains the list of sentences. "
+            "Structure: {'sentences': [{'id': 1, 'text': '...'} etc]}"
+        )
+        seed_res = requests.post(url, headers=headers, json={
+            "model": "llama-3.1-8b-instant",
+            "messages": [{"role": "user", "content": seed_prompt}],
+            "response_format": {"type": "json_object"}
+        }).json()
+        seeds = json.loads(seed_res['choices'][0]['message']['content']).get('sentences', [])
+
+        # --- STEP 2: The Saboteur Pass ---
+        saboteur_prompt = """
+            Act as a 'Grammar Saboteur'. Review these sentences and create 'Broken' versions.
+            Rules: 
+            - Subject Singular? Remove the 's' (He eats -> He eat).
+            - Subject Plural? Add an 's' (They eat -> They eats).
+            - Switch do/does
+            - Remove 's' from the main verb but do NOT do it if the resulting word is misspelled (She eats fish -> She eat fish).
+            - Add 's' to the main verb but do NOT do it if the resulting word is misspelled (They eat fish -> They eats fish).
+            - Any words that end in 's' or could end in 's' should be sabotaged.
+            - Do NOT sabotage in a way that creates spelling mistakes. 
+            - Sabotage to create grammatical errors ONLY.
+            - 'correctWords' must be the word(s) that fixes the error.
+            - Sabotage one word only.
+            - Return ONLY JSON array with keys: id, text, correctWords. 
+            - Structure: {'sentences': [{'id': 1, 'text': '...'} etc]}
+                Example: [{'id': 1, 'text': 'He run fast.', 'correctWords': 'runs'}]
+                Example: [{'id': 2, 'text': 'Why do she run fast and they walks slow?', 'correctWords': 'does, walk'}]
+                Example: [{'id': 3, 'text': 'It runs fast.', 'correctWords': ''}]
+            Process these sentences: """ + f"{json.dumps(seeds)}"
+        
+        saboteur_res = {
             "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "user", "content": gen_prompt}],
-            "temperature": 0.7,
+            "messages": [{"role": "user", "content": saboteur_prompt}],
             "response_format": {"type": "json_object"}
         }
-
+        
         try:
             # First API Call
-            response = requests.post(url, headers=headers, json=gen_data, timeout=10)
+            response = requests.post(url, headers=headers, json=saboteur_res, timeout=10)
             response.raise_for_status()
             raw_content = response.json()['choices'][0]['message']['content']
             
@@ -103,46 +150,20 @@ class GameData(models.Model):
                 text = sentence.get('text', '')
                 correct_words = sentence.get('correctWords', '')
 
-                # --- STEP B: VERIFY (The Binary Judge) ---
-                # We ask for a single token: '1' for pass, '0' for fail.
-                check_prompt = f"""Task: Grammar Validation
-                    Rule: Respond '1' only if '{correct_words}' provides the correct changes for the sentence: '{text}'.
-                    Examples:
-                    'He go.' | 'goes' | Result: 1
-                    'They plays.' | 'play' | Result: 1
-                    'He runs.' | '' | Result: 1
-                    'She runs.' | 'run' | Result: 0
-                    Now evaluate:
-                    Sentence: '{text}' | Verb: '{correct_words}' | Result:"""
-
-                judge_data = {
-                    "model": "openai/gpt-oss-20b",
-                    "messages": [{"role": "user", "content": check_prompt}],
-                    "temperature": 0.1,
-                    # "max_tokens": 1  # Efficiency: only 1 token output
-                }
-
-                # Second API Call (Verification)
-                check_res = requests.post(url, headers=headers, json=judge_data, timeout=5)
-                verdict = check_res.json()['choices'][0]['message']['content'].strip()
-
-                if verdict != "1":
-                    continue # Skip flawed sentences
-
-                # --- STEP C: CALCULATE DIFFICULTY & SAVE ---
                 word_count = len(text.split())
                 correction_count = len(correct_words.split(','))
-                # Formula: (Words * Corrections * 2) / 10, capped at 10
-                difficulty = min(10, (word_count * correction_count * 2) // 10)
+                if word_count < 30 and correction_count==1:  # sometimes the model generates very long sentences; ignore those
+                    # Formula: (Words * Corrections * 2) / 10, capped at 10
+                    difficulty = min(10, (word_count * 2) // 5)
 
-                record = self.create({
-                    'game_name': 'Lonely S',
-                    'data_category': 'sentence',
-                    'json_data': sentence,
-                    'difficulty': difficulty,
-                    'usage': 0
-                })
-                created_records.append(record.id)
+                    record = self.create({
+                        'game_name': 'Lonely S',
+                        'data_category': 'sentence',
+                        'json_data': sentence,
+                        'difficulty': difficulty,
+                        'usage': 0
+                    })
+                    created_records.append(record.id)
                 
                 # Stop if we have reached the requested count
                 if len(created_records) >= num_sentences:
@@ -152,8 +173,6 @@ class GameData(models.Model):
 
         except Exception as e:
             raise UserError(f"AI Service Error: {str(e)}")
-
-
         except requests.exceptions.Timeout:
             raise UserError("The AI request timed out. Please try again later.")
         except requests.exceptions.RequestException as e:

@@ -5,10 +5,9 @@
             <div class="card shadow-sm mx-auto" style="max-width: 800px;">
                 <div class="card-header bg-primary text-white">
                     <h3 class="mb-0">The "Lonely S" Challenge</h3>
-                    <p class="mb-0">Fix the missing 's' in each sentence!</p>
                 </div>
                 <div class="card-body">
-                    <div t-foreach="state.sentences" t-as="item" t-key="item.uniqueId" class="mb-4 p-3 border-bottom">
+                    <div t-foreach="state.sentences" t-as="item" t-key="item.uniqueId" class="p-3 border-bottom">
                         <p class="fs-5">
                             <span t-attf-class="{{state.checked and !item.isCorrect and 'text-danger fw-bold' or ''}}">
                                 <t t-esc="item.text"/>
@@ -34,8 +33,11 @@
 
                     <div class="text-center mt-4">
                         <h4 t-if="state.checked" class="mb-3">
-                            Final Score: <t t-esc="state.score"/>%
+                            Final Score: <strong><t t-esc="state.score"/></strong> out of <t t-esc="state.sentences.length"/>
                         </h4>
+                        <h5 t-if="state.checked and state.submission_submitted" class="mb-3">
+                            These results have been saved and the APEX task submitted.
+                        </h5>
                         <button t-if="!state.checked" class="btn btn-lg btn-success" t-on-click="checkAnswers">
                             Check Answers
                         </button>
