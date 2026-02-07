@@ -13,6 +13,7 @@ class GameData(models.Model):
     json_data = fields.Json(string='JSON Data')
     difficulty = fields.Integer(string='Difficulty', default=0)
     usage = fields.Integer(string='Usage', default=0)
+    problem_flag = fields.Boolean(string='Problem Flag', default=False)
 
     @api.constrains('difficulty')
     def _check_difficulty(self):
@@ -46,7 +47,8 @@ class GameData(models.Model):
         for record in selected_records:
             data = record.json_data.copy()
             data['correctWords'] = data.get('correctWords') or data.get('correctWords', '')            
-            data['difficulty'] = record.difficulty            
+            data['difficulty'] = record.difficulty
+            data['record_id'] = record.id            
             sentences.append(data)            # Increment usage
             record.usage += 1        
         # After getting sentences, generate more if needed
@@ -56,7 +58,7 @@ class GameData(models.Model):
         return sentences   
                 
     @api.model
-    def generate_sentences_ai(self, num_sentences=2, sentence_count_limit=1000):
+    def generate_sentences_ai(self, num_sentences=2, sentence_count_limit=10):
         """
         Generates grammar sentences using a fast model (8B) and 
         verifies them using a smart model (70B) for 100% accuracy.

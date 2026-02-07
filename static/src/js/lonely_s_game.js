@@ -40,6 +40,7 @@ export class LonelySGame extends Component {
         this.state.submission_submitted = false;
         try {
             const result = await this.orm.call("game.data", "get_lonely_s_sentences", [this.numSentences, null]);
+            console.log('Backend result:', result);
             this.state.sentences = result.map((s, index) => ({
                 ...s,
                 uniqueId: index,
@@ -52,7 +53,8 @@ export class LonelySGame extends Component {
         } finally {
             this.state.loading = false;
         }
-        this.orm.call("game.data", "generate_sentences_ai", [5]);
+        // Creates five new sentences in the background. This keeps happening until we have a 1000 sentences.
+        this.orm.call("game.data", "generate_sentences_ai", [5]);  
     }
 
     async checkAnswers() {
@@ -141,8 +143,20 @@ export class LonelySGame extends Component {
         }
     }
 
-    resetGame() {
-        this.generateNewGame();
+    async flagProblem(uniqueId) {
+        const sentence = this.state.sentences.find(s => s.uniqueId === uniqueId);
+        console.log('Found sentence:', sentence);
+        if (sentence && sentence.record_id) {
+            try {
+                await this.orm.write("game.data", [sentence.record_id], { problem_flag: true });
+                this.notification.add("Question flagged as problematic.", { type: "info" });
+            } catch (error) {
+                console.error("Error flagging question:", error);
+                this.notification.add("Error flagging question.", { type: "danger" });
+            }
+        } else {
+            console.log('Sentence not found or no record_id');
+        }
     }
 }
 

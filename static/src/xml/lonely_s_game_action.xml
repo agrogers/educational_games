@@ -19,6 +19,13 @@
                                    placeholder="Type the corrected word..."
                                    t-model="item.userAnswer"
                                    t-att-disabled="state.checked"/>
+                            <button t-if="state.checked" 
+                                    t-on-click="() => this.flagProblem(item.uniqueId)" 
+                                    class="btn btn-sm ms-2" 
+                                    title="Flag this question as problematic">
+                                ⚠
+                            </button>
+                            
                             
                             <span t-if="state.checked" class="ms-3">
                                 <t t-if="item.isCorrect">
