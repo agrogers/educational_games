@@ -1,26 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="educational_games_menu" name="Educational Games" sequence="10"/>
+    <menuitem id="educational_games_menu" name="cEducational Games" sequence="10"/>
 
-    <record id="educational_games_dashboard_action" model="ir.actions.act_url">
+    <record id="educational_games_dashboard_action" model="ir.actions.act_url" forcecreate="1">
         <field name="name">Games Dashboard</field>
         <field name="url">/educational_games/dashboard</field>
         <field name="target">self</field>
     </record>
 
-    <menuitem id="menu_dashboard" 
-              name="Dashboard (External)" 
-              parent="educational_games_menu" 
-              action="educational_games_dashboard_action" 
-              sequence="10"/>
-
-    <record id="action_student_game" model="ir.actions.client">
+    <record id="action_student_game" model="ir.actions.client" forcecreate="1">
         <field name="name">Classroom Challenge</field>
         <field name="tag">action_student_game_js</field>
     </record>
 
     <!-- <menuitem id="menu_game_root" name="LMS Games" sequence="10"/> -->
-    <menuitem id="menu_game_play" name="Start Game" 
+    <record id="action_lonely_s_game" model="ir.actions.client" forcecreate="1">
+        <field name="name">Lonely S</field>
+        <field name="tag">action_lonely_s_game_js</field>
+    </record>
+
+    <menuitem id="menu_dashboard" 
+              name="Test Game" 
               parent="educational_games_menu" 
-              action="action_student_game"/>              
+              action="action_student_game" 
+              sequence="10"/>
+
+    <menuitem id="menu_lonely_s" 
+              name="Lonely S" 
+              parent="educational_games_menu" 
+              action="action_lonely_s_game" 
+              sequence="20"/>
 </odoo>

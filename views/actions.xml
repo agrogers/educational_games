@@ -4,5 +4,9 @@
         <field name="tag">action_student_game_js</field>
     </record>
 
+    <record id="action_lonely_s_game" model="ir.actions.client">
+        <field name="name">Lonely S Game</field>
+        <field name="tag">action_lonely_s_game_js</field>
+    </record>
 
 </odoo>
