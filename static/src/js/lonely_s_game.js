@@ -158,6 +158,9 @@ export class LonelySGame extends Component {
             console.log('Sentence not found or no record_id');
         }
     }
+    resetGame() {
+        this.generateNewGame();
+    }
 }
 
 registry.category("actions").add("action_lonely_s_game_js", LonelySGame);

@@ -18,16 +18,4 @@
         <field name="name">Lonely S</field>
         <field name="tag">action_lonely_s_game_js</field>
     </record>
-
-    <menuitem id="menu_dashboard" 
-              name="Test Game" 
-              parent="educational_games_menu" 
-              action="action_student_game" 
-              sequence="10"/>
-
-    <menuitem id="menu_lonely_s" 
-              name="Lonely S" 
-              parent="educational_games_menu" 
-              action="action_lonely_s_game" 
-              sequence="20"/>
 </odoo>

@@ -58,7 +58,7 @@ class GameData(models.Model):
         return sentences   
                 
     @api.model
-    def generate_sentences_ai(self, num_sentences=2, sentence_count_limit=10):
+    def generate_sentences_ai(self, num_sentences=2, sentence_count_limit=1000):
         """
         Generates grammar sentences using a fast model (8B) and 
         verifies them using a smart model (70B) for 100% accuracy.
