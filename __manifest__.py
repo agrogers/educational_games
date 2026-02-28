@@ -1,6 +1,6 @@
 {
     'name': 'Educational Games',
-    'version': '18.0.1.0.2',
+    'version': '18.0.1.0.3',
     'category': 'Education',
     'summary': 'Educational games for learning English grammar',
     'description': 'A collection of educational games to help students learn English grammar concepts.',
@@ -18,9 +18,11 @@
             'educational_games/static/src/css/educational_games.css',
         ],
         'web.assets_backend': [
+            'educational_games/static/src/js/binary_conversions.js',
             'educational_games/static/src/js/lonely_s_game.js',
             'educational_games/static/src/js/game_action.js',
             'educational_games/static/src/xml/game_action.xml',
+            'educational_games/static/src/xml/binary_conversions_action.xml',
             'educational_games/static/src/xml/lonely_s_game_action.xml',
         ],
     },

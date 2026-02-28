@@ -9,4 +9,9 @@
         <field name="tag">action_lonely_s_game_js</field>
     </record>
 
+    <record id="action_binary_conversions" model="ir.actions.client">
+        <field name="name">Binary Conversions</field>
+        <field name="tag">action_binary_conversions_js</field>
+    </record>
+
 </odoo>
