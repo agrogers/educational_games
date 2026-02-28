@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="html_game_wrapper.GameTemplate" owl="1">
+        <div class="o_action_manager o_content h-100" style="overflow: hidden;">
+            <iframe t-att-src="this.iframeUrl" 
+                    style="width: 100%; height: 100%; border: none; display: block;" 
+                    frameborder="0">
+            </iframe>
+        </div>
+    </t>
+</templates>

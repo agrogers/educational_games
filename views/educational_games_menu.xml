@@ -24,9 +24,7 @@
 
     <menuitem id="menu_binary_conversions" name="Binary Conversions" parent="educational_games_menu" action="action_binary_conversions" sequence="20" groups="aps_sis.group_aps_teacher"/>
 
-    <menuitem id="menu_binary_adder" name="Binary Adder" parent="educational_games_menu" action="action_binary_adder" sequence="30" groups="aps_sis.group_aps_teacher"/>
-
-    <menuitem id="menu_binary_adder_original" name="Binary Adder (Original)" parent="educational_games_menu" action="action_binary_adder_original" sequence="40" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_binary_adder_original" name="Binary Adder" parent="educational_games_menu" action="action_binary_adder_original" sequence="40" groups="aps_sis.group_aps_teacher"/>
 
     <menuitem id="menu_student_game" name="Classroom Challenge" parent="educational_games_menu" action="action_student_game" sequence="50" groups="aps_sis.group_aps_teacher"/>
 </odoo>

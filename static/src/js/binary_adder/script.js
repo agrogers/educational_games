@@ -320,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hours = Math.round((timerSeconds / 3600) * 10) / 10;
 
     try {
-      debugger;
+      // debugger;
       const values = {
         score: score,
         out_of_marks: getQuestionCount() ,

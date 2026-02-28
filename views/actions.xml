@@ -14,17 +14,34 @@
         <field name="tag">action_binary_conversions_js</field>
     </record>
 
-    <record id="action_binary_adder" model="ir.actions.client">
+    <!-- <record id="action_binary_adder" model="ir.actions.client">
         <field name="name">Binary Adder</field>
         <field name="tag">action_binaryadder2_js</field>
-    </record>
+    </record> -->
 
     <!-- Delete old act_url record if it exists -->
     <delete id="action_binary_adder_original" model="ir.actions.act_url"/>
 
+    <!--
+        Generic HTML/JS Game Wrapper - Use this for future HTML/JS mini quizzes
+        
+        Example: Creating a new HTML/JS game action
+        <record id="action_my_new_game" model="ir.actions.client">
+            <field name="name">My New Game</field>
+            <field name="tag">action_html_game_wrapper_js</field>
+            <field name="context">{
+                'game_path': '/educational_games/static/src/js/my_game/index.html',
+                'level': 1,
+                'format': 'default'
+            }</field>
+        </record>
+    -->
     <record id="action_binary_adder_original" model="ir.actions.client">
-        <field name="name">Binary Adder (Original)</field>
-        <field name="tag">action_binary_adder_wrapper_js</field>
+        <field name="name">Binary Adder</field>
+        <field name="tag">action_html_game_wrapper_js</field>
+        <field name="context">{
+            'game_path': '/educational_games/static/src/js/binary_adder/index.html'
+        }</field>
     </record>
 
 </odoo>

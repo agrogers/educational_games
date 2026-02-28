@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 
+         I DONT THINK I NEED THIS ANYMORE - MAYBE DELETE?
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+         
+        Generic template for HTML/JS quiz pages loaded in iframes
+        Usage: Create a route or template that calls this and passes:
+          - quiz_title: The title to display
+          - game_path: The path to the quiz HTML file
+        Example:
+          <t t-call="educational_games.js_quiz_iframe_template">
+              <t t-set="quiz_title">My Quiz Title</t>
+              <t t-set="game_path">/path/to/quiz.html</t>
+          </t>
+    -->
+    <template id="js_quiz_iframe_template" name="JS Quiz iframe Template">
+        <t t-call="web.layout">
+            <t t-set="title"><t t-out="quiz_title"/></t>
+            <div style="width: 100%; height: 100vh; border: none; margin: 0; padding: 0; overflow: hidden;">
+                <iframe t-att-src="game_path" 
+                        style="width: 100%; height: 100%; border: none; margin: 0; padding: 0;" 
+                        seamless="seamless">
+                </iframe>
+            </div>
+        </t>
+    </template>
+
+    <!-- Binary Adder specific template (calls generic template with parameters) -->
+    <template id="binary_adder_template" name="Binary Adder Quiz">
+        <t t-call="educational_games.js_quiz_iframe_template">
+            <t t-set="quiz_title">Binary Adder Quiz</t>
+            <t t-set="game_path">/educational_games/static/src/js/binary_adder/index.html</t>
+        </t>
+    </template>
+</odoo>
