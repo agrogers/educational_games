@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const submissionId = odooContext.active_id || (Number.isFinite(fallbackActiveId) ? fallbackActiveId : null);
   const submissionModel = odooContext.active_model || fallbackActiveModel;
-  const submissionState = odooContext.submission_state || fallbackSubmissionState;
+  let submissionState = odooContext.submission_state || fallbackSubmissionState;
   const isOdooContext = !!(submissionId && submissionModel === 'aps.resource.submission');
 
   function getQuestionCount() {
@@ -168,7 +168,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateFormatBadge() {
-    // Format badge removed from header layout
+    const badge = document.getElementById('formatBadge');
+    const fmt = formatSelect.value;
+    if (fmt === 'binary') {
+      badge.textContent = 'B';
+      badge.className = 'badge bg-info text-dark';
+    } else if (fmt === 'hexadecimal') {
+      badge.textContent = 'H';
+      badge.className = 'badge bg-success text-dark';
+    }
+  }
+
+  function makeAnswersReadonly() {
+    const inputs = questionsContainer.querySelectorAll('.answer-input');
+    inputs.forEach(input => input.readOnly = true);
+    checkAllBtn.textContent = 'Practice Again';
+  }
+
+  function makeAnswersEditable() {
+    const inputs = questionsContainer.querySelectorAll('.answer-input');
+    inputs.forEach(input => input.readOnly = false);
+    checkAllBtn.textContent = 'Check All';
   }
 
   function renderQuestions() {
@@ -313,13 +333,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (submissionState !== 'assigned') {
       console.warn('This task has already been submitted so these results can not be saved.');
-      return;
+      return 'already-submitted';
     }
 
     const htmlReport = buildResultsHtml();
     const hours = Math.round((timerSeconds / 3600) * 10) / 10;
 
     try {
+      // Validate submission can still be written before attempting to save
+      if (submissionState !== 'assigned') {
+        console.warn('Cannot save: This task has already been submitted.');
+        return false;
+      }
+
+      if (!submissionId) {
+        console.error('Cannot save: No submission ID found.');
+        return false;
+      }
+
       // debugger;
       const values = {
         score: score,
@@ -369,6 +400,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       console.log('Official submission saved!');
+      // Update local state to prevent re-submission
+      submissionState = 'submitted';
       return true;
     } catch (error) {
       console.error('Error saving submission:', error);
@@ -385,6 +418,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   checkAllBtn.addEventListener('click', async () => {
+    // If button says "Practice Again", generate a new round instead of checking answers
+    if (checkAllBtn.textContent === 'Practice Again') {
+      questions = generateRound();
+      updateFormatBadge();
+      renderQuestions();
+      makeAnswersEditable();
+      return;
+    }
+    
     for (let i = 0; i < getQuestionCount(); i++) {
       const item = questionsContainer.children[i];
       if (!item) continue;
@@ -401,22 +443,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isOdooContext) {
       const success = await submitToOdoo();
       
-      if (success) {
-          // Usage examples
+      if (success === 'already-submitted') {
+        // Already submitted - show info that this is practice/review
+        showOdooLikeToast('info', 'Review Mode', `<strong>Review Mode:</strong> This submission has already been saved. You are reviewing your results. Score: ${score} / ${getQuestionCount()}`);
+      } else if (success) {
         showOdooLikeToast('success', 'Saved!', `<strong>Success!</strong> Your results have been saved to APEX. Score: ${score} / ${getQuestionCount()}`);
       } else {
         showOdooLikeToast('danger', 'Error', `<strong>Error:</strong> Failed to save results. Score: ${score} / ${getQuestionCount()}`);
       }
     } else {
       // Practice mode - show blue info message
-        showOdooLikeToast('info', 'Practice Mode', `<strong>Practice Mode:</strong> Your score: ${score} / ${getQuestionCount()}`);
+      showOdooLikeToast('info', 'Practice Mode', `<strong>Practice Mode:</strong> Your score: ${score} / ${getQuestionCount()}`);
     }
+    
+    // Make answers readonly and change button to "Practice Again"
+    makeAnswersReadonly();
   });
 
   startBtn.addEventListener('click', () => {
     questions = generateRound();
     updateFormatBadge();
     renderQuestions();
+    
+    // Reset answers to editable and button back to "Check All"
+    makeAnswersEditable();
 
     // Display URL params at bottom of page
     const params = new URLSearchParams({

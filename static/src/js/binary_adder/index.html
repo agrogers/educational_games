@@ -38,10 +38,13 @@
         <form id="controlsForm" class="row g-3">
           <div class="col-6 col-md-auto form-col">
             <label class="form-label">Format</label>
-            <select id="formatSelect" class="form-select">
-              <option value="binary">Binary (base 2)</option>
-              <option value="hexadecimal">Hexadecimal (base 16)</option>
-            </select>
+            <div class="d-flex align-items-center gap-2">
+              <select id="formatSelect" class="form-select">
+                <option value="binary">Binary (base 2)</option>
+                <option value="hexadecimal">Hexadecimal (base 16)</option>
+              </select>
+              <span id="formatBadge" class="badge bg-info text-dark">B</span>
+            </div>
           </div>
           <div class="col-6 col-md-auto form-col">
             <label class="form-label">Numbers to add</label>
