@@ -4,7 +4,7 @@
         <t t-call="web.layout">
             <t t-set="title">Binary Adder Quiz</t>
             <div style="width: 100%; height: 100vh; border: none; margin: 0; padding: 0; overflow: hidden;">
-                <iframe src="/web/content/educational_games/static/src/js/binary_adder/index.html" 
+                <iframe src="/educational_games/static/src/js/binary_adder/index.html" 
                         style="width: 100%; height: 100%; border: none; margin: 0; padding: 0;" 
                         seamless="seamless">
                 </iframe>

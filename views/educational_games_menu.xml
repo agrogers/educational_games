@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Root menu for Educational Games - visible only to APEX Teachers -->
-    <menuitem id="educational_games_menu" name="Educational Games" sequence="10" groups="aps_sis.group_aps_teacher"/>
+    <!-- Educational Games menu under APEX root - visible only to APEX Teachers -->
+    <menuitem id="educational_games_menu" name="Educational Games" parent="aps_sis.menu_apex_root" sequence="20" groups="aps_sis.group_aps_teacher"/>
 
     <record id="educational_games_dashboard_action" model="ir.actions.act_url" forcecreate="1">
         <field name="name">Games Dashboard</field>

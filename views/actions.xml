@@ -19,10 +19,12 @@
         <field name="tag">action_binaryadder2_js</field>
     </record>
 
-    <record id="action_binary_adder_original" model="ir.actions.act_url">
+    <!-- Delete old act_url record if it exists -->
+    <delete id="action_binary_adder_original" model="ir.actions.act_url"/>
+
+    <record id="action_binary_adder_original" model="ir.actions.client">
         <field name="name">Binary Adder (Original)</field>
-        <field name="url">/educational_games/binary_adder</field>
-        <field name="target">self</field>
+        <field name="tag">action_binary_adder_wrapper_js</field>
     </record>
 
 </odoo>
