@@ -1,13 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="binary_conversions.GameTemplate" owl="1">
-        <div class="o_action_manager o_content p-5 bg-light h-100 overflow-auto">
-            <div class="card shadow-sm mx-auto" style="max-width: 900px;">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h3 class="mb-0">Binary Conversions</h3>
-                    <span class="badge bg-light text-dark">Timer: <t t-esc="this.formatTime(state.timer_seconds)"/></span>
+        <div id="binary_conversions_container" class="o_action_manager o_content h-100 overflow-auto">
+            <!-- Banner Header with Background Image -->
+            <div id="binary_conversions_banner" class="d-flex align-items-center justify-content-center" 
+                style="position: relative; width: 100%; min-height:80px; max-height: 140px; overflow: hidden; background-image: url('/educational_games/static/src/js/binary_conversions/binary_conversions.jpg'); background-size: cover; background-position: center;">
+                <div id="binary_conversions_banner_text" class="text-center" style="position: relative; color: white; z-index: 1;">
+                    <h1 class="mb-3" style="color: white;">Binary Conversions</h1>
                 </div>
-                <div class="card-body">
+                <div id="binary_conversions_banner_timer" style="position: absolute; top: 10px; right: 20px; text-align: right; color: white; font-size: 14px;">
+                    <div style="background-color: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px;">
+                        <div style="color: white; font-weight: bold;">Timer: <t t-esc="this.formatTime(state.timer_seconds)"/></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <div id="binary_conversions_content" class="p-3 bg-light" style="min-height: calc(100vh - 140px);">
+                <div id="binary_conversions_card" class="card shadow-sm mx-auto" style="max-width: 900px;">
+                    <div class="card-body">
                     <div t-if="!state.started" class="mb-4">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -73,6 +84,7 @@
                                 Try Again
                             </button>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>

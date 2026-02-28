@@ -1,40 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="binaryadder2.GameTemplate" owl="1">
-        <div class="o_action_manager o_content p-5 bg-light h-100 overflow-auto">
-            <div class="card shadow-sm mx-auto" style="max-width: 900px;">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h3 class="mb-0">Binary Addition Quiz</h3>
-                    <span class="badge bg-light text-dark">Timer: <t t-esc="this.formatTime(state.timer_seconds)"/></span>
+        <div class="o_action_manager o_content h-100 overflow-auto">
+            <!-- Banner Header with Background Image -->
+            <div class="d-flex align-items-center justify-content-center" style="position: relative; width: 100%; min-height:80px; max-height: 140px; overflow: hidden; background-image: url('/educational_games/static/src/js/binary_adder/binary.jpg'); background-size: cover; background-position: center;">
+                <div class="text-center" style="position: relative; color: white; z-index: 1;">
+                    <h1 class="mb-3" style="color: white;">Binary Addition Quiz</h1>
                 </div>
-                <div class="card-body">
-                    <div t-if="!state.started" class="mb-4">
+                <div style="position: absolute; top: 10px; left: 20px; text-align: left; color: white; font-size: 14px;">
+                    <div style="background-color: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 20px; display: inline-block;">
+                        <t t-if="state.format === 'binary'">
+                            <span style="color: white; font-weight: bold;">📊 Binary (Base 2)</span>
+                        </t>
+                        <t t-elif="state.format === 'hexadecimal'">
+                            <span style="color: white; font-weight: bold;">🔷 Hexadecimal (Base 16)</span>
+                        </t>
+                    </div>
+                </div>
+                <div style="position: absolute; top: 10px; right: 20px; text-align: right; color: white; font-size: 14px;">
+                    <div t-if="state.started" style="background-color: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px;">
+                        <div style="color: white; font-weight: bold;">Score: <t t-esc="state.score"/> / <t t-esc="state.questions.length"/></div>
+                        <div style="color: white; font-weight: bold; margin-top: 5px;">Timer: <t t-esc="this.formatTime(state.timer_seconds)"/></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <div class="container py-3" style="min-height: calc(100vh - 140px);">
+                <!-- Controls Card -->
+                <div t-if="!state.started" class="card mb-4">
+                    <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label">Format</label>
+                            <div class="col-6 col-md-auto" style="display: flex; flex-direction: column;">
+                                <label class="form-label" style="flex-grow: 1; display: flex; align-items: flex-start;">Format</label>
                                 <select class="form-select" t-model="state.format">
                                     <option value="binary">Binary (base 2)</option>
                                     <option value="hexadecimal">Hexadecimal (base 16)</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Numbers to add</label>
+                            <div class="col-6 col-md-auto" style="display: flex; flex-direction: column;">
+                                <label class="form-label" style="flex-grow: 1; display: flex; align-items: flex-start;">Numbers to add</label>
                                 <select class="form-select" t-model="state.num_count">
                                     <option value="2">2</option>
                                     <option value="3">3</option>
                                     <option value="4">4</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Level</label>
+                            <div class="col-6 col-md-auto" style="display: flex; flex-direction: column;">
+                                <label class="form-label" style="flex-grow: 1; display: flex; align-items: flex-start;">Level</label>
                                 <select class="form-select" t-model="state.level">
                                     <option value="easy">Easy (4 bits)</option>
                                     <option value="medium">Medium (8 bits)</option>
                                     <option value="hard">Hard (12 bits)</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Number of questions</label>
+                            <div class="col-6 col-md-auto" style="display: flex; flex-direction: column;">
+                                <label class="form-label" style="flex-grow: 1; display: flex; align-items: flex-start;">Number of questions</label>
                                 <select class="form-select" t-model="state.num_questions">
                                     <option value="1">1</option>
                                     <option value="5">5</option>
@@ -43,33 +64,46 @@
                                     <option value="20">20</option>
                                 </select>
                             </div>
-                        </div>
-                        <div class="mt-3">
-                            <button class="btn btn-success" t-on-click="startQuiz">Start Quiz</button>
+                            <div class="col-auto" style="display: flex; flex-direction: column;">
+                                <label class="form-label" style="visibility: hidden;">.</label>
+                                <button class="btn btn-success" t-on-click="startQuiz">Start</button>
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <div t-if="state.started">
-                        <div t-foreach="state.questions" t-as="item" t-key="item.uniqueId" class="p-3 border-bottom">
-                            <p class="fs-5">
-                                <span t-attf-class="{{state.checked and !item.isCorrect and 'text-danger fw-bold' or ''}}">
-                                    <t t-esc="item.prompt"/>
-                                </span>
-                            </p>
-                            <div class="d-flex align-items-center">
-                                <input type="text"
-                                       class="form-control w-50"
-                                       placeholder="Type your answer..."
-                                       t-model="item.userAnswer"
-                                       t-att-disabled="state.checked"/>
-                                <span t-if="state.checked" class="ms-3">
-                                    <t t-if="item.isCorrect">
-                                        <span class="text-success fs-4">✅</span>
-                                    </t>
-                                    <t t-else="">
-                                        <span class="text-danger">❌ Correct: <strong t-esc="item.correctAnswer"/></span>
-                                    </t>
-                                </span>
+                <!-- Quiz Card -->
+                <div t-if="state.started" class="card">
+                    <div class="card-body">
+                        <div class="list-group mb-3">
+                            <div t-foreach="state.questions" t-as="item" t-key="item.uniqueId" class="list-group-item p-3">
+                                <div class="d-flex align-items-start">
+                                    <div class="me-3">
+                                        <span t-attf-class="badge {{state.format === 'binary' ? 'bg-info text-dark' : 'bg-success text-dark'}}">
+                                            <t t-esc="state.format === 'binary' and 'B' or 'H'"/>
+                                        </span>
+                                    </div>
+                                    <div class="flex-fill">
+                                        <div class="fw-bold question-text">
+                                            <t t-esc="item.prompt"/>
+                                        </div>
+                                        <div class="mt-2 d-flex align-items-center gap-2">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   t-attf-placeholder="{{state.format === 'binary' and 'Answer in Binary' or 'Answer in Hexadecimal'}}"
+                                                   t-model="item.userAnswer"
+                                                   t-att-disabled="state.checked"/>
+                                            <span t-if="state.checked">
+                                                <t t-if="item.isCorrect">
+                                                    <span class="text-success fs-4">✅</span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="text-danger">❌ Correct: <strong t-esc="item.correctAnswer"/></span>
+                                                </t>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

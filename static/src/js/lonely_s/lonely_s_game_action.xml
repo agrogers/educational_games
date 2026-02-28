@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="lonely_s_game.GameTemplate" owl="1">
+        <div id="lonely_s_container" class="o_action_manager o_content h-100 overflow-auto">
+            <!-- Banner Header with Image -->
+            <div id="lonely_s_banner" class="d-flex align-items-center justify-content-center" style="position: relative; width: 100%; min-height:80px; max-height: 140px; overflow: hidden; background-image: url('/educational_games/static/src/js/lonely_s/lonely_s.jpg'); background-size: cover; background-position: center;">
+                <div id="lonely_s_banner_text" class="text-center" style="position: relative; color: white; z-index: 1;">
+                    <h1 class="mb-3" style="color: white;">The "Lonely S" Challenge</h1>
+                </div>
+                <div id="lonely_s_banner_score" style="position: absolute; top: 10px; right: 20px; text-align: right; color: white; font-size: 14px;">
+                    <div t-if="state.checked" style="background-color: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px;">
+                        <div style="color: white; font-weight: bold;">Score: <t t-esc="state.score"/> / <t t-esc="state.sentences.length"/></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <div id="lonely_s_content" class="p-3 bg-light" style="min-height: calc(100vh - 140px);">
+                <div class="alert alert-info text-center mx-auto" style="max-width: 800px;">
+                    <p>The sentences below may contain <b>one</b> word that has a problem with the letter "s". <br/>
+                    Your task is to find the word (if there is one) and type the correct version of that word. <br/>
+                    If there are no mistakes, leave the answer empty. Click "Check Answers" to see your score and submit your results.</p>
+                </div>
+                <div id="lonely_s_card" class="card shadow-sm mx-auto" style="max-width: 800px;">
+                    <div id="lonely_s_card_body" class="card-body">
+                        <div id="lonely_s_sentences_container" t-foreach="state.sentences" t-as="item" t-key="item.uniqueId" class="p-3 border-bottom">
+                            <p class="fs-5">
+                                <span t-attf-class="{{state.checked and !item.isCorrect and 'text-danger fw-bold' or ''}}">
+                                    <t t-esc="item.text"/>
+                                </span>
+                            </p>
+                            <div class="d-flex align-items-center">
+                                <input type="text" 
+                                       class="form-control mx-auto" 
+                                       placeholder="Type the corrected word. Leave empty if the sentence is correct.."
+                                       t-model="item.userAnswer"
+                                       t-att-disabled="state.checked"/>
+                                <button t-if="state.checked" 
+                                        t-on-click="() => this.flagProblem(item.uniqueId)" 
+                                        class="btn btn-sm ms-2" 
+                                        title="Flag this question as problematic">
+                                    ⚠
+                                </button>
+                                
+                                
+                                <span t-if="state.checked" class="ms-3">
+                                    <t t-if="item.isCorrect">
+                                        <span class="text-success fs-4">✅</span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="text-danger">❌ Correct: <strong t-esc="item.correctWords"/></span>
+                                    </t>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div id="lonely_s_results" class="text-center mt-4">
+                            <h4 t-if="state.checked" class="mb-3">
+                                Final Score: <strong><t t-esc="state.score"/></strong> out of <t t-esc="state.sentences.length"/>
+                            </h4>
+                            <h5 t-if="state.checked and state.submission_submitted" class="mb-3">
+                                These results have been saved and the APEX task submitted.
+                            </h5>
+                            <button t-if="!state.checked" class="btn btn-lg btn-success" t-on-click="checkAnswers">
+                                Check Answers
+                            </button>
+                            <button t-if="state.checked" class="btn btn-lg btn-outline-primary" t-on-click="resetGame">
+                                Try Again
+                            </button>
+                        </div>
+                        <div id="lonely_s_difficulty_info" class="text-center mt-3">
+                            <p class="text-muted">Total Difficulty: <strong t-esc="state.totalDifficulty"/></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

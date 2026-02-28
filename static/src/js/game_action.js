@@ -5,6 +5,12 @@ import { useService } from "@web/core/utils/hooks";
 
 export class StudentGame extends Component {
     static template = "student_game.GameTemplate";
+    static props = {
+        action: Object,
+        actionId: { type: Number, optional: true },
+        updateActionState: { type: Function, optional: true },
+        className: { type: String, optional: true },
+    };
 
     setup() {
         this.orm = useService("orm");

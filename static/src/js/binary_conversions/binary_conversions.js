@@ -3,8 +3,8 @@ import { Component, useState, onWillUnmount } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
-export class BinaryAdderGame extends Component {
-    static template = "binaryadder2.GameTemplate";
+export class BinaryConversionsGame extends Component {
+    static template = "binary_conversions.GameTemplate";
     static props = {
         action: Object,
         actionId: { type: Number, optional: true },
@@ -14,7 +14,7 @@ export class BinaryAdderGame extends Component {
 
     setup() {
         const context = this.props.action.context || {};
-        debugger;
+
         this.orm = useService("orm");
         this.notification = useService("notification");
 
@@ -26,10 +26,9 @@ export class BinaryAdderGame extends Component {
             questions: [],
             submission_state: context.submission_state,
             submission_submitted: false,
-            format: context.format || "binary",
-            num_count: parseInt(context.num_count, 10) || 2,
-            level: context.level || "easy",
-            num_questions: parseInt(context.out_of_marks, 10) || 10,
+            conversion_type: "bin_to_dec",
+            number_size: context.number_size || 8,
+            num_questions: context.out_of_marks || 10,
             timer_seconds: 0,
         });
 
@@ -49,36 +48,31 @@ export class BinaryAdderGame extends Component {
         const urlSettings = this._getUrlSettings();
         const settings = contextSettings || urlSettings;
         if (settings) {
-            if (settings.format) {
-                this.state.format = settings.format;
+            if (settings.conversion_type) {
+                this.state.conversion_type = settings.conversion_type;
             }
-            if (settings.num_count) {
-                this.state.num_count = parseInt(settings.num_count, 10);
-            }
-            if (settings.level) {
-                this.state.level = settings.level;
+            if (settings.number_size) {
+                this.state.number_size = settings.number_size;
             }
             if (settings.num_questions) {
-                this.state.num_questions = parseInt(settings.num_questions, 10);
+                this.state.num_questions = settings.num_questions;
             }
             this.startQuiz();
         }
     }
 
     _getContextSettings(context) {
-        const format = context.format;
-        const num_count = context.num_count;
-        const level = context.level;
+        const conversion_type = context.conversion_type;
+        const number_size = context.number_size;
         const num_questions = context.num_questions;
 
-        if (!format && !num_count && !level && !num_questions) {
+        if (!conversion_type && !number_size && !num_questions) {
             return null;
         }
 
         return {
-            format,
-            num_count: num_count ? parseInt(num_count, 10) : null,
-            level,
+            conversion_type,
+            number_size: number_size ? parseInt(number_size, 10) : null,
             num_questions: num_questions ? parseInt(num_questions, 10) : null,
         };
     }
@@ -88,19 +82,17 @@ export class BinaryAdderGame extends Component {
         const hash = (window.location.hash || "").replace(/^#/, "");
         const hashParams = new URLSearchParams(hash);
 
-        const format = params.get("format") || hashParams.get("format");
-        const num_count = params.get("num_count") || hashParams.get("num_count");
-        const level = params.get("level") || hashParams.get("level");
+        const conversion_type = params.get("conversion_type") || hashParams.get("conversion_type");
+        const number_size = params.get("number_size") || hashParams.get("number_size");
         const num_questions = params.get("num_questions") || hashParams.get("num_questions");
 
-        if (!format && !num_count && !level && !num_questions) {
+        if (!conversion_type && !number_size && !num_questions) {
             return null;
         }
 
         return {
-            format,
-            num_count: num_count ? parseInt(num_count, 10) : null,
-            level,
+            conversion_type,
+            number_size: number_size ? parseInt(number_size, 10) : null,
             num_questions: num_questions ? parseInt(num_questions, 10) : null,
         };
     }
@@ -127,44 +119,49 @@ export class BinaryAdderGame extends Component {
         return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
     }
 
-    _bitsForLevel(level) {
-        if (level === "easy") return 4;
-        if (level === "medium") return 8;
-        return 12; // hard
+    _getConversionConfig(conversionType) {
+        const configs = {
+            bin_to_dec: { fromBase: 2, toBase: 10, fromLabel: "binary", toLabel: "decimal" },
+            dec_to_bin: { fromBase: 10, toBase: 2, fromLabel: "decimal", toLabel: "binary" },
+            bin_to_hex: { fromBase: 2, toBase: 16, fromLabel: "binary", toLabel: "hexadecimal" },
+            hex_to_bin: { fromBase: 16, toBase: 2, fromLabel: "hexadecimal", toLabel: "binary" },
+            dec_to_hex: { fromBase: 10, toBase: 16, fromLabel: "decimal", toLabel: "hexadecimal" },
+            hex_to_dec: { fromBase: 16, toBase: 10, fromLabel: "hexadecimal", toLabel: "decimal" },
+        };
+        return configs[conversionType] || configs.bin_to_dec;
     }
 
-    _randInt(maxInclusive) {
-        return Math.floor(Math.random() * maxInclusive) + 1;
+    _maxValueForBase(base, size) {
+        return Math.pow(base, size) - 1;
     }
 
-    _formatNumber(n, format, bits) {
-        if (format === "binary") {
-            return n.toString(2).padStart(bits, "0");
+    _formatValue(value, base) {
+        if (base === 16) {
+            return value.toString(16).toUpperCase();
         }
-        if (format === "hexadecimal") {
-            return n.toString(16).toUpperCase();
-        }
-        return n.toString(10);
+        return value.toString(base);
     }
 
-    _normalizeAnswer(answer, format) {
+    _normalizeAnswer(answer, base) {
         const raw = (answer || "").trim();
         if (!raw) {
             return null;
         }
-
         let cleaned = raw.toLowerCase().replace(/\s+/g, "");
 
-        if (format === "binary") {
+        if (base === 10) {
+            const num = parseInt(cleaned, 10);
+            if (Number.isNaN(num)) {
+                return null;
+            }
+            return String(num);
+        }
+
+        if (base === 2) {
             cleaned = cleaned.replace(/^0b/, "");
-            if (!/^[01]*$/.test(cleaned)) {
-                return null;
-            }
-        } else if (format === "hexadecimal") {
+        }
+        if (base === 16) {
             cleaned = cleaned.replace(/^0x/, "");
-            if (!/^[0-9a-f]*$/.test(cleaned)) {
-                return null;
-            }
         }
 
         cleaned = cleaned.replace(/^0+/, "");
@@ -175,31 +172,28 @@ export class BinaryAdderGame extends Component {
     }
 
     _generateQuestions() {
-        const bits = this._bitsForLevel(this.state.level);
-        const max = (1 << bits) - 1; // 2^bits - 1
-        const count = parseInt(this.state.num_count, 10);
-        const numQuestions = parseInt(this.state.num_questions, 10);
+        const conversionType = this.state.conversion_type;
+        const { fromBase, toBase, fromLabel, toLabel } = this._getConversionConfig(conversionType);
+
+        const size = parseInt(this.state.number_size, 10);
+        const count = parseInt(this.state.num_questions, 10);
+
+        const maxValue = this._maxValueForBase(fromBase, size);
         const questions = [];
 
-        for (let i = 0; i < numQuestions; i++) {
-            const nums = [];
-            for (let j = 0; j < count; j++) {
-                nums.push(this._randInt(max));
-            }
-
-            const questionText = nums
-                .map(n => this._formatNumber(n, this.state.format, bits))
-                .join(" + ");
-            const sum = nums.reduce((a, b) => a + b, 0);
-            const correctAnswer = this._formatNumber(sum, this.state.format, bits);
+        for (let i = 0; i < count; i++) {
+            const value = Math.floor(Math.random() * (maxValue + 1));
+            const sourceValue = this._formatValue(value, fromBase);
+            const correctAnswer = this._formatValue(value, toBase);
 
             questions.push({
                 uniqueId: i,
-                nums,
-                prompt: `${questionText} = ?`,
+                prompt: `Convert ${sourceValue} (${fromLabel}) to ${toLabel}`,
                 correctAnswer,
                 userAnswer: "",
                 isCorrect: null,
+                fromBase,
+                toBase,
             });
         }
 
@@ -207,8 +201,15 @@ export class BinaryAdderGame extends Component {
     }
 
     startQuiz() {
-        if (this.state.num_questions <= 0) {
-            this.notification.add("Please select a valid number of questions.", { type: "warning" });
+        const size = parseInt(this.state.number_size, 10);
+        const count = parseInt(this.state.num_questions, 10);
+
+        if (!size || size <= 0) {
+            this.notification.add("Please enter a valid number size.", { type: "warning" });
+            return;
+        }
+        if (!count || count <= 0) {
+            this.notification.add("Please enter a valid number of questions.", { type: "warning" });
             return;
         }
 
@@ -221,35 +222,13 @@ export class BinaryAdderGame extends Component {
         this._startTimer();
     }
 
-    checkQuestion(uniqueId) {
-        const question = this.state.questions.find(q => q.uniqueId === uniqueId);
-        if (!question) return;
-
-        const userNormalized = this._normalizeAnswer(question.userAnswer, this.state.format);
-        const correctNormalized = this._normalizeAnswer(question.correctAnswer, this.state.format);
-
-        if (userNormalized === null) {
-            this.notification.add("Invalid format. Please check your answer.", { type: "warning" });
-            return;
-        }
-
-        const isCorrect = userNormalized === correctNormalized;
-        if (isCorrect && !question.isCorrect) {
-            this.state.score++;
-        } else if (!isCorrect && question.isCorrect) {
-            this.state.score--;
-        }
-
-        question.isCorrect = isCorrect;
-    }
-
-    async checkAllAnswers() {
+    async checkAnswers() {
         this._stopTimer();
 
         let correctCount = 0;
         this.state.questions.forEach(q => {
-            const userNormalized = this._normalizeAnswer(q.userAnswer, this.state.format);
-            const correctNormalized = this._normalizeAnswer(q.correctAnswer, this.state.format);
+            const userNormalized = this._normalizeAnswer(q.userAnswer, q.toBase);
+            const correctNormalized = this._normalizeAnswer(q.correctAnswer, q.toBase);
             const isCorrect = userNormalized !== null && userNormalized === correctNormalized;
 
             q.isCorrect = isCorrect;
@@ -262,32 +241,30 @@ export class BinaryAdderGame extends Component {
         this.state.checked = true;
 
         const gameResults = this.state.questions.map(q => ({
-            prompt: q.prompt,
+            question: q.prompt,
             userGuess: q.userAnswer || "(Empty)",
             correctAnswer: q.correctAnswer,
             isCorrect: q.isCorrect,
         }));
 
-        await this.onGameFinished(this.state.score, gameResults);
+        await this.onGameFinished(this.state.score, gameResults, this.state.timer_seconds);
     }
 
-    _buildAnswerHtml(results) {
-        const timeDisplay = this.formatTime(this.state.timer_seconds);
-        const rows = results
-            .map(res => {
-                const bgColor = res.isCorrect ? "#d4edda" : "#f8d7da";
-                const textColor = res.isCorrect ? "#155724" : "#721c24";
+    _buildAnswerHtml(results, elapsedSeconds) {
+        const timeDisplay = this.formatTime(elapsedSeconds);
+        const rows = results.map(res => {
+            const bgColor = res.isCorrect ? "#d4edda" : "#f8d7da";
+            const textColor = res.isCorrect ? "#155724" : "#721c24";
 
-                return `
+            return `
                 <tr>
-                    <td style="padding: 8px; border: 1px solid #dee2e6;">${res.prompt}</td>
+                    <td style="padding: 8px; border: 1px solid #dee2e6;">${res.question}</td>
                     <td style="padding: 8px; border: 1px solid #dee2e6; background-color: ${bgColor}; color: ${textColor}; font-weight: bold;">
                         ${res.userGuess}
                     </td>
                     <td style="padding: 8px; border: 1px solid #dee2e6;">${res.correctAnswer}</td>
                 </tr>`;
-            })
-            .join("");
+        }).join("");
 
         return `
             <div style="font-family: sans-serif; margin-bottom: 8px;">
@@ -305,10 +282,10 @@ export class BinaryAdderGame extends Component {
             </table>`;
     }
 
-    async onGameFinished(finalScore, gameResults) {
+    async onGameFinished(finalScore, gameResults, elapsedSeconds) {
         if (!this.isValidSubmission) {
             this.notification.add(
-                `Practice Score: ${finalScore} out of ${this.state.questions.length} (Time: ${this.formatTime(this.state.timer_seconds)})`,
+                `Practice Score: ${finalScore} out of ${this.state.questions.length} (Time: ${this.formatTime(elapsedSeconds)})`,
                 { type: "info" }
             );
             return;
@@ -319,8 +296,8 @@ export class BinaryAdderGame extends Component {
             return;
         }
 
-        const htmlReport = this._buildAnswerHtml(gameResults);
-        const hours = Math.round((this.state.timer_seconds / 3600) * 10) / 10;
+        const htmlReport = this._buildAnswerHtml(gameResults, elapsedSeconds);
+        const hours = Math.round((elapsedSeconds / 3600) * 10) / 10;
 
         try {
             await this.orm.write(this.submissionModel, [this.resId], {
@@ -343,8 +320,7 @@ export class BinaryAdderGame extends Component {
         this.state.checked = false;
         this.state.questions = [];
         this.state.timer_seconds = 0;
-        this.state.score = 0;
     }
 }
 
-registry.category("actions").add("action_binaryadder2_js", BinaryAdderGame);
+registry.category("actions").add("action_binary_conversions_js", BinaryConversionsGame);
