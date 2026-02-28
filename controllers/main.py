@@ -14,3 +14,7 @@ class EducationalGamesController(http.Controller):
     @http.route('/educational_games/click_game', type='http', auth='user')
     def click_game(self, **kwargs):
         return request.render('educational_games.ClickGame')
+
+    @http.route('/educational_games/binary_adder', type='http', auth='public')
+    def binary_adder(self, **kwargs):
+        return request.render('educational_games.binary_adder_template')

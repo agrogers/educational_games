@@ -14,4 +14,15 @@
         <field name="tag">action_binary_conversions_js</field>
     </record>
 
+    <record id="action_binary_adder" model="ir.actions.client">
+        <field name="name">Binary Adder</field>
+        <field name="tag">action_binaryadder2_js</field>
+    </record>
+
+    <record id="action_binary_adder_original" model="ir.actions.act_url">
+        <field name="name">Binary Adder (Original)</field>
+        <field name="url">/educational_games/binary_adder</field>
+        <field name="target">self</field>
+    </record>
+
 </odoo>

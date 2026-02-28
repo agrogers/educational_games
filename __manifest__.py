@@ -11,6 +11,7 @@
         'views/actions.xml',
         'views/educational_games_menu.xml',
         'views/educational_games_views.xml',
+        'views/binary_adder_page.xml',
         'security/ir.model.access.csv',
     ],
     'assets': {
@@ -20,10 +21,12 @@
         'web.assets_backend': [
             'educational_games/static/src/js/binary_conversions.js',
             'educational_games/static/src/js/lonely_s_game.js',
+            'educational_games/static/src/js/binaryadder2.js',
             'educational_games/static/src/js/game_action.js',
             'educational_games/static/src/xml/game_action.xml',
             'educational_games/static/src/xml/binary_conversions_action.xml',
             'educational_games/static/src/xml/lonely_s_game_action.xml',
+            'educational_games/static/src/xml/binaryadder2_action.xml',
         ],
     },
     'installable': True,

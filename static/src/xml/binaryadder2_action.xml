@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="binaryadder2.GameTemplate" owl="1">
+        <div class="o_action_manager o_content p-5 bg-light h-100 overflow-auto">
+            <div class="card shadow-sm mx-auto" style="max-width: 900px;">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">Binary Addition Quiz</h3>
+                    <span class="badge bg-light text-dark">Timer: <t t-esc="this.formatTime(state.timer_seconds)"/></span>
+                </div>
+                <div class="card-body">
+                    <div t-if="!state.started" class="mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Format</label>
+                                <select class="form-select" t-model="state.format">
+                                    <option value="binary">Binary (base 2)</option>
+                                    <option value="hexadecimal">Hexadecimal (base 16)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Numbers to add</label>
+                                <select class="form-select" t-model="state.num_count">
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Level</label>
+                                <select class="form-select" t-model="state.level">
+                                    <option value="easy">Easy (4 bits)</option>
+                                    <option value="medium">Medium (8 bits)</option>
+                                    <option value="hard">Hard (12 bits)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Number of questions</label>
+                                <select class="form-select" t-model="state.num_questions">
+                                    <option value="1">1</option>
+                                    <option value="5">5</option>
+                                    <option value="10">10</option>
+                                    <option value="15">15</option>
+                                    <option value="20">20</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-success" t-on-click="startQuiz">Start Quiz</button>
+                        </div>
+                    </div>
+
+                    <div t-if="state.started">
+                        <div t-foreach="state.questions" t-as="item" t-key="item.uniqueId" class="p-3 border-bottom">
+                            <p class="fs-5">
+                                <span t-attf-class="{{state.checked and !item.isCorrect and 'text-danger fw-bold' or ''}}">
+                                    <t t-esc="item.prompt"/>
+                                </span>
+                            </p>
+                            <div class="d-flex align-items-center">
+                                <input type="text"
+                                       class="form-control w-50"
+                                       placeholder="Type your answer..."
+                                       t-model="item.userAnswer"
+                                       t-att-disabled="state.checked"/>
+                                <span t-if="state.checked" class="ms-3">
+                                    <t t-if="item.isCorrect">
+                                        <span class="text-success fs-4">✅</span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="text-danger">❌ Correct: <strong t-esc="item.correctAnswer"/></span>
+                                    </t>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <h4 t-if="state.checked" class="mb-3">
+                                Final Score: <strong><t t-esc="state.score"/></strong> out of <t t-esc="state.questions.length"/>
+                            </h4>
+                            <h5 t-if="state.checked and state.submission_submitted" class="mb-3">
+                                These results have been saved and the APEX task submitted.
+                            </h5>
+                            <button t-if="!state.checked" class="btn btn-lg btn-success" t-on-click="checkAllAnswers">
+                                Check Answers
+                            </button>
+                            <button t-if="state.checked" class="btn btn-lg btn-outline-primary" t-on-click="resetGame">
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>
