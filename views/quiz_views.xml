@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════════════════
+         quiz.quiz  –  List view
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_quiz_quiz_list" model="ir.ui.view">
+        <field name="name">quiz.quiz.list</field>
+        <field name="model">quiz.quiz</field>
+        <field name="arch" type="xml">
+            <list string="Quizzes">
+                <field name="name"/>
+                <field name="question_count"/>
+                <field name="total_marks"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
+         quiz.quiz  –  Form view  (questions + answers on one page)
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_quiz_quiz_form" model="ir.ui.view">
+        <field name="name">quiz.quiz.form</field>
+        <field name="model">quiz.quiz</field>
+        <field name="arch" type="xml">
+            <form string="Quiz">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Quiz Name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Business English – Formal Letters"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <field name="question_count" readonly="1"/>
+                        <field name="total_marks" readonly="1"/>
+                    </group>
+                    <field name="description" widget="html"
+                           placeholder="Optional description shown to students…"/>
+
+                    <notebook>
+                        <!-- ── Questions tab ── -->
+                        <page string="Questions" name="questions">
+                            <field name="question_ids" context="{'default_quiz_id': id}">
+                                <list string="Questions">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="question_text" widget="html" string="Question"/>
+                                    <field name="marks"/>
+                                    <field name="correct_answer_count" string="# Correct"/>
+                                </list>
+                                <!-- Inline popup form: question + all its answers on one page -->
+                                <form string="Question">
+                                    <sheet>
+                                        <group>
+                                            <field name="sequence"/>
+                                            <field name="marks"/>
+                                        </group>
+                                        <field name="question_text" widget="html"
+                                               placeholder="Enter the question…"/>
+                                        <separator string="Answers"/>
+                                        <field name="answer_ids">
+                                            <list editable="bottom" string="Answers">
+                                                <field name="sequence" widget="handle"/>
+                                                <field name="answer_text" widget="html"
+                                                       string="Answer Text"/>
+                                                <field name="is_correct" string="Correct?"/>
+                                            </list>
+                                        </field>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+
+                        <!-- ── Bulk import tab ── -->
+                        <page string="Bulk Import" name="bulk_import">
+                            <div class="alert alert-info" role="alert">
+                                <strong>Instructions:</strong>
+                                Paste your quiz below.
+                                <ul class="mb-0 mt-1">
+                                    <li>Use a number followed by <code>.</code> or <code>)</code> to start a question
+                                        (e.g. <code>1. What is …?</code>).</li>
+                                    <li>Use a letter followed by <code>)</code> or <code>.</code> for each answer option
+                                        (e.g. <code>A) Paris</code>).</li>
+                                    <li><strong>Bold</strong> the question line and each <strong>correct</strong>
+                                        answer line in the editor, or wrap them in <code>**asterisks**</code>.</li>
+                                </ul>
+                            </div>
+                            <field name="bulk_text" widget="html"
+                                   placeholder="Paste your formatted quiz text here…"/>
+                            <div class="mt-2">
+                                <button name="action_parse_bulk_text"
+                                        string="Import Questions from Text"
+                                        type="object"
+                                        class="btn btn-primary"/>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Bind specific views to the quiz list action -->
+    <record id="action_quiz_list_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_quiz_quiz_list"/>
+        <field name="act_window_id" ref="educational_games.action_quiz_list"/>
+    </record>
+
+    <record id="action_quiz_list_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_quiz_quiz_form"/>
+        <field name="act_window_id" ref="educational_games.action_quiz_list"/>
+    </record>
+
+</odoo>

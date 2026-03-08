@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="quiz_game.QuizTemplate" owl="1">
+        <div class="o_action_manager o_content h-100 overflow-auto bg-light">
+
+            <!-- Loading spinner -->
+            <div t-if="state.loading" class="d-flex flex-column align-items-center justify-content-center" style="min-height:300px;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading…</span>
+                </div>
+                <p class="mt-3 text-muted">Loading quiz…</p>
+            </div>
+
+            <!-- No quiz ID provided -->
+            <div t-elif="!state.quiz" class="d-flex flex-column align-items-center justify-content-center" style="min-height:300px;">
+                <h3 class="text-muted">No quiz has been assigned.</h3>
+                <p class="text-muted">Please contact your teacher.</p>
+            </div>
+
+            <!-- Quiz content -->
+            <div t-else="" class="p-3 p-md-4">
+
+                <!-- ── Header ── -->
+                <div class="card mb-4 border-0 shadow-sm">
+                    <div class="card-body rounded" style="background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white;">
+                        <h2 class="mb-1" style="color:white;">
+                            <t t-esc="state.quiz.name"/>
+                        </h2>
+                        <p class="mb-0 opacity-75">
+                            <t t-esc="state.quiz.questions.length"/> question(s) · <t t-esc="state.totalMarks"/> mark(s)
+                        </p>
+                        <div t-if="state.submitted" class="mt-3">
+                            <h4 class="mb-0" style="color:white;">
+                                Your Score: <strong><t t-esc="state.score"/></strong> / <t t-esc="state.totalMarks"/>
+                            </h4>
+                            <p t-if="state.submission_submitted" class="mt-1 mb-0 opacity-75">
+                                ✅ Results have been saved to your submission.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Question cards ── -->
+                <t t-foreach="state.quiz.questions" t-as="question" t-key="question.id">
+                    <t t-set="qResult" t-value="question.result"/>
+                    <div t-attf-class="card mb-3 shadow-sm {{state.submitted and qResult and qResult.is_correct ? 'border-success' : state.submitted and qResult ? 'border-danger' : ''}}">
+                        <div class="card-body">
+
+                            <!-- Question text + marks badge -->
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div t-out="question.question_text" class="fw-semibold fs-5 flex-grow-1"/>
+                                <span class="badge bg-secondary ms-3 flex-shrink-0">
+                                    <t t-esc="question.marks"/> mark<t t-if="question.marks !== 1">s</t>
+                                </span>
+                            </div>
+
+                            <!-- Answer options -->
+                            <t t-foreach="question.answers" t-as="answer" t-key="answer.id">
+                                <t t-set="isSelected" t-value="question.selected_answers.includes(answer.id)"/>
+                                <t t-set="ansResult" t-value="qResult and qResult.answers.find(a => a.id === answer.id)"/>
+                                <t t-set="isCorrect"  t-value="ansResult and ansResult.is_correct"/>
+                                <t t-set="wasSelected" t-value="ansResult and ansResult.was_selected"/>
+
+                                <div t-on-click="() => this.toggleAnswer(question, answer)"
+                                     t-attf-class="
+                                         d-flex align-items-center p-2 mb-2 rounded border
+                                         {{ !state.submitted ? 'quiz-answer-option' : '' }}
+                                         {{ !state.submitted and isSelected ? 'border-primary bg-primary bg-opacity-10' : '' }}
+                                         {{ state.submitted and isCorrect ? 'border-success bg-success bg-opacity-10' : '' }}
+                                         {{ state.submitted and wasSelected and !isCorrect ? 'border-danger bg-danger bg-opacity-10' : '' }}
+                                     "
+                                     style="cursor:pointer; transition: background 0.15s;">
+
+                                    <input type="checkbox"
+                                           class="form-check-input me-2 flex-shrink-0"
+                                           t-att-checked="isSelected"
+                                           t-att-disabled="state.submitted"
+                                           style="cursor:pointer; pointer-events:none;"/>
+
+                                    <div t-out="answer.answer_text" class="flex-grow-1"/>
+
+                                    <span t-if="state.submitted and isCorrect" class="ms-2 text-success flex-shrink-0">✅</span>
+                                    <span t-if="state.submitted and wasSelected and !isCorrect" class="ms-2 text-danger flex-shrink-0">❌</span>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- ── Actions / Results ── -->
+                <div class="text-center mt-4 pb-4">
+                    <div t-if="state.submitted">
+                        <div class="alert mx-auto" style="max-width:450px;"
+                             t-attf-class="alert {{state.score >= state.totalMarks / 2 ? 'alert-success' : 'alert-warning'}}">
+                            <h4 class="mb-1">
+                                Final Score: <strong><t t-esc="state.score"/></strong> / <t t-esc="state.totalMarks"/>
+                            </h4>
+                            <p t-if="state.submission_submitted" class="mb-0">
+                                Results have been saved to your APEX submission.
+                            </p>
+                        </div>
+                        <button class="btn btn-outline-primary mt-2" t-on-click="resetQuiz">
+                            Try Again
+                        </button>
+                    </div>
+                    <button t-else=""
+                            class="btn btn-lg btn-success px-5"
+                            t-on-click="submitQuiz">
+                        Submit Quiz
+                    </button>
+                </div>
+
+            </div><!-- /quiz content -->
+        </div>
+    </t>
+
+</templates>
