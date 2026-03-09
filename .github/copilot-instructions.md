@@ -24,7 +24,6 @@ Key data flows: Submissions → Tasks → Resources (SIS workflow); Invoices →
 - **Assets Loading**: Add CSS/JS to `'web.assets_backend'` in manifest for backend UI
 
 ## Integration Patterns
-- **OpenEducat Dependency**: Custom addons depend on `'openeducat_core'`; inherit from `op.faculty`, `op.student` models
 - **Cross-Addon Communication**: Use related fields and computed updates (e.g., task state syncs with submission states)
 - **External APIs**: Minimal; focus on internal Odoo ORM operations
 - **Database**: PostgreSQL; use Odoo ORM for all queries (avoid raw SQL)
