@@ -4,6 +4,28 @@ from markupsafe import escape, Markup
 import random
 import re
 
+# Extensible patterns for question and answer line detection.
+# Add new compiled regexes to support additional quiz text formats.
+_QUESTION_PATTERNS = [
+    # "1. What is..." or "1) What is..."
+    re.compile(r'^(\d+)[\.)\:]\s+(?P<text>.+)$'),
+    # "Question 1: What is..." or "Question 1. What is..."
+    re.compile(r'^Question\s+\d+[:\.\)]\s*(?P<text>.+)$', re.IGNORECASE),
+]
+
+_ANSWER_PATTERNS = [
+    # "A) text", "A. text", "A: text"
+    re.compile(r'^(?P<letter>[A-Za-z])[\)\.:]\s+(?P<text>.+)$'),
+]
+
+# Prefixes to strip from parsed text.
+_QUESTION_PREFIX_RE = re.compile(
+    r'^(?:Question\s+\d+[:\.\)]\s*|\d+[:\.\)]\s+)', re.IGNORECASE
+)
+_ANSWER_PREFIX_RE = re.compile(
+    r'^[A-Za-z][\)\.:]\s+'
+)
+
 
 class Quiz(models.Model):
     _name = 'quiz.quiz'
@@ -47,76 +69,215 @@ class Quiz(models.Model):
         for record in self:
             record.total_marks = sum(q.marks for q in record.question_ids)
 
+    def action_preview_quiz(self):
+        """Launch the student quiz view in preview/practice mode."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'action_quiz_game_js',
+            'name': self.name,
+            'context': {
+                'quiz_id': self.id,
+            },
+        }
+
     def action_parse_bulk_text(self):
         """Parse the bulk_text HTML field and auto-create questions and answers."""
+        total_q = 0
+        total_a = 0
         for record in self:
             if not record.bulk_text or not record.bulk_text.strip():
                 raise UserError(
                     "No text to parse. Please paste quiz text into the 'Paste Quiz Text' field first."
                 )
-            self._parse_and_create_questions(record)
+            q_count, a_count = self._parse_and_create_questions(record)
+            total_q += q_count
+            total_a += a_count
             record.bulk_text = False
+        if total_q == 0:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Import Failed',
+                    'message': 'No questions could be parsed from the pasted text.',
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
+        # Reload the form so the Questions tab shows the new records
         return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': 'Import Successful',
-                'message': 'Questions and answers have been created from the pasted text.',
-                'type': 'success',
-                'sticky': False,
+            'type': 'ir.actions.act_window',
+            'res_model': self._name,
+            'res_id': self[:1].id,
+            'view_mode': 'form',
+            'target': 'current',
+            'context': {
+                'notification': {
+                    'title': 'Import Successful',
+                    'message': f'Imported {total_q} question(s) with {total_a} answer(s).',
+                    'type': 'success',
+                },
             },
         }
 
     def _parse_and_create_questions(self, quiz_record):
-        """Parse formatted quiz text (HTML or plain) into questions and answers."""
+        """Parse formatted quiz text (HTML or plain) into questions and answers.
+
+        Strategy 1 (primary) – formatting-based:
+            Italic line  → new question
+            Following non-italic lines → answers (bold = correct)
+
+        Strategy 2 (fallback) – pattern-based:
+            Lines matching _QUESTION_PATTERNS → question
+            Lines matching _ANSWER_PATTERNS  → answer
+
+        Returns (question_count, answer_count).
+        """
         text = quiz_record.bulk_text or ''
-        lines_with_bold = self._extract_lines_from_html(text)
+        parsed_lines = self._extract_lines_from_html(text)
+
+        # Try formatting-based parsing first
+        q_count, a_count = self._parse_by_formatting(quiz_record, parsed_lines)
+        if q_count > 0:
+            return q_count, a_count
+
+        # Fallback to pattern-based parsing
+        return self._parse_by_patterns(quiz_record, parsed_lines)
+
+    def _parse_by_formatting(self, quiz_record, parsed_lines):
+        """Strategy 1: italic line = question, subsequent lines = answers, bold = correct."""
+        # Check if any italic lines exist; if not this strategy is not applicable
+        if not any(is_italic for (_, _, is_italic) in parsed_lines):
+            return 0, 0
 
         current_question = None
         existing_sequences = [q.sequence for q in quiz_record.question_ids]
         q_seq = (max(existing_sequences) + 10) if existing_sequences else 10
         ans_seq = 10
+        q_count = 0
+        a_count = 0
 
-        for (line_text, is_bold) in lines_with_bold:
+        for (line_text, has_bold, is_italic) in parsed_lines:
             line_text = line_text.strip()
             if not line_text:
                 continue
 
-            # Question: starts with a number followed by . or )
-            q_match = re.match(r'^(\d+)[\.\)]\s+(.+)$', line_text)
-            if q_match:
+            if is_italic:
+                # New question – strip prefix like "Question 1:"
+                clean_q = self._clean_question_text(line_text)
                 current_question = self.env['quiz.question'].create({
                     'quiz_id': quiz_record.id,
                     'sequence': q_seq,
-                    'question_text': Markup('<p>%s</p>') % escape(q_match.group(2)),
+                    'question_text': escape(clean_q),
                     'marks': 1,
                 })
                 q_seq += 10
                 ans_seq = 10
-                continue
-
-            # Answer: starts with a letter followed by ) or .
-            a_match = re.match(r'^([A-Za-z])[\)\.]\s+(.+)$', line_text)
-            if a_match and current_question:
+                q_count += 1
+            elif current_question:
+                # Answer line – strip prefix like "A.", bold means correct
+                clean_a = self._clean_answer_text(line_text)
                 self.env['quiz.answer'].create({
                     'question_id': current_question.id,
                     'sequence': ans_seq,
-                    'answer_text': Markup('<p>%s</p>') % escape(a_match.group(2)),
-                    'is_correct': is_bold,
+                    'answer_text': escape(clean_a),
+                    'is_correct': has_bold,
                 })
                 ans_seq += 10
+                a_count += 1
+
+        return q_count, a_count
+
+    def _parse_by_patterns(self, quiz_record, parsed_lines):
+        """Strategy 2: regex-based question/answer detection."""
+        current_question = None
+        existing_sequences = [q.sequence for q in quiz_record.question_ids]
+        q_seq = (max(existing_sequences) + 10) if existing_sequences else 10
+        ans_seq = 10
+        q_count = 0
+        a_count = 0
+
+        for (line_text, has_bold, _is_italic) in parsed_lines:
+            line_text = line_text.strip()
+            if not line_text:
+                continue
+
+            q_text = self._match_question_line(line_text)
+            if q_text is not None:
+                current_question = self.env['quiz.question'].create({
+                    'quiz_id': quiz_record.id,
+                    'sequence': q_seq,
+                    'question_text': escape(q_text),
+                    'marks': 1,
+                })
+                q_seq += 10
+                ans_seq = 10
+                q_count += 1
+                continue
+
+            a_result = self._match_answer_line(line_text, has_bold)
+            if a_result and current_question:
+                answer_text, answer_is_correct = a_result
+                self.env['quiz.answer'].create({
+                    'question_id': current_question.id,
+                    'sequence': ans_seq,
+                    'answer_text': escape(answer_text),
+                    'is_correct': answer_is_correct,
+                })
+                ans_seq += 10
+                a_count += 1
+
+        return q_count, a_count
+
+    @staticmethod
+    def _clean_question_text(text):
+        """Strip common question prefixes like 'Question 1:', '1.', '1)' etc."""
+        return _QUESTION_PREFIX_RE.sub('', text).strip()
+
+    @staticmethod
+    def _clean_answer_text(text):
+        """Strip common answer prefixes like 'A.', 'A)', 'A:' etc."""
+        return _ANSWER_PREFIX_RE.sub('', text).strip()
+
+    @staticmethod
+    def _match_question_line(line_text):
+        """Match a question line against _QUESTION_PATTERNS. Returns question text or None."""
+        for pattern in _QUESTION_PATTERNS:
+            m = pattern.match(line_text)
+            if m:
+                return m.group('text')
+        return None
+
+    @staticmethod
+    def _match_answer_line(line_text, line_has_bold):
+        """Match an answer line and determine correctness.
+
+        Returns (answer_text, is_correct) or None.
+        Detects inline **markdown bold** markers within the answer text.
+        """
+        for pattern in _ANSWER_PATTERNS:
+            m = pattern.match(line_text)
+            if m:
+                raw_text = m.group('text')
+                # Check for inline **bold** markers (e.g. "**Hydraulic action**.")
+                bold_match = re.match(r'^\*\*(.+?)\*\*(.?)\s*$', raw_text)
+                if bold_match:
+                    return (bold_match.group(1) + bold_match.group(2)).strip(), True
+                return raw_text, line_has_bold
+        return None
 
     @staticmethod
     def _extract_lines_from_html(html_text):
         """
-        Return a list of (text, is_bold) tuples from HTML quiz content.
-        A line is considered bold if its primary content is wrapped in <strong>/<b>
-        or if the raw text begins with '**'.
+        Return a list of (text, has_bold, is_italic) tuples from HTML quiz content.
+
+        has_bold:   True when the line contains <strong>/<b> or ** markers.
+        is_italic:  True when the line's primary content is italic (<em>/<i>).
         """
         lines = []
         try:
             from lxml import html as lxml_html
-            # Use fragment_fromstring to avoid string-interpolating untrusted HTML
             tree = lxml_html.fragment_fromstring(html_text, create_parent='div')
             for elem in tree.iter():
                 if elem.tag not in ('p', 'div', 'li', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
@@ -125,30 +286,46 @@ class Quiz(models.Model):
                 if not full_text:
                     continue
 
-                is_bold = False
+                total_len = len(full_text)
+
+                # Detect bold
+                has_bold = False
                 if full_text.startswith('**'):
-                    is_bold = True
+                    has_bold = True
                     full_text = full_text.strip('*').strip()
                 else:
-                    children = list(elem)
-                    if children and children[0].tag in ('strong', 'b'):
-                        bold_text = ''.join(children[0].itertext()).strip()
-                        if bold_text and len(bold_text) >= len(full_text) * 0.5:
-                            is_bold = True
+                    bold_len = sum(
+                        len(''.join(c.itertext()).strip())
+                        for c in elem.iter()
+                        if c.tag in ('strong', 'b')
+                    )
+                    if bold_len and bold_len >= total_len * 0.3:
+                        has_bold = True
+
+                # Detect italic
+                is_italic = False
+                italic_len = sum(
+                    len(''.join(c.itertext()).strip())
+                    for c in elem.iter()
+                    if c.tag in ('em', 'i')
+                )
+                if italic_len and italic_len >= total_len * 0.5:
+                    is_italic = True
 
                 if full_text:
-                    lines.append((full_text, is_bold))
+                    lines.append((full_text, has_bold, is_italic))
         except Exception:
-            # Fallback: strip all HTML tags and handle ** markdown
+            # Fallback: strip all HTML tags and handle markdown markers
             clean = re.sub(r'<[^>]+>', '\n', html_text)
             for line in clean.split('\n'):
                 line = line.strip()
                 if not line:
                     continue
-                is_bold = line.startswith('**')
-                clean_line = line.strip('*').strip()
+                has_bold = '**' in line
+                is_italic = line.startswith('*') and not line.startswith('**')
+                clean_line = line.strip('*').strip() if (has_bold or is_italic) else line
                 if clean_line:
-                    lines.append((clean_line, is_bold))
+                    lines.append((clean_line, has_bold, is_italic))
         return lines
 
     @api.model
@@ -170,6 +347,7 @@ class Quiz(models.Model):
                 'id': question.id,
                 'question_text': question.question_text or '',
                 'marks': question.marks,
+                'allow_multiple': question.allow_multiple,
                 'answers': [
                     {
                         'id': a.id,
@@ -246,6 +424,11 @@ class QuizQuestion(models.Model):
     sequence = fields.Integer(string='Sequence', default=10)
     question_text = fields.Html(string='Question', required=True, sanitize=True)
     marks = fields.Integer(string='Marks', default=1)
+    allow_multiple = fields.Boolean(
+        string='Allow Multiple Answers',
+        default=False,
+        help='If checked, students can select more than one answer.',
+    )
     answer_ids = fields.One2many('quiz.answer', 'question_id', string='Answers')
     correct_answer_count = fields.Integer(
         string='Correct Answers',

@@ -28,3 +28,84 @@
     font-size: 1.2rem;
     margin-top: 1rem;
 }
+.card-body {
+    background-color: gray;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Quiz student view – scoped under .o_quiz_page
+   ═══════════════════════════════════════════════════════ */
+.o_quiz_page {
+    /* Page-level overrides go here */
+}
+
+.o_quiz_page .quiz-header .card-body {
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+}
+
+.o_quiz_page .quiz-title {
+    font-weight: 700;
+}
+
+.o_quiz_page .quiz-question-card {
+    border-radius: 0.5rem;
+}
+
+.o_quiz_page .quiz-question-body {
+    background-color: #a3a3a360;
+}
+
+.o_quiz_page .quiz-question-text {
+    line-height: 1.5;
+}
+
+.o_quiz_page .quiz-answer-item {
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    background-color: white;
+}
+
+.o_quiz_page .quiz-answer-option:hover {
+    border-color: #1a73e8;
+}
+
+.o_quiz_page .quiz-answer-selected {
+    font-weight: 500;
+    background-color: rgb(138, 255, 216);
+}
+
+.o_quiz_page .quiz-answer-text {
+    line-height: 1.4;
+}
+
+.o_quiz_page .quiz-answer-correct {
+    /* Additional overrides for correct answers after submit */
+}
+
+.o_quiz_page .quiz-answer-wrong {
+    /* Additional overrides for wrong answers after submit */
+}
+
+.o_quiz_page .quiz-question-correct {
+    /* Card-level correct styling */
+}
+
+.o_quiz_page .quiz-question-incorrect {
+    /* Card-level incorrect styling */
+}
+
+.o_quiz_page .quiz-btn-submit {
+    /* Submit button overrides */
+}
+
+.o_quiz_page .quiz-btn-retry {
+    /* Try Again button overrides */
+}
+
+.o_quiz_page .quiz-results {
+    /* Results section overrides */
+}
+
+.o_quiz_page .quiz-score-header {
+    /* Score display in header */
+}

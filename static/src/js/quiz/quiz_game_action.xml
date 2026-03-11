@@ -2,10 +2,10 @@
 <templates xml:space="preserve">
 
     <t t-name="quiz_game.QuizTemplate" owl="1">
-        <div class="o_action_manager o_content h-100 overflow-auto bg-light">
+        <div class="o_action_manager o_content h-100 overflow-auto bg-light o_quiz_page">
 
             <!-- Loading spinner -->
-            <div t-if="state.loading" class="d-flex flex-column align-items-center justify-content-center" style="min-height:300px;">
+            <div t-if="state.loading" class="d-flex flex-column align-items-center justify-content-center quiz-loading" style="min-height:300px;">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading…</span>
                 </div>
@@ -13,24 +13,24 @@
             </div>
 
             <!-- No quiz ID provided -->
-            <div t-elif="!state.quiz" class="d-flex flex-column align-items-center justify-content-center" style="min-height:300px;">
+            <div t-elif="!state.quiz" class="d-flex flex-column align-items-center justify-content-center quiz-empty" style="min-height:300px;">
                 <h3 class="text-muted">No quiz has been assigned.</h3>
                 <p class="text-muted">Please contact your teacher.</p>
             </div>
 
             <!-- Quiz content -->
-            <div t-else="" class="p-3 p-md-4">
+            <div t-else="" class="p-3 p-md-4 quiz-content">
 
                 <!-- ── Header ── -->
-                <div class="card mb-4 border-0 shadow-sm">
+                <div class="card mb-4 border-0 shadow-sm quiz-header">
                     <div class="card-body rounded" style="background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white;">
-                        <h2 class="mb-1" style="color:white;">
+                        <h2 class="mb-1 quiz-title" style="color:white;">
                             <t t-esc="state.quiz.name"/>
                         </h2>
-                        <p class="mb-0 opacity-75">
+                        <p class="mb-0 opacity-75 quiz-subtitle">
                             <t t-esc="state.quiz.questions.length"/> question(s) · <t t-esc="state.totalMarks"/> mark(s)
                         </p>
-                        <div t-if="state.submitted" class="mt-3">
+                        <div t-if="state.submitted" class="mt-3 quiz-score-header">
                             <h4 class="mb-0" style="color:white;">
                                 Your Score: <strong><t t-esc="state.score"/></strong> / <t t-esc="state.totalMarks"/>
                             </h4>
@@ -44,15 +44,18 @@
                 <!-- ── Question cards ── -->
                 <t t-foreach="state.quiz.questions" t-as="question" t-key="question.id">
                     <t t-set="qResult" t-value="question.result"/>
-                    <div t-attf-class="card mb-3 shadow-sm {{state.submitted and qResult and qResult.is_correct ? 'border-success' : state.submitted and qResult ? 'border-danger' : ''}}">
-                        <div class="card-body">
+                    <div t-attf-class="card mb-3 shadow-sm quiz-question-card {{state.submitted and qResult and qResult.is_correct ? 'border-success quiz-question-correct' : state.submitted and qResult ? 'border-danger quiz-question-incorrect' : ''}}">
+                        <div class="card-body quiz-question-body">
 
                             <!-- Question text + marks badge -->
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div t-out="question.question_text" class="fw-semibold fs-5 flex-grow-1"/>
-                                <span class="badge bg-secondary ms-3 flex-shrink-0">
-                                    <t t-esc="question.marks"/> mark<t t-if="question.marks !== 1">s</t>
-                                </span>
+                            <div class="d-flex justify-content-between align-items-start mb-3 quiz-question-header">
+                                <div t-out="question.question_text" class="fw-semibold fs-5 flex-grow-1 quiz-question-text"/>
+                                <div class="d-flex align-items-center ms-3 flex-shrink-0 gap-2">
+                                    <span t-if="question.allow_multiple" class="badge bg-info">Multi</span>
+                                    <span class="badge bg-secondary">
+                                        <t t-esc="question.marks"/> mark<t t-if="question.marks !== 1">s</t>
+                                    </span>
+                                </div>
                             </div>
 
                             <!-- Answer options -->
@@ -64,21 +67,29 @@
 
                                 <div t-on-click="() => this.toggleAnswer(question, answer)"
                                      t-attf-class="
-                                         d-flex align-items-center p-2 mb-2 rounded border
+                                         d-flex align-items-center p-2 mb-2 rounded border quiz-answer-item
                                          {{ !state.submitted ? 'quiz-answer-option' : '' }}
-                                         {{ !state.submitted and isSelected ? 'border-primary bg-primary bg-opacity-10' : '' }}
-                                         {{ state.submitted and isCorrect ? 'border-success bg-success bg-opacity-10' : '' }}
-                                         {{ state.submitted and wasSelected and !isCorrect ? 'border-danger bg-danger bg-opacity-10' : '' }}
+                                         {{ !state.submitted and isSelected ? 'border-primary bg-primary bg-opacity-10 quiz-answer-selected' : '' }}
+                                         {{ state.submitted and isCorrect ? 'border-success bg-success bg-opacity-10 quiz-answer-correct' : '' }}
+                                         {{ state.submitted and wasSelected and !isCorrect ? 'border-danger bg-danger bg-opacity-10 quiz-answer-wrong' : '' }}
                                      "
                                      style="cursor:pointer; transition: background 0.15s;">
 
-                                    <input type="checkbox"
+                                    <input t-if="question.allow_multiple"
+                                           type="checkbox"
                                            class="form-check-input me-2 flex-shrink-0"
                                            t-att-checked="isSelected"
                                            t-att-disabled="state.submitted"
                                            style="cursor:pointer; pointer-events:none;"/>
+                                    <input t-else=""
+                                           type="radio"
+                                           class="form-check-input me-2 flex-shrink-0"
+                                           t-att-checked="isSelected"
+                                           t-att-disabled="state.submitted"
+                                           t-att-name="'q_' + question.id"
+                                           style="cursor:pointer; pointer-events:none;"/>
 
-                                    <div t-out="answer.answer_text" class="flex-grow-1"/>
+                                    <div t-out="answer.answer_text" class="flex-grow-1 quiz-answer-text"/>
 
                                     <span t-if="state.submitted and isCorrect" class="ms-2 text-success flex-shrink-0">✅</span>
                                     <span t-if="state.submitted and wasSelected and !isCorrect" class="ms-2 text-danger flex-shrink-0">❌</span>
@@ -89,8 +100,8 @@
                 </t>
 
                 <!-- ── Actions / Results ── -->
-                <div class="text-center mt-4 pb-4">
-                    <div t-if="state.submitted">
+                <div class="text-center mt-4 pb-4 quiz-actions">
+                    <div t-if="state.submitted" class="quiz-results">
                         <div class="alert mx-auto" style="max-width:450px;"
                              t-attf-class="alert {{state.score >= state.totalMarks / 2 ? 'alert-success' : 'alert-warning'}}">
                             <h4 class="mb-1">
@@ -100,12 +111,12 @@
                                 Results have been saved to your APEX submission.
                             </p>
                         </div>
-                        <button class="btn btn-outline-primary mt-2" t-on-click="resetQuiz">
+                        <button class="btn btn-outline-primary mt-2 quiz-btn-retry" t-on-click="resetQuiz">
                             Try Again
                         </button>
                     </div>
                     <button t-else=""
-                            class="btn btn-lg btn-success px-5"
+                            class="btn btn-lg btn-success px-5 quiz-btn-submit"
                             t-on-click="submitQuiz">
                         Submit Quiz
                     </button>

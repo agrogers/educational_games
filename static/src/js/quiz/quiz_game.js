@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, onWillStart, markup } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
@@ -51,6 +51,11 @@ export class QuizGame extends Component {
             quizData.questions.forEach((q) => {
                 q.selected_answers = [];
                 q.result = null; // populated after submission
+                // Mark HTML strings as safe for t-out rendering
+                q.question_text = markup(q.question_text || "");
+                q.answers.forEach((a) => {
+                    a.answer_text = markup(a.answer_text || "");
+                });
             });
             this.state.quiz = quizData;
             this.state.totalMarks = quizData.total_marks;
@@ -64,15 +69,21 @@ export class QuizGame extends Component {
 
     /**
      * Toggle an answer selection for a given question.
-     * Supports multiple correct answers via checkboxes.
+     * Single-answer questions: replaces any previous selection (radio behavior).
+     * Multiple-answer questions: toggles the answer on/off (checkbox behavior).
      */
     toggleAnswer(question, answer) {
         if (this.state.submitted) return;
-        const idx = question.selected_answers.indexOf(answer.id);
-        if (idx === -1) {
-            question.selected_answers.push(answer.id);
+        if (question.allow_multiple) {
+            const idx = question.selected_answers.indexOf(answer.id);
+            if (idx === -1) {
+                question.selected_answers.push(answer.id);
+            } else {
+                question.selected_answers.splice(idx, 1);
+            }
         } else {
-            question.selected_answers.splice(idx, 1);
+            // Single-answer: replace selection
+            question.selected_answers.splice(0, question.selected_answers.length, answer.id);
         }
     }
 
