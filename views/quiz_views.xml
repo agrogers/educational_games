@@ -39,8 +39,16 @@
                         </h1>
                     </div>
                     <group>
-                        <field name="question_count" readonly="1"/>
-                        <field name="total_marks" readonly="1"/>
+                        <group>
+                            <field name="question_count" readonly="1"/>
+                            <field name="total_marks" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="header_image" widget="image"
+                                   string="Header Image"
+                                   options="{'size': [1400, 300]}"
+                                   class="o_field_image"/>
+                        </group>
                     </group>
                     <field name="description" widget="html"
                            placeholder="Optional description shown to students…"/>

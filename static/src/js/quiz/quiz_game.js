@@ -26,6 +26,7 @@ export class QuizGame extends Component {
             totalMarks: 0,
             results: [],
             submission_submitted: false,
+            activeQuestionId: null,
         });
 
         this.resId = context.active_id;
@@ -59,11 +60,40 @@ export class QuizGame extends Component {
             });
             this.state.quiz = quizData;
             this.state.totalMarks = quizData.total_marks;
+            // Activate first question by default
+            if (quizData.questions.length > 0) {
+                this.state.activeQuestionId = quizData.questions[0].id;
+            }
         } catch (error) {
             console.error("Error loading quiz:", error);
             this.notification.add("Error loading quiz. Please try again.", { type: "danger" });
         } finally {
             this.state.loading = false;
+        }
+    }
+
+    /**
+     * Returns the TOC/card status for a question.
+     * @returns {'unanswered'|'answered'|'correct'|'incorrect'}
+     */
+    getQuestionStatus(question) {
+        if (this.state.submitted && question.result) {
+            return question.result.is_correct ? "correct" : "incorrect";
+        }
+        return question.selected_answers.length > 0 ? "answered" : "unanswered";
+    }
+
+    /** Set the currently highlighted question. */
+    setActiveQuestion(questionId) {
+        this.state.activeQuestionId = questionId;
+    }
+
+    /** Scroll to a question card and activate it. */
+    scrollToQuestion(questionId) {
+        this.state.activeQuestionId = questionId;
+        const el = document.querySelector(`[data-question-id="${questionId}"]`);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
     }
 
@@ -74,6 +104,7 @@ export class QuizGame extends Component {
      */
     toggleAnswer(question, answer) {
         if (this.state.submitted) return;
+        this.state.activeQuestionId = question.id;
         if (question.allow_multiple) {
             const idx = question.selected_answers.indexOf(answer.id);
             if (idx === -1) {
@@ -139,7 +170,7 @@ export class QuizGame extends Component {
             .map((r) => {
                 const bgColor = r.is_correct ? "#d4edda" : "#f8d7da";
                 const textColor = r.is_correct ? "#155724" : "#721c24";
-                const status = r.is_correct ? "✅ Correct" : "❌ Incorrect";
+                const status = r.is_correct ? "✓ Correct" : "✗ Incorrect";
 
                 const correctAnswers = r.answers
                     .filter((a) => a.is_correct)
@@ -214,9 +245,11 @@ export class QuizGame extends Component {
         this.state.score = 0;
         this.state.results = [];
         this.state.submission_submitted = false;
+        this.state.activeQuestionId = null;
         this.state.loading = true;
         this.loadQuiz();
     }
 }
 
 registry.category("actions").add("action_quiz_game_js", QuizGame);
+

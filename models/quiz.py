@@ -45,6 +45,12 @@ class Quiz(models.Model):
         compute='_compute_total_marks',
         store=True,
     )
+    header_image = fields.Image(
+        string='Header Image',
+        max_width=1400,
+        max_height=300,
+        help='Optional banner image displayed in the quiz header.',
+    )
     bulk_text = fields.Html(
         string='Paste Quiz Text',
         sanitize=True,
@@ -361,6 +367,8 @@ class Quiz(models.Model):
             'id': quiz.id,
             'name': quiz.name,
             'total_marks': quiz.total_marks,
+            # quiz.id is always a positive integer from the ORM; safe for URL use
+            'header_image_url': f'/web/image/quiz.quiz/{quiz.id}/header_image' if quiz.header_image else None,
             'questions': questions,
         }
 
