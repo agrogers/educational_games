@@ -30,6 +30,12 @@
                             type="object"
                             class="btn btn-secondary"
                             icon="fa-eye"/>
+                    <button name="action_delete_all_questions"
+                            string="Delete All Questions"
+                            type="object"
+                            class="btn btn-danger"
+                            icon="fa-trash"
+                            confirm="This will permanently delete ALL questions and answers for this quiz. This cannot be undone. Continue?"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -43,11 +49,11 @@
                             <field name="question_count" readonly="1"/>
                             <field name="total_marks" readonly="1"/>
                         </group>
-                        <group>
+                        <group class="quiz-form-header-image">
                             <field name="header_image" widget="image"
                                    string="Header Image"
-                                   options="{'size': [1400, 300]}"
-                                   class="o_field_image"/>
+                                   options="{'size': [800, 200]}"
+                                   nolabel="1"/>
                         </group>
                     </group>
                     <field name="description" widget="html"
@@ -90,38 +96,46 @@
                         <!-- ── Bulk import tab ── -->
                         <page string="Bulk Import" name="bulk_import">
                             <div class="alert alert-info" role="alert">
-                                <strong>Instructions:</strong>
-                                Paste your quiz text below and click <em>Import Questions from Text</em>.
-                                The importer will auto-detect your format. Two methods are supported:
-
-                                <h6 class="mt-2 mb-1"><strong>Method 1 — Formatting-based (preferred)</strong></h6>
+                                <strong>Recommended workflow:</strong>
+                                <ol class="mb-1 mt-1">
+                                    <li>Paste your quiz text into the field below.</li>
+                                    <li>Click <strong>Clean Up Text</strong> to fix Unicode/formatting artefacts from ChatGPT or NotebookLM.</li>
+                                    <li>Click <strong>Preview Import</strong> to colour-code the text:
+                                        <span style="color:#1e1b4b; font-weight:bold;"> dark = question</span>,
+                                        <span style="color:#15803d; font-weight:bold;"> green = correct answer</span>,
+                                        <span style="color:#9a3412;"> red = answer option</span>,
+                                        <span style="color:#9ca3af;"> grey = unrecognised</span>.
+                                    </li>
+                                    <li>Edit the colour-coded text if needed, then click <strong>Import Questions from Text</strong>.</li>
+                                </ol>
+                                <strong>Supported paste formats:</strong>
                                 <ul class="mb-1">
-                                    <li>Put each question on its own line in <em>italic</em> font.</li>
-                                    <li>Put each answer option on its own line (normal text).</li>
-                                    <li><strong>Bold</strong> the correct answer(s).</li>
+                                    <li><em>Italic</em> question line + plain answer lines + <strong>bold correct answer</strong> (Method 1).</li>
+                                    <li>Numbered questions (<code>1. text</code>) + lettered answers (<code>A) text</code>) with the correct answer in <strong>bold</strong> (Method 2 — ChatGPT default).</li>
                                 </ul>
-
-                                <h6 class="mt-2 mb-1"><strong>Method 2 — Pattern-based (fallback)</strong></h6>
-                                <ul class="mb-1">
-                                    <li>Start questions with a number or "Question N:"
-                                        (e.g. <code>1. What is …?</code> or <code>Question 3: Which …?</code>).</li>
-                                    <li>Start answers with a letter followed by <code>)</code>, <code>.</code> or <code>:</code>
-                                        (e.g. <code>A) Paris</code> or <code>B. London</code>).</li>
-                                    <li><strong>Bold</strong> the correct answer line, or wrap it in
-                                        <code>**asterisks**</code>.</li>
-                                </ul>
-
                                 <small class="text-muted">
-                                    Prefixes like "Question 1:" and "A." are automatically removed from the stored text.
+                                    Prefixes like "Question 1:" and "A." are automatically removed on import.
+                                    The text is kept in this field after import so you can review or re-import.
                                 </small>
                             </div>
                             <field name="bulk_text" widget="html"
                                    placeholder="Paste your formatted quiz text here…"/>
-                            <div class="mt-2">
-                                <button name="action_parse_bulk_text"
-                                        string="Import Questions from Text"
+                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                <button name="action_cleanup_bulk_text"
+                                        string="1. Clean Up Text"
                                         type="object"
-                                        class="btn btn-primary"/>
+                                        class="btn btn-secondary"
+                                        icon="fa-magic"/>
+                                <button name="action_preview_bulk_text"
+                                        string="2. Preview Import"
+                                        type="object"
+                                        class="btn btn-info"
+                                        icon="fa-eye"/>
+                                <button name="action_parse_bulk_text"
+                                        string="3. Import Questions from Text"
+                                        type="object"
+                                        class="btn btn-primary"
+                                        icon="fa-upload"/>
                             </div>
                         </page>
                     </notebook>

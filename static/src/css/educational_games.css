@@ -19,6 +19,17 @@
     font-weight: bold;
 }
 
+/* ── Admin form – keep header image thumbnail compact ───────────────── */
+.quiz-form-header-image .o_field_image img {
+    max-height: 80px;
+    max-width: 220px;
+    width: auto;
+    height: auto;
+    object-fit: cover;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+}
+
 .feedback-incorrect {
     color: red;
     font-weight: bold;
@@ -78,7 +89,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    /* background: linear-gradient(135deg, rgba(109,40,217,.75) 0%, rgba(67,56,202,.88) 100%); */
+    background: linear-gradient(135deg, rgba(109,40,217,.75) 0%, rgba(67,56,202,.88) 100%);
 }
 .o_quiz_page .quiz-header-content { position: relative; z-index: 1; }
 
