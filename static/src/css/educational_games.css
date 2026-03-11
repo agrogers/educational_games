@@ -58,7 +58,7 @@
 /* ── Header ─────────────────────────────────────────── */
 .o_quiz_page .quiz-header {
     position: relative;
-    background: linear-gradient(135deg, #6d28d9 0%, #4338ca 100%);
+    background: linear-gradient(135deg, #020005cb 0%, #ffffff00 100%);
     color: white;
     padding: 1.75rem 2rem 1.5rem;
     overflow: hidden;
@@ -78,7 +78,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(109,40,217,.75) 0%, rgba(67,56,202,.88) 100%);
+    /* background: linear-gradient(135deg, rgba(109,40,217,.75) 0%, rgba(67,56,202,.88) 100%); */
 }
 .o_quiz_page .quiz-header-content { position: relative; z-index: 1; }
 
