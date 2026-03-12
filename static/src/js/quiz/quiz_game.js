@@ -19,9 +19,19 @@ export class QuizGame extends Component {
 
     setup() {
         const context = this.props.action.context || {};
+        // In Odoo 18, URL query parameters (e.g. ?quiz_id=1&questionCount=3)
+        // are placed in action.params by the router, NOT in action.context.
+        // Context takes priority (set by action_preview_quiz or APEX injection);
+        // params are the fallback for direct URL navigation.
+        const params = this.props.action.params || {};
 
         this.orm = useService("orm");
         this.notification = useService("notification");
+
+        // Helper: read a value from context first, then URL params.
+        const getParam = (key) => (key in context ? context[key] : params[key]);
+
+        const arStr = getParam("allowResubmission");
 
         this.state = useState({
             loading: true,
@@ -37,17 +47,17 @@ export class QuizGame extends Component {
             retakeMode: false,
             // allowResubmission is True (Python bool) when set by action_preview_quiz,
             // or 'true' (string) when passed via a URL parameter.
-            allowResubmission: context.allowResubmission === true || context.allowResubmission === 'true',
+            allowResubmission: arStr === true || arStr === 'true',
         });
 
-        this.resId = context.active_id;
-        this.resModel = context.active_model;
-        this.quizId = context.quiz_id;
-        this.questionCount = context.questionCount || 0;
-        this.optionCount = context.optionCount || 0;
+        this.resId = getParam("active_id");
+        this.resModel = getParam("active_model");
+        this.quizId = getParam("quiz_id");
+        this.questionCount = getParam("questionCount") || 0;
+        this.optionCount = getParam("optionCount") || 0;
         this.submissionModel = APS_SUBMISSION_MODEL;
         this.isValidSubmission = (this.resModel === APS_SUBMISSION_MODEL && !!this.resId);
-        this.submission_state = context.submission_state;
+        this.submission_state = getParam("submission_state");
 
         // Track the current target submission ID; may change on each resubmission
         // so that every retake (when allowResubmission=true) writes to a new record.

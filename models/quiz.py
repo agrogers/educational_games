@@ -172,18 +172,26 @@ class Quiz(models.Model):
     def action_preview_quiz(self):
         """Launch the student quiz view in preview/practice mode."""
         self.ensure_one()
-        ctx = {'quiz_id': self.id}
+        # Build the params dict — these are serialised into the browser URL by
+        # Odoo 18's router (action.params → query string) so the quiz survives a
+        # page refresh.  The same keys are placed in context for backward
+        # compatibility with any caller that reads from action.context.
+        quiz_params = {'quiz_id': self.id}
         if self.display_question_count:
-            ctx['questionCount'] = self.display_question_count
+            quiz_params['questionCount'] = self.display_question_count
         if self.display_option_count:
-            ctx['optionCount'] = self.display_option_count
+            quiz_params['optionCount'] = self.display_option_count
         if self.allow_resubmission:
-            ctx['allowResubmission'] = True
+            quiz_params['allowResubmission'] = True
         return {
             'type': 'ir.actions.client',
             'tag': 'action_quiz_game_js',
             'name': self.name,
-            'context': ctx,
+            # params are put into the URL by the Odoo 18 router, so the quiz
+            # can be refreshed without losing the quiz_id.
+            'params': quiz_params,
+            # context is kept for compatibility (some callers read it directly).
+            'context': quiz_params,
         }
 
     def action_delete_all_questions(self):
