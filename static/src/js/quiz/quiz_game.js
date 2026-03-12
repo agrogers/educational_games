@@ -32,6 +32,8 @@ export class QuizGame extends Component {
         this.resId = context.active_id;
         this.resModel = context.active_model;
         this.quizId = context.quiz_id;
+        this.questionCount = context.questionCount || 0;
+        this.optionCount = context.optionCount || 0;
         this.submissionModel = "aps.resource.submission";
         this.isValidSubmission = (this.resModel === this.submissionModel && !!this.resId);
         this.submission_state = context.submission_state;
@@ -47,7 +49,12 @@ export class QuizGame extends Component {
 
     async loadQuiz() {
         try {
-            const quizData = await this.orm.call("quiz.quiz", "get_quiz_for_student", [this.quizId]);
+            const quizData = await this.orm.call(
+                "quiz.quiz",
+                "get_quiz_for_student",
+                [this.quizId],
+                { question_count: this.questionCount, option_count: this.optionCount }
+            );
             // Add reactive selected-answer tracking to each question
             quizData.questions.forEach((q) => {
                 q.selected_answers = [];

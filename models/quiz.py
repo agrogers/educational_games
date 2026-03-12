@@ -87,6 +87,25 @@ class Quiz(models.Model):
         max_height=300,
         help='Optional banner image displayed in the quiz header.',
     )
+    display_question_count = fields.Integer(
+        string='Questions to Show',
+        default=0,
+        help='Number of questions to display to the student. 0 = show all questions.',
+    )
+    display_option_count = fields.Integer(
+        string='Options to Show',
+        default=0,
+        help=(
+            'Number of answer options to show per question. '
+            'The correct answer is always included; remaining slots are filled randomly. '
+            '0 = show all options.'
+        ),
+    )
+    quiz_url_params = fields.Char(
+        string='Quiz URL Parameters',
+        compute='_compute_quiz_url_params',
+        help='Copy these parameters into any URL that opens this quiz.',
+    )
     bulk_text = fields.Html(
         string='Paste Quiz Text',
         sanitize=True,
@@ -111,16 +130,29 @@ class Quiz(models.Model):
         for record in self:
             record.total_marks = sum(q.marks for q in record.question_ids)
 
+    @api.depends('display_question_count', 'display_option_count')
+    def _compute_quiz_url_params(self):
+        for record in self:
+            parts = []
+            if record.display_question_count and record.display_question_count > 0:
+                parts.append(f'questionCount={record.display_question_count}')
+            if record.display_option_count and record.display_option_count > 0:
+                parts.append(f'optionCount={record.display_option_count}')
+            record.quiz_url_params = ('?' + '&'.join(parts)) if parts else ''
+
     def action_preview_quiz(self):
         """Launch the student quiz view in preview/practice mode."""
         self.ensure_one()
+        ctx = {'quiz_id': self.id}
+        if self.display_question_count:
+            ctx['questionCount'] = self.display_question_count
+        if self.display_option_count:
+            ctx['optionCount'] = self.display_option_count
         return {
             'type': 'ir.actions.client',
             'tag': 'action_quiz_game_js',
             'name': self.name,
-            'context': {
-                'quiz_id': self.id,
-            },
+            'context': ctx,
         }
 
     def action_delete_all_questions(self):
@@ -614,20 +646,49 @@ class Quiz(models.Model):
         return lines
 
     @api.model
-    def get_quiz_for_student(self, quiz_id):
+    def get_quiz_for_student(self, quiz_id, question_count=0, option_count=0):
         """
         Return quiz data with randomised answer order for the student view.
         Correct-answer flags are NOT included to prevent client-side cheating;
         validation is performed server-side in submit_quiz_answers.
+
+        :param quiz_id: int – ID of the quiz to load
+        :param question_count: int – number of questions to include (0 = all;
+            overrides quiz.display_question_count)
+        :param option_count: int – number of answer options per question (0 = all;
+            overrides quiz.display_option_count).  The correct answer is always
+            included; remaining slots are filled with randomly chosen wrong answers.
+            Note: if a question has more correct answers than option_count, all correct
+            answers are still shown (option_count acts as a minimum in that case).
         """
         quiz = self.browse(int(quiz_id))
         if not quiz.exists():
             raise UserError("Quiz not found.")
 
+        # Convert once; caller params take precedence over stored defaults
+        q_limit = int(question_count) if int(question_count) > 0 else (quiz.display_question_count or 0)
+        o_limit = int(option_count) if int(option_count) > 0 else (quiz.display_option_count or 0)
+
+        all_questions = list(quiz.question_ids)
+        if q_limit > 0 and q_limit < len(all_questions):
+            all_questions = random.sample(all_questions, q_limit)
+
         questions = []
-        for question in quiz.question_ids:
-            answers = list(question.answer_ids)
-            random.shuffle(answers)
+        for question in all_questions:
+            all_answers = list(question.answer_ids)
+
+            if o_limit > 0 and o_limit < len(all_answers):
+                correct = [a for a in all_answers if a.is_correct]
+                wrong = [a for a in all_answers if not a.is_correct]
+                # Always keep all correct answers; fill remaining slots with random wrong ones
+                keep_wrong = max(0, o_limit - len(correct))
+                selected = correct + random.sample(wrong, min(keep_wrong, len(wrong)))
+                random.shuffle(selected)
+                answers = selected
+            else:
+                answers = all_answers
+                random.shuffle(answers)
+
             questions.append({
                 'id': question.id,
                 'question_text': question.question_text or '',
@@ -642,10 +703,11 @@ class Quiz(models.Model):
                 ],
             })
 
+        displayed_marks = sum(q['marks'] for q in questions)
         return {
             'id': quiz.id,
             'name': quiz.name,
-            'total_marks': quiz.total_marks,
+            'total_marks': displayed_marks,
             # quiz.id is always a positive integer from the ORM; safe for URL use
             'header_image_url': f'/web/image/quiz.quiz/{quiz.id}/header_image' if quiz.header_image else None,
             'questions': questions,
@@ -667,8 +729,13 @@ class Quiz(models.Model):
 
         score = 0
         results = []
+        total_marks = 0
 
-        for question in quiz.question_ids:
+        # Only score the questions that the student actually received (keys in answers)
+        submitted_ids = {int(k) for k in answers}
+        questions_to_score = quiz.question_ids.filtered(lambda q: q.id in submitted_ids) if submitted_ids else quiz.question_ids
+
+        for question in questions_to_score:
             q_id = str(question.id)
             selected_ids = set(int(i) for i in (answers.get(q_id) or []))
             correct_ids = set(question.answer_ids.filtered('is_correct').ids)
@@ -676,6 +743,7 @@ class Quiz(models.Model):
             is_correct = bool(correct_ids) and selected_ids == correct_ids
             if is_correct:
                 score += question.marks
+            total_marks += question.marks
 
             results.append({
                 'question_id': question.id,
@@ -697,7 +765,7 @@ class Quiz(models.Model):
 
         return {
             'score': score,
-            'total_marks': quiz.total_marks,
+            'total_marks': total_marks,
             'results': results,
         }
 
