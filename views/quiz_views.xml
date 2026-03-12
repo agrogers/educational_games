@@ -60,39 +60,6 @@
                            placeholder="Optional description shown to students…"/>
 
                     <notebook>
-                        <!-- ── Questions tab ── -->
-                        <page string="Questions" name="questions">
-                            <field name="question_ids" context="{'default_quiz_id': id}">
-                                <list string="Questions">
-                                    <field name="sequence" widget="handle"/>
-                                    <field name="question_text" widget="html" string="Question"/>
-                                    <field name="marks"/>
-                                    <field name="correct_answer_count" string="# Correct"/>
-                                </list>
-                                <!-- Inline popup form: question + all its answers on one page -->
-                                <form string="Question">
-                                    <sheet>
-                                        <group>
-                                            <field name="sequence"/>
-                                            <field name="marks"/>
-                                            <field name="allow_multiple"/>
-                                        </group>
-                                        <field name="question_text" widget="html"
-                                               placeholder="Enter the question…"/>
-                                        <separator string="Answers"/>
-                                        <field name="answer_ids">
-                                            <list editable="bottom" string="Answers">
-                                                <field name="sequence" widget="handle"/>
-                                                <field name="answer_text" widget="html"
-                                                       string="Answer Text"/>
-                                                <field name="is_correct" string="Correct?"/>
-                                            </list>
-                                        </field>
-                                    </sheet>
-                                </form>
-                            </field>
-                        </page>
-
                         <!-- ── Bulk import tab ── -->
                         <page string="Bulk Import" name="bulk_import">
                             <div class="alert alert-info" role="alert">
@@ -138,6 +105,39 @@
                                         icon="fa-upload"/>
                             </div>
                         </page>
+                        <!-- ── Questions tab ── -->
+                        <page string="Questions" name="questions">
+                            <field name="question_ids" context="{'default_quiz_id': id}">
+                                <list string="Questions">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="question_text" widget="html" string="Question"/>
+                                    <field name="marks"/>
+                                    <field name="correct_answer_count" string="# Correct"/>
+                                </list>
+                                <!-- Inline popup form: question + all its answers on one page -->
+                                <form string="Question">
+                                    <sheet>
+                                        <group>
+                                            <field name="sequence"/>
+                                            <field name="marks"/>
+                                            <field name="allow_multiple"/>
+                                        </group>
+                                        <field name="question_text" widget="html"
+                                               placeholder="Enter the question…"/>
+                                        <separator string="Answers"/>
+                                        <field name="answer_ids">
+                                            <list editable="bottom" string="Answers">
+                                                <field name="sequence" widget="handle"/>
+                                                <field name="answer_text" widget="html"
+                                                       string="Answer Text"/>
+                                                <field name="is_correct" string="Correct?"/>
+                                            </list>
+                                        </field>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+
                     </notebook>
                 </sheet>
             </form>
