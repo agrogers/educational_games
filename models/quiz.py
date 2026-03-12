@@ -112,9 +112,13 @@ class Quiz(models.Model):
         ),
     )
     quiz_url_params = fields.Char(
-        string='Quiz URL Parameters',
+        string='APEX Game URL',
         compute='_compute_quiz_url_params',
-        help='Copy these parameters into any URL that opens this quiz.',
+        help=(
+            'Copy this into APEX to open this specific quiz. '
+            'Format: action:<id>?quiz_id=<id>&…  '
+            'Paste it into the resource URL field in the APEX module.'
+        ),
     )
     bulk_text = fields.Html(
         string='Paste Quiz Text',
@@ -142,15 +146,28 @@ class Quiz(models.Model):
 
     @api.depends('display_question_count', 'display_option_count', 'allow_resubmission')
     def _compute_quiz_url_params(self):
+        # Resolve the client action ID once for all records in this batch.
+        # The format APEX expects is: action:<action_id>?quiz_id=<quiz_id>&…
+        try:
+            action = self.env.ref('educational_games.action_quiz_game')
+            action_id = action.id
+        except ValueError:
+            # External ID not found — log a warning so it is easy to diagnose
+            import logging
+            logging.getLogger(__name__).warning(
+                "educational_games.action_quiz_game not found; quiz URL will not contain a valid action ID."
+            )
+            action_id = 'UNKNOWN'
+
         for record in self:
-            parts = []
+            parts = [f'quiz_id={record.id}']
             if record.display_question_count and record.display_question_count > 0:
                 parts.append(f'questionCount={record.display_question_count}')
             if record.display_option_count and record.display_option_count > 0:
                 parts.append(f'optionCount={record.display_option_count}')
             if record.allow_resubmission:
                 parts.append('allowResubmission=true')
-            record.quiz_url_params = ('?' + '&'.join(parts)) if parts else ''
+            record.quiz_url_params = f'action:{action_id}?{"&".join(parts)}'
 
     def action_preview_quiz(self):
         """Launch the student quiz view in preview/practice mode."""

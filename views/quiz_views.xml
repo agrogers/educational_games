@@ -59,11 +59,11 @@
                                    nolabel="1"/>
                         </group>
                     </group>
-                    <group invisible="not quiz_url_params">
+                    <group>
                         <field name="quiz_url_params" readonly="1"
-                               string="URL Parameters"
+                               string="APEX Game URL"
                                widget="CopyClipboardChar"
-                               help="Append these parameters to the quiz URL to control how many questions and options are shown."/>
+                               help="Paste this into the resource URL field in APEX to open this quiz. The format is action:&lt;id&gt;?quiz_id=&lt;id&gt;&amp;… matching the pattern used by other games."/>
                     </group>
                     <field name="description" widget="html"
                            placeholder="Optional description shown to students…"/>
