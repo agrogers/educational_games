@@ -289,13 +289,16 @@ class Quiz(models.Model):
             'answer': False,
             'state': 'assigned',
         }
-        # Clear the due date. The APEX module (aps_sis) may name this field
-        # differently across versions; try the most common names and clear the
-        # first one found. The break is intentional — we only need to clear one.
-        for date_field in ('due_date', 'date_deadline', 'deadline_date'):
+        # Clear the due date on the copy so the student gets an open-ended
+        # resubmission with no deadline.  The APEX module (aps_sis) may use
+        # different field names across versions; clear every date-like field
+        # that exists on the model rather than stopping at the first match.
+        for date_field in (
+            'due_date', 'date_deadline', 'deadline_date',
+            'date_due', 'deadline', 'date_stop',
+        ):
             if date_field in Submission._fields:
                 defaults[date_field] = False
-                break
 
         new_sub = original.copy(defaults)
         return new_sub.id

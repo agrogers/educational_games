@@ -44,6 +44,9 @@ export class QuizGame extends Component {
         this.notification = useService("notification");
 
         const arStr = getParam("allowResubmission");
+        // Read submission_state early so we can initialise retakeMode correctly below.
+        const initialSubmissionState = getParam("submission_state");
+        const allowResubmission = this._toBool(arStr);
         const routeResId = this._extractRecordIdFromActionRoute();
 
         this.state = useState({
@@ -57,10 +60,14 @@ export class QuizGame extends Component {
             activeQuestionId: null,
             // retakeMode becomes true after resetQuiz so onGameFinished can
             // distinguish a first submission from a subsequent retake.
-            retakeMode: false,
+            // It also starts as true when the existing submission record is
+            // already submitted and allowResubmission is enabled — so the first
+            // submit in this session creates a new copy rather than showing the
+            // "already submitted" error toast.
+            retakeMode: allowResubmission && !!initialSubmissionState && initialSubmissionState !== "assigned",
             // allowResubmission is True (Python bool) when set by action_preview_quiz,
             // or 'true' (string) when passed via a URL parameter.
-            allowResubmission: this._toBool(arStr),
+            allowResubmission: allowResubmission,
         });
 
         this.resId = this._toInt(getParam("active_id")) || routeResId;
@@ -73,7 +80,7 @@ export class QuizGame extends Component {
         this.optionCount = this._toInt(getParam("optionCount")) || 0;
         this.submissionModel = APS_SUBMISSION_MODEL;
         this.isValidSubmission = (this.resModel === APS_SUBMISSION_MODEL && !!this.resId);
-        this.submission_state = getParam("submission_state");
+        this.submission_state = initialSubmissionState;
 
         // Track the current target submission ID; may change on each resubmission
         // so that every retake (when allowResubmission=true) writes to a new record.
