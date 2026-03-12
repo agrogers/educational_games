@@ -142,6 +142,7 @@ export class QuizGame extends Component {
             this.state.totalMarks = result.total_marks;
             this.state.results = result.results;
             this.state.submitted = true;
+            this.state.activeQuestionId = null;
 
             await this.onGameFinished(result.score, result.results);
         } catch (error) {
