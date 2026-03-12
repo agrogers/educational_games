@@ -54,7 +54,7 @@
                         <group class="quiz-form-header-image">
                             <field name="header_image" widget="image"
                                    string="Header Image"
-                                   options="{'size': [800, 200]}"
+                                   options="{'size': [400, 50]}"
                                    nolabel="1"/>
                         </group>
                     </group>
