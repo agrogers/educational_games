@@ -8,19 +8,22 @@
     'website': '',
     'depends': ['base', 'web', 'aps_sis'],
     'data': [
+        'views/quiz_actions.xml',
         'views/actions.xml',
         'views/educational_games_menu.xml',
         'views/educational_games_views.xml',
+        'views/quiz_views.xml',
         # 'views/html_iframe_wrapper.xml',
         'security/ir.model.access.csv',
     ],
     'assets': {
-        'web.assets_frontend': [
-            'educational_games/static/src/css/educational_games.css',
-        ],
         'web.assets_backend': [
+            'educational_games/static/src/css/educational_games.css',
             'educational_games/static/src/js/binary_conversions/binary_conversions.js',
             'educational_games/static/src/js/binary_conversions/binary_conversions_action.xml',
+            # Shared utility: ORM write + notifications for aps.resource.submission.
+            # Must be listed before any game/quiz JS that imports from it.
+            'educational_games/static/src/js/utils/aps_submission.js',
             'educational_games/static/src/js/lonely_s/lonely_s_game.js',
             'educational_games/static/src/js/lonely_s/lonely_s_game_action.xml',
             # 'educational_games/static/src/js/binaryadder2.js',
@@ -29,6 +32,8 @@
             'educational_games/static/src/xml/html_game_wrapper.xml',
             'educational_games/static/src/js/game_action.js',
             'educational_games/static/src/xml/game_action.xml',
+            'educational_games/static/src/js/quiz/quiz_game.js',
+            'educational_games/static/src/js/quiz/quiz_game_action.xml',
         ],
     },
     'installable': True,
