@@ -19,19 +19,32 @@ export class QuizGame extends Component {
 
     setup() {
         const context = this.props.action.context || {};
-        // In Odoo 18, URL query parameters (e.g. ?quiz_id=1&questionCount=3)
-        // are placed in action.params by the router, NOT in action.context.
-        // Context takes priority (set by action_preview_quiz or APEX injection);
-        // params are the fallback for direct URL navigation.
-        const params = this.props.action.params || {};
+        const actionParams = this.props.action.params || {};
+        const urlParams = this._getUrlQueryParams();
+        const storageKey = this._getLaunchStorageKey();
+        const storedParams = this._loadStoredLaunchParams(storageKey);
+
+        // Context lookup precedence:
+        // 1) action.context (runtime launch), 2) action.params (router),
+        // 3) URL query string (direct URL), 4) sessionStorage (hard-refresh fallback).
+        const getParam = (key) => {
+            for (const source of [context, actionParams, urlParams, storedParams]) {
+                if (!source) {
+                    continue;
+                }
+                const value = source[key];
+                if (value !== undefined && value !== null && value !== "") {
+                    return value;
+                }
+            }
+            return undefined;
+        };
 
         this.orm = useService("orm");
         this.notification = useService("notification");
 
-        // Helper: read a value from context first, then URL params.
-        const getParam = (key) => (key in context ? context[key] : params[key]);
-
         const arStr = getParam("allowResubmission");
+        const routeResId = this._extractRecordIdFromActionRoute();
 
         this.state = useState({
             loading: true,
@@ -47,14 +60,17 @@ export class QuizGame extends Component {
             retakeMode: false,
             // allowResubmission is True (Python bool) when set by action_preview_quiz,
             // or 'true' (string) when passed via a URL parameter.
-            allowResubmission: arStr === true || arStr === 'true',
+            allowResubmission: this._toBool(arStr),
         });
 
-        this.resId = getParam("active_id");
+        this.resId = this._toInt(getParam("active_id")) || routeResId;
         this.resModel = getParam("active_model");
-        this.quizId = getParam("quiz_id");
-        this.questionCount = getParam("questionCount") || 0;
-        this.optionCount = getParam("optionCount") || 0;
+        this.quizId = this._toInt(getParam("quiz_id"));
+        this.quizToken = getParam("quiz_token");
+        // Legacy plain params are still read for backward compatibility, but
+        // signed quiz_token is preferred and enforced server-side.
+        this.questionCount = this._toInt(getParam("questionCount")) || 0;
+        this.optionCount = this._toInt(getParam("optionCount")) || 0;
         this.submissionModel = APS_SUBMISSION_MODEL;
         this.isValidSubmission = (this.resModel === APS_SUBMISSION_MODEL && !!this.resId);
         this.submission_state = getParam("submission_state");
@@ -63,7 +79,29 @@ export class QuizGame extends Component {
         // so that every retake (when allowResubmission=true) writes to a new record.
         this.currentSubmissionId = this.resId;
 
+        // Persist launch parameters for hard refresh and also mirror them into
+        // URL/state so this screen can be opened from a normal URL.
+        this._persistLaunchParams(storageKey, {
+            quiz_id: this.quizId,
+            quiz_token: this.quizToken,
+            active_id: this.resId,
+            active_model: this.resModel,
+            submission_state: this.submission_state,
+        });
+        this._syncActionRouteState({
+            quiz_id: this.quizId,
+            quiz_token: this.quizToken,
+            active_id: this.resId,
+            active_model: this.resModel,
+            submission_state: this.submission_state,
+        });
+
         onWillStart(async () => {
+            // Last-ditch fallback: in direct `/odoo/action-.../<id>/...` URLs,
+            // use that record id as quiz_id if no explicit quiz_id is present.
+            if (!this.quizId && routeResId) {
+                this.quizId = routeResId;
+            }
             if (this.quizId) {
                 await this.loadQuiz();
             } else {
@@ -78,7 +116,11 @@ export class QuizGame extends Component {
                 "quiz.quiz",
                 "get_quiz_for_student",
                 [this.quizId],
-                { question_count: this.questionCount, option_count: this.optionCount }
+                {
+                    quiz_token: this.quizToken,
+                    question_count: this.questionCount,
+                    option_count: this.optionCount,
+                }
             );
             // Add reactive selected-answer tracking to each question
             quizData.questions.forEach((q) => {
@@ -92,6 +134,9 @@ export class QuizGame extends Component {
             });
             this.state.quiz = quizData;
             this.state.totalMarks = quizData.total_marks;
+            if (typeof quizData.allow_resubmission === "boolean") {
+                this.state.allowResubmission = quizData.allow_resubmission;
+            }
             // Activate first question by default
             if (quizData.questions.length > 0) {
                 this.state.activeQuestionId = quizData.questions[0].id;
@@ -299,6 +344,111 @@ export class QuizGame extends Component {
         this.state.activeQuestionId = null;
         this.state.loading = true;
         this.loadQuiz();
+    }
+
+    _toInt(value) {
+        const asInt = parseInt(value, 10);
+        return Number.isFinite(asInt) ? asInt : null;
+    }
+
+    _toBool(value) {
+        return value === true || value === 1 || value === "1" || value === "true";
+    }
+
+    _getUrlQueryParams() {
+        const out = {};
+        const search = window.location?.search || "";
+        const params = new URLSearchParams(search);
+        for (const [key, value] of params.entries()) {
+            out[key] = value;
+        }
+        return out;
+    }
+
+    _getLaunchStorageKey() {
+        return `educational_games.quiz.launch:${window.location.pathname}`;
+    }
+
+    _loadStoredLaunchParams(storageKey) {
+        try {
+            const raw = window.sessionStorage.getItem(storageKey);
+            if (!raw) {
+                return {};
+            }
+            return JSON.parse(raw) || {};
+        } catch {
+            return {};
+        }
+    }
+
+    _persistLaunchParams(storageKey, payload) {
+        if (!payload.quiz_id) {
+            return;
+        }
+
+        try {
+            window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+        } catch {
+            // Ignore storage failures (private mode/quota).
+        }
+
+        // Ensure launch params are visible in the URL so hard refresh/direct
+        // navigation has enough context even without prior session storage.
+        try {
+            const url = new URL(window.location.href);
+            const keys = [
+                "quiz_id",
+                "quiz_token",
+                "active_id",
+                "active_model",
+                "submission_state",
+            ];
+            const concealKeys = ["questionCount", "optionCount", "allowResubmission"];
+            let changed = false;
+
+            for (const key of keys) {
+                const value = payload[key];
+                if (value === undefined || value === null || value === "" || value === false) {
+                    continue;
+                }
+                const strValue = String(value);
+                if (url.searchParams.get(key) !== strValue) {
+                    url.searchParams.set(key, strValue);
+                    changed = true;
+                }
+            }
+
+            // Remove raw tuning params so difficulty is not user-editable.
+            for (const key of concealKeys) {
+                if (url.searchParams.has(key)) {
+                    url.searchParams.delete(key);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                window.history.replaceState(window.history.state, "", url.toString());
+            }
+        } catch {
+            // Ignore URL manipulation errors.
+        }
+    }
+
+    _syncActionRouteState(payload) {
+        if (!this.props.updateActionState || !payload.quiz_id) {
+            return;
+        }
+        this.props.updateActionState(payload);
+    }
+
+    _extractRecordIdFromActionRoute() {
+        const path = window.location?.pathname || "";
+        // Typical path: /odoo/action-1136/1/action_quiz_game_js
+        const match = path.match(/\/odoo\/action-[^/]+\/(\d+)(?:\/|$)/);
+        if (!match) {
+            return null;
+        }
+        return this._toInt(match[1]);
     }
 }
 

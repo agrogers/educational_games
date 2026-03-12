@@ -1,6 +1,11 @@
 from odoo import models, fields, api
 from odoo.exceptions import UserError
+from odoo.tools import config
 from markupsafe import escape, Markup
+import base64
+import hashlib
+import hmac
+import json
 import random
 import re
 import unicodedata
@@ -144,10 +149,54 @@ class Quiz(models.Model):
         for record in self:
             record.total_marks = sum(q.marks for q in record.question_ids)
 
+    @staticmethod
+    def _b64url_encode(data):
+        return base64.urlsafe_b64encode(data).decode().rstrip('=')
+
+    @staticmethod
+    def _b64url_decode(data):
+        pad = '=' * (-len(data) % 4)
+        return base64.urlsafe_b64decode((data + pad).encode())
+
+    def _sign_quiz_payload(self, payload_json):
+        secret = (config.get('database.secret') or self.env.cr.dbname or 'odoo').encode()
+        return hmac.new(secret, payload_json.encode(), hashlib.sha256).digest()
+
+    def _build_quiz_token(self, quiz_id, question_count=0, option_count=0, allow_resubmission=False):
+        payload = {
+            'quiz_id': int(quiz_id),
+            'question_count': max(0, int(question_count or 0)),
+            'option_count': max(0, int(option_count or 0)),
+            'allow_resubmission': bool(allow_resubmission),
+        }
+        payload_json = json.dumps(payload, separators=(',', ':'), sort_keys=True)
+        signature = self._sign_quiz_payload(payload_json)
+        return f"{self._b64url_encode(payload_json.encode())}.{self._b64url_encode(signature)}"
+
+    def _decode_quiz_token(self, token):
+        if not token or '.' not in token:
+            return None
+        payload_part, sig_part = token.split('.', 1)
+        try:
+            payload_json = self._b64url_decode(payload_part).decode()
+            signature = self._b64url_decode(sig_part)
+            expected = self._sign_quiz_payload(payload_json)
+            if not hmac.compare_digest(signature, expected):
+                return None
+            payload = json.loads(payload_json)
+            return {
+                'quiz_id': int(payload.get('quiz_id') or 0),
+                'question_count': max(0, int(payload.get('question_count') or 0)),
+                'option_count': max(0, int(payload.get('option_count') or 0)),
+                'allow_resubmission': bool(payload.get('allow_resubmission')),
+            }
+        except Exception:
+            return None
+
     @api.depends('display_question_count', 'display_option_count', 'allow_resubmission')
     def _compute_quiz_url_params(self):
         # Resolve the client action ID once for all records in this batch.
-        # The format APEX expects is: action:<action_id>?quiz_id=<quiz_id>&…
+        # The format APEX expects is: action:<action_id>?quiz_id=<quiz_id>&quiz_token=<signed>
         try:
             action = self.env.ref('educational_games.action_quiz_game')
             action_id = action.id
@@ -160,35 +209,46 @@ class Quiz(models.Model):
             action_id = 'UNKNOWN'
 
         for record in self:
-            parts = [f'quiz_id={record.id}']
-            if record.display_question_count and record.display_question_count > 0:
-                parts.append(f'questionCount={record.display_question_count}')
-            if record.display_option_count and record.display_option_count > 0:
-                parts.append(f'optionCount={record.display_option_count}')
-            if record.allow_resubmission:
-                parts.append('allowResubmission=true')
+            # During onchange on unsaved forms, record.id is a NewId placeholder.
+            # Only generate a signed URL once we have a real persisted quiz ID.
+            quiz_id = record._origin.id or (record.id if isinstance(record.id, int) else 0)
+            if not quiz_id:
+                record.quiz_url_params = ''
+                continue
+
+            token = record._build_quiz_token(
+                quiz_id,
+                record.display_question_count,
+                record.display_option_count,
+                record.allow_resubmission,
+            )
+            parts = [f'quiz_id={quiz_id}', f'quiz_token={token}']
             record.quiz_url_params = f'action:{action_id}?{"&".join(parts)}'
 
     def action_preview_quiz(self):
         """Launch the student quiz view in preview/practice mode."""
         self.ensure_one()
-        # Build the params dict — these are serialised into the browser URL by
-        # Odoo 18's router (action.params → query string) so the quiz survives a
-        # page refresh.  The same keys are placed in context for backward
-        # compatibility with any caller that reads from action.context.
-        quiz_params = {'quiz_id': self.id}
-        if self.display_question_count:
-            quiz_params['questionCount'] = self.display_question_count
-        if self.display_option_count:
-            quiz_params['optionCount'] = self.display_option_count
-        if self.allow_resubmission:
-            quiz_params['allowResubmission'] = True
+        quiz_id = self._origin.id or (self.id if isinstance(self.id, int) else 0)
+        if not quiz_id:
+            raise UserError("Please save the quiz before previewing.")
+
+        # Use a signed token so URL params can configure quiz difficulty without
+        # exposing editable plain counts in the browser address bar.
+        quiz_params = {
+            'quiz_id': quiz_id,
+            'quiz_token': self._build_quiz_token(
+                quiz_id,
+                self.display_question_count,
+                self.display_option_count,
+                self.allow_resubmission,
+            ),
+        }
         return {
             'type': 'ir.actions.client',
             'tag': 'action_quiz_game_js',
             'name': self.name,
             # params are put into the URL by the Odoo 18 router, so the quiz
-            # can be refreshed without losing the quiz_id.
+            # can be refreshed without losing the signed quiz context.
             'params': quiz_params,
             # context is kept for compatibility (some callers read it directly).
             'context': quiz_params,
@@ -719,28 +779,38 @@ class Quiz(models.Model):
         return lines
 
     @api.model
-    def get_quiz_for_student(self, quiz_id, question_count=0, option_count=0):
+    def get_quiz_for_student(self, quiz_id, question_count=0, option_count=0, quiz_token=None):
         """
         Return quiz data with randomised answer order for the student view.
         Correct-answer flags are NOT included to prevent client-side cheating;
         validation is performed server-side in submit_quiz_answers.
 
         :param quiz_id: int – ID of the quiz to load
-        :param question_count: int – number of questions to include (0 = all;
-            overrides quiz.display_question_count)
-        :param option_count: int – number of answer options per question (0 = all;
-            overrides quiz.display_option_count).  The correct answer is always
-            included; remaining slots are filled with randomly chosen wrong answers.
-            Note: if a question has more correct answers than option_count, all correct
-            answers are still shown (option_count acts as a minimum in that case).
+        :param question_count: int – accepted only for backward compatibility.
+            Ignored unless quiz_token is valid.
+        :param option_count: int – accepted only for backward compatibility.
+            Ignored unless quiz_token is valid.
+        :param quiz_token: str – signed token produced by _build_quiz_token().
         """
         quiz = self.browse(int(quiz_id))
         if not quiz.exists():
             raise UserError("Quiz not found.")
 
-        # Convert once; caller params take precedence over stored defaults
-        q_limit = int(question_count) if int(question_count) > 0 else (quiz.display_question_count or 0)
-        o_limit = int(option_count) if int(option_count) > 0 else (quiz.display_option_count or 0)
+        allow_resubmission = False
+
+        # Signed token mode: trust only values encoded in the token.
+        if quiz_token:
+            token_data = self._decode_quiz_token(quiz_token)
+            if not token_data or token_data['quiz_id'] != quiz.id:
+                raise UserError("Invalid quiz link.")
+            q_limit = token_data['question_count']
+            o_limit = token_data['option_count']
+            allow_resubmission = token_data['allow_resubmission']
+        else:
+            # Unsigned URL parameters are intentionally ignored so students
+            # cannot lower difficulty by editing query parameters.
+            q_limit = 0
+            o_limit = 0
 
         all_questions = list(quiz.question_ids)
         if q_limit > 0 and q_limit < len(all_questions):
@@ -781,6 +851,7 @@ class Quiz(models.Model):
             'id': quiz.id,
             'name': quiz.name,
             'total_marks': displayed_marks,
+            'allow_resubmission': allow_resubmission,
             # quiz.id is always a positive integer from the ORM; safe for URL use
             'header_image_url': f'/web/image/quiz.quiz/{quiz.id}/header_image' if quiz.header_image else None,
             'questions': questions,
