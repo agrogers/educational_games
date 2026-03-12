@@ -144,6 +144,18 @@ export class QuizGame extends Component {
             if (typeof quizData.allow_resubmission === "boolean") {
                 this.state.allowResubmission = quizData.allow_resubmission;
             }
+            // Token-based allow_resubmission arrives from the server after setup().
+            // Re-evaluate initial retake mode now so existing submitted tasks can
+            // immediately enter resubmission flow when enabled by token.
+            if (
+                !this.state.retakeMode &&
+                this.isValidSubmission &&
+                this.submission_state &&
+                this.submission_state !== "assigned" &&
+                this.state.allowResubmission
+            ) {
+                this.state.retakeMode = true;
+            }
             // Activate first question by default
             if (quizData.questions.length > 0) {
                 this.state.activeQuestionId = quizData.questions[0].id;

@@ -294,8 +294,7 @@ class Quiz(models.Model):
         # different field names across versions; clear every date-like field
         # that exists on the model rather than stopping at the first match.
         for date_field in (
-            'due_date', 'date_deadline', 'deadline_date',
-            'date_due', 'deadline', 'date_stop',
+            'date_due',
         ):
             if date_field in Submission._fields:
                 defaults[date_field] = False
