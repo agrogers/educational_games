@@ -2,6 +2,10 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import {
+    APS_SUBMISSION_MODEL,
+    saveToApsSubmission,
+} from "@educational_games/js/utils/aps_submission";
 
 export class LonelySGame extends Component {
     static template = "lonely_s_game.GameTemplate";
@@ -32,8 +36,8 @@ export class LonelySGame extends Component {
         
         this.resId = context.active_id;
         this.resModel = context.active_model;
-        this.submissionModel = "aps.resource.submission";
-        this.isValidSubmission = (this.resModel === this.submissionModel && !!this.resId);
+        this.submissionModel = APS_SUBMISSION_MODEL;
+        this.isValidSubmission = (this.resModel === APS_SUBMISSION_MODEL && !!this.resId);
         this.numSentences = context.out_of_marks || 10; // default for practice mode
         
 
@@ -121,6 +125,11 @@ export class LonelySGame extends Component {
             </table>`;
     }
 
+    /**
+     * Called when the student checks their answers.
+     * Saves the result to the linked aps.resource.submission using the shared
+     * saveToApsSubmission() utility from aps_submission.js.
+     */
     async onGameFinished(finalScore, gameResults) {
         if (!this.isValidSubmission) {
             this.notification.add(`Practice Score: ${finalScore} out of ${this.numSentences} `, { type: "info" });
@@ -134,18 +143,12 @@ export class LonelySGame extends Component {
 
         const htmlReport = this._buildAnswerHtml(gameResults);
 
-        try {
-            await this.orm.write(this.submissionModel, [this.resId], {
-                score: finalScore,
-                answer: htmlReport,
-                state: 'submitted'
-            });
-            this.notification.add("Official submission saved!", { type: "success" });
+        const saved = await saveToApsSubmission(
+            this.orm, this.notification, this.resId, finalScore, htmlReport
+        );
+        if (saved) {
             this.state.submission_state = 'submitted';
             this.state.submission_submitted = true;
-
-        } catch (error) {
-            this.notification.add("Error saving submission.", { type: "danger" });
         }
     }
 

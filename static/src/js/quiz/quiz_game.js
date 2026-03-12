@@ -2,6 +2,11 @@
 import { Component, useState, onWillStart, markup } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import {
+    APS_SUBMISSION_MODEL,
+    saveToApsSubmission,
+    createSubmissionCopy,
+} from "@educational_games/js/utils/aps_submission";
 
 export class QuizGame extends Component {
     static template = "quiz_game.QuizTemplate";
@@ -27,6 +32,12 @@ export class QuizGame extends Component {
             results: [],
             submission_submitted: false,
             activeQuestionId: null,
+            // retakeMode becomes true after resetQuiz so onGameFinished can
+            // distinguish a first submission from a subsequent retake.
+            retakeMode: false,
+            // allowResubmission is True (Python bool) when set by action_preview_quiz,
+            // or 'true' (string) when passed via a URL parameter.
+            allowResubmission: context.allowResubmission === true || context.allowResubmission === 'true',
         });
 
         this.resId = context.active_id;
@@ -34,9 +45,13 @@ export class QuizGame extends Component {
         this.quizId = context.quiz_id;
         this.questionCount = context.questionCount || 0;
         this.optionCount = context.optionCount || 0;
-        this.submissionModel = "aps.resource.submission";
-        this.isValidSubmission = (this.resModel === this.submissionModel && !!this.resId);
+        this.submissionModel = APS_SUBMISSION_MODEL;
+        this.isValidSubmission = (this.resModel === APS_SUBMISSION_MODEL && !!this.resId);
         this.submission_state = context.submission_state;
+
+        // Track the current target submission ID; may change on each resubmission
+        // so that every retake (when allowResubmission=true) writes to a new record.
+        this.currentSubmissionId = this.resId;
 
         onWillStart(async () => {
             if (this.quizId) {
@@ -172,50 +187,50 @@ export class QuizGame extends Component {
         return div.innerHTML;
     }
 
-    _buildAnswerHtml(results) {
+    /**
+     * Build a plain-text HTML report for storing in the submission's answer field.
+     *
+     * Each question is shown as a row with:
+     *   ✅ / ❌  question text (plain, no HTML formatting)  (N mark/marks)
+     *
+     * The report intentionally avoids images and rich formatting so it is
+     * readable in the APEX submission viewer.
+     */
+    _buildAnswerHtml(results, score, totalMarks) {
         const safeText = (html) => this._escapeHtml(this._stripHtml(html));
-        const rows = results
-            .map((r) => {
-                const bgColor = r.is_correct ? "#d4edda" : "#f8d7da";
-                const textColor = r.is_correct ? "#155724" : "#721c24";
-                const status = r.is_correct ? "✓ Correct" : "✗ Incorrect";
+        const rows = results.map((r) => {
+            const icon = r.is_correct ? "✅" : "❌";
+            const marksLabel = r.marks === 1 ? "1 mark" : `${r.marks} marks`;
+            return `<tr>
+                <td style="padding:6px 10px;border:1px solid #dee2e6;font-size:1.1em;width:36px;">${icon}</td>
+                <td style="padding:6px 10px;border:1px solid #dee2e6;">${safeText(r.question_text)} <em style="color:#6c757d;">(${marksLabel})</em></td>
+            </tr>`;
+        }).join("");
 
-                const correctAnswers = r.answers
-                    .filter((a) => a.is_correct)
-                    .map((a) => safeText(a.answer_text))
-                    .join(", ");
-
-                const selectedAnswers =
-                    r.answers
-                        .filter((a) => a.was_selected)
-                        .map((a) => safeText(a.answer_text))
-                        .join(", ") || "(None selected)";
-
-                return `
-                    <tr>
-                        <td style="padding:8px;border:1px solid #dee2e6;">${safeText(r.question_text)}</td>
-                        <td style="padding:8px;border:1px solid #dee2e6;background:${bgColor};color:${textColor};">${selectedAnswers}</td>
-                        <td style="padding:8px;border:1px solid #dee2e6;">${correctAnswers}</td>
-                        <td style="padding:8px;border:1px solid #dee2e6;background:${bgColor};color:${textColor};font-weight:bold;">${status}</td>
-                    </tr>`;
-            })
-            .join("");
-
-        return `
-            <table style="width:100%;border-collapse:collapse;margin-top:10px;font-family:sans-serif;">
-                <thead>
-                    <tr style="background:#f8f9fa;">
-                        <th style="padding:8px;border:1px solid #dee2e6;text-align:left;">Question</th>
-                        <th style="padding:8px;border:1px solid #dee2e6;text-align:left;">Your Answer(s)</th>
-                        <th style="padding:8px;border:1px solid #dee2e6;text-align:left;">Correct Answer(s)</th>
-                        <th style="padding:8px;border:1px solid #dee2e6;text-align:left;">Result</th>
-                    </tr>
-                </thead>
+        return `<p style="font-family:sans-serif;"><strong>Score: ${score} / ${totalMarks}</strong></p>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;font-family:sans-serif;font-size:0.95em;">
                 <tbody>${rows}</tbody>
             </table>`;
     }
 
+    /**
+     * Called when the student submits the quiz.
+     *
+     * Saves the result to the linked aps.resource.submission when one exists,
+     * using the shared saveToApsSubmission() utility from aps_submission.js.
+     *
+     * Resubmission flow (allowResubmission=true):
+     *   - First submission:  writes to the original submission record.
+     *   - Retake:            creates a new submission copy (no due date) via
+     *                        createSubmissionCopy(), then writes to it.
+     *
+     * Practice flow (allowResubmission=false or no submission context):
+     *   - Retake:            shows a practice-score toast; nothing is saved.
+     */
     async onGameFinished(finalScore, results) {
+        const htmlReport = this._buildAnswerHtml(results, finalScore, this.state.totalMarks);
+
+        // No submission context — always show practice score toast
         if (!this.isValidSubmission) {
             this.notification.add(
                 `Practice Score: ${finalScore} / ${this.state.totalMarks}`,
@@ -224,6 +239,29 @@ export class QuizGame extends Component {
             return;
         }
 
+        // Retake after a previous submission
+        if (this.state.retakeMode) {
+            if (this.state.allowResubmission) {
+                // Create a new submission copy and save to it
+                const newId = await createSubmissionCopy(this.orm, this.notification, this.currentSubmissionId);
+                if (newId) {
+                    const saved = await saveToApsSubmission(this.orm, this.notification, newId, finalScore, htmlReport);
+                    if (saved) {
+                        this.currentSubmissionId = newId;
+                        this.state.submission_submitted = true;
+                    }
+                }
+            } else {
+                // Practice retake — do not save
+                this.notification.add(
+                    `Practice Score: ${finalScore} / ${this.state.totalMarks}. Results not saved.`,
+                    { type: "info" }
+                );
+            }
+            return;
+        }
+
+        // First submission: check that it hasn't already been submitted
         if (this.submission_state !== "assigned") {
             this.notification.add(
                 "This task has already been submitted so these results cannot be saved.",
@@ -232,23 +270,18 @@ export class QuizGame extends Component {
             return;
         }
 
-        const htmlReport = this._buildAnswerHtml(results);
-
-        try {
-            await this.orm.write(this.submissionModel, [this.resId], {
-                score: finalScore,
-                answer: htmlReport,
-                state: "submitted",
-            });
-            this.notification.add("Results saved successfully!", { type: "success" });
+        const saved = await saveToApsSubmission(
+            this.orm, this.notification, this.currentSubmissionId, finalScore, htmlReport
+        );
+        if (saved) {
             this.state.submission_submitted = true;
-        } catch (error) {
-            console.error("Error saving submission:", error);
-            this.notification.add("Error saving results. Please contact your teacher.", { type: "danger" });
+            this.submission_state = "submitted";
         }
     }
 
     resetQuiz() {
+        // Mark subsequent submissions as retakes so onGameFinished handles them correctly
+        this.state.retakeMode = true;
         this.state.submitted = false;
         this.state.score = 0;
         this.state.results = [];
