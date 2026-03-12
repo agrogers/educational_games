@@ -48,6 +48,8 @@
                         <group>
                             <field name="question_count" readonly="1"/>
                             <field name="total_marks" readonly="1"/>
+                            <field name="display_question_count"/>
+                            <field name="display_option_count"/>
                         </group>
                         <group class="quiz-form-header-image">
                             <field name="header_image" widget="image"
@@ -55,6 +57,12 @@
                                    options="{'size': [800, 200]}"
                                    nolabel="1"/>
                         </group>
+                    </group>
+                    <group invisible="not quiz_url_params">
+                        <field name="quiz_url_params" readonly="1"
+                               string="URL Parameters"
+                               widget="CopyClipboardChar"
+                               help="Append these parameters to the quiz URL to control how many questions and options are shown."/>
                     </group>
                     <field name="description" widget="html"
                            placeholder="Optional description shown to students…"/>
