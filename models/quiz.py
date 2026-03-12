@@ -27,6 +27,12 @@ _ANSWER_PREFIX_RE = re.compile(
     r'^[A-Za-z][\)\.:]\s+'
 )
 
+# Plain Markdown detection patterns (used in _extract_lines_from_html).
+# _MD_BOLD_ITALIC_RE: ***text*** — whole-line bold+italic wrap
+# _MD_ITALIC_RE:      *text*    — whole-line italic wrap (empty *  * is rejected)
+_MD_BOLD_ITALIC_RE = re.compile(r'^\*{3}(.+)\*{3}\s*$')
+_MD_ITALIC_RE = re.compile(r'^\*([^*]+)\*\s*$')
+
 
 def _normalize_text(text):
     """
@@ -531,7 +537,7 @@ class Quiz(models.Model):
                 is_italic = False
 
                 # Bold + italic: ***text***
-                _m = re.match(r'^\*{3}(.+?)\*{3}\s*$', raw_text)
+                _m = _MD_BOLD_ITALIC_RE.match(raw_text)
                 if _m:
                     raw_text = _m.group(1).strip()
                     has_bold = True
@@ -542,7 +548,7 @@ class Quiz(models.Model):
                         has_bold = True
                         raw_text = raw_text.replace('**', '').strip()
                     # Italic: *text* single-asterisk whole-line wrap
-                    _m = re.match(r'^\*([^*]+)\*\s*$', raw_text)
+                    _m = _MD_ITALIC_RE.match(raw_text)
                     if _m:
                         raw_text = _m.group(1).strip()
                         is_italic = True
@@ -577,7 +583,7 @@ class Quiz(models.Model):
                 is_italic = False
                 clean_line = line
                 # Bold + italic: ***text***
-                _m = re.match(r'^\*{3}(.+?)\*{3}\s*$', line)
+                _m = _MD_BOLD_ITALIC_RE.match(line)
                 if _m:
                     clean_line = _m.group(1).strip()
                     has_bold = True
@@ -585,19 +591,23 @@ class Quiz(models.Model):
                 elif has_bold:
                     clean_line = line.replace('**', '').strip()
                     # After stripping **, check if remainder is *text* wrapped
-                    _m = re.match(r'^\*([^*]+)\*\s*$', clean_line)
+                    _m = _MD_ITALIC_RE.match(clean_line)
                     if _m:
                         clean_line = _m.group(1).strip()
                         is_italic = True
                 else:
                     # Italic: *text* whole-line wrap or line that starts with lone *
-                    _m = re.match(r'^\*([^*]+)\*\s*$', line)
+                    _m = _MD_ITALIC_RE.match(line)
                     if _m:
                         clean_line = _m.group(1).strip()
                         is_italic = True
                     elif line.startswith('*') and not line.startswith('**'):
                         is_italic = True
-                        clean_line = line.lstrip('*').rstrip('*').strip()
+                        # Strip only the leading * and (if present) trailing *
+                        clean_line = line[1:]
+                        if clean_line.endswith('*'):
+                            clean_line = clean_line[:-1]
+                        clean_line = clean_line.strip()
                 clean_line = _normalize_text(clean_line)
                 if clean_line:
                     lines.append((clean_line, has_bold, is_italic))
