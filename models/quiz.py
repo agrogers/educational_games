@@ -101,6 +101,16 @@ class Quiz(models.Model):
             '0 = show all options.'
         ),
     )
+    allow_resubmission = fields.Boolean(
+        string='Allow Resubmission',
+        default=False,
+        help=(
+            'If enabled, students can retake the quiz and save each attempt as '
+            'a new submission. The "Submit Quiz" button changes to '
+            '"Resubmit this Quiz" on retakes. '
+            'If disabled, retakes run in practice mode only (no save).'
+        ),
+    )
     quiz_url_params = fields.Char(
         string='Quiz URL Parameters',
         compute='_compute_quiz_url_params',
@@ -130,7 +140,7 @@ class Quiz(models.Model):
         for record in self:
             record.total_marks = sum(q.marks for q in record.question_ids)
 
-    @api.depends('display_question_count', 'display_option_count')
+    @api.depends('display_question_count', 'display_option_count', 'allow_resubmission')
     def _compute_quiz_url_params(self):
         for record in self:
             parts = []
@@ -138,6 +148,8 @@ class Quiz(models.Model):
                 parts.append(f'questionCount={record.display_question_count}')
             if record.display_option_count and record.display_option_count > 0:
                 parts.append(f'optionCount={record.display_option_count}')
+            if record.allow_resubmission:
+                parts.append('allowResubmission=true')
             record.quiz_url_params = ('?' + '&'.join(parts)) if parts else ''
 
     def action_preview_quiz(self):
@@ -148,6 +160,8 @@ class Quiz(models.Model):
             ctx['questionCount'] = self.display_question_count
         if self.display_option_count:
             ctx['optionCount'] = self.display_option_count
+        if self.allow_resubmission:
+            ctx['allowResubmission'] = True
         return {
             'type': 'ir.actions.client',
             'tag': 'action_quiz_game_js',
@@ -166,6 +180,40 @@ class Quiz(models.Model):
             'view_mode': 'form',
             'target': 'current',
         }
+
+    @api.model
+    def create_submission_copy(self, source_submission_id):
+        """
+        Create a copy of an existing aps.resource.submission for resubmission.
+
+        Called by the OWL quiz component (quiz_game.js) when allowResubmission
+        is enabled and the student clicks "Resubmit this Quiz".  The copy is
+        created using ORM copy() so all required fields are preserved.  The
+        due date (whichever field name the APEX module uses) is cleared, and
+        score/answer/state are reset to give the student a fresh attempt.
+
+        Returns the ID of the newly created submission.
+        """
+        Submission = self.env['aps.resource.submission']
+        original = Submission.browse(int(source_submission_id))
+        if not original.exists():
+            raise UserError("Original submission not found.")
+
+        defaults = {
+            'score': 0,
+            'answer': False,
+            'state': 'assigned',
+        }
+        # Clear the due date. The APEX module (aps_sis) may name this field
+        # differently across versions; try the most common names and clear the
+        # first one found. The break is intentional — we only need to clear one.
+        for date_field in ('due_date', 'date_deadline', 'deadline_date'):
+            if date_field in Submission._fields:
+                defaults[date_field] = False
+                break
+
+        new_sub = original.copy(defaults)
+        return new_sub.id
 
     def action_cleanup_bulk_text(self):
         """

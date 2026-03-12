@@ -175,8 +175,16 @@
                                         Results saved to your submission ✓
                                     </div>
                                 </div>
-                                <button class="quiz-btn-retry btn mt-3" t-on-click="resetQuiz">
-                                    Try Again
+                                <!-- Button caption changes based on whether resubmission saves results -->
+                                <button t-if="state.allowResubmission"
+                                        class="quiz-btn-retry btn mt-3"
+                                        t-on-click="resetQuiz">
+                                    Resubmit this Quiz
+                                </button>
+                                <button t-else=""
+                                        class="quiz-btn-retry btn mt-3"
+                                        t-on-click="resetQuiz">
+                                    Practice Again
                                 </button>
                             </div>
 

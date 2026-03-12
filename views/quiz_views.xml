@@ -50,6 +50,7 @@
                             <field name="total_marks" readonly="1"/>
                             <field name="display_question_count"/>
                             <field name="display_option_count"/>
+                            <field name="allow_resubmission"/>
                         </group>
                         <group class="quiz-form-header-image">
                             <field name="header_image" widget="image"
