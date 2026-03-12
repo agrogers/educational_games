@@ -482,8 +482,13 @@ class Quiz(models.Model):
 
         has_bold:   True when the line contains <strong>/<b>, bold inline style,
                     or ** markdown markers.
-        is_italic:  True when the majority of the line's text is in italic tags
-                    or has italic inline style.
+        is_italic:  True when the majority of the line's text is in italic tags,
+                    has italic inline style, or is wrapped in *single asterisks*.
+
+        Supported plain-Markdown inputs (checked before HTML styling):
+          *question text*        → italic (question)
+          **correct answer**     → bold (correct answer)
+          ***bold+italic text*** → bold + italic
         """
         lines = []
         BLOCK_TAGS = frozenset(('p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'))
@@ -521,27 +526,42 @@ class Quiz(models.Model):
 
                 total_len = len(raw_text)
 
-                # Detect bold: markdown ** markers take priority
+                # Markdown markers take priority over HTML element styling.
                 has_bold = False
-                if '**' in raw_text:
-                    has_bold = True
-                    # Remove ** markers whether inline or wrapping the whole line
-                    raw_text = raw_text.replace('**', '').strip()
-                else:
-                    bold_len = sum(
-                        len(_normalize_text(''.join(c.itertext())))
-                        for c in elem.iter()
-                        if c is not elem and _elem_is_bold(c)
-                    )
-                    has_bold = bool(bold_len) and bold_len >= total_len * 0.3
+                is_italic = False
 
-                # Detect italic
-                italic_len = sum(
-                    len(_normalize_text(''.join(c.itertext())))
-                    for c in elem.iter()
-                    if c is not elem and _elem_is_italic(c)
-                )
-                is_italic = bool(italic_len) and italic_len >= total_len * 0.5
+                # Bold + italic: ***text***
+                _m = re.match(r'^\*{3}(.+?)\*{3}\s*$', raw_text)
+                if _m:
+                    raw_text = _m.group(1).strip()
+                    has_bold = True
+                    is_italic = True
+                else:
+                    # Bold: ** markers (whole-line wrap or inline occurrences)
+                    if '**' in raw_text:
+                        has_bold = True
+                        raw_text = raw_text.replace('**', '').strip()
+                    # Italic: *text* single-asterisk whole-line wrap
+                    _m = re.match(r'^\*([^*]+)\*\s*$', raw_text)
+                    if _m:
+                        raw_text = _m.group(1).strip()
+                        is_italic = True
+
+                    # Fall back to HTML element inspection when no Markdown found
+                    if not has_bold:
+                        bold_len = sum(
+                            len(_normalize_text(''.join(c.itertext())))
+                            for c in elem.iter()
+                            if c is not elem and _elem_is_bold(c)
+                        )
+                        has_bold = bool(bold_len) and bold_len >= total_len * 0.3
+                    if not is_italic:
+                        italic_len = sum(
+                            len(_normalize_text(''.join(c.itertext())))
+                            for c in elem.iter()
+                            if c is not elem and _elem_is_italic(c)
+                        )
+                        is_italic = bool(italic_len) and italic_len >= total_len * 0.5
 
                 if raw_text:
                     lines.append((raw_text, has_bold, is_italic))
@@ -554,9 +574,30 @@ class Quiz(models.Model):
                 if not line:
                     continue
                 has_bold = '**' in line
-                is_italic = line.startswith('*') and not line.startswith('**')
-                # Use replace() consistently with the lxml path
-                clean_line = line.replace('**', '').replace('*', '').strip() if (has_bold or is_italic) else line
+                is_italic = False
+                clean_line = line
+                # Bold + italic: ***text***
+                _m = re.match(r'^\*{3}(.+?)\*{3}\s*$', line)
+                if _m:
+                    clean_line = _m.group(1).strip()
+                    has_bold = True
+                    is_italic = True
+                elif has_bold:
+                    clean_line = line.replace('**', '').strip()
+                    # After stripping **, check if remainder is *text* wrapped
+                    _m = re.match(r'^\*([^*]+)\*\s*$', clean_line)
+                    if _m:
+                        clean_line = _m.group(1).strip()
+                        is_italic = True
+                else:
+                    # Italic: *text* whole-line wrap or line that starts with lone *
+                    _m = re.match(r'^\*([^*]+)\*\s*$', line)
+                    if _m:
+                        clean_line = _m.group(1).strip()
+                        is_italic = True
+                    elif line.startswith('*') and not line.startswith('**'):
+                        is_italic = True
+                        clean_line = line.lstrip('*').rstrip('*').strip()
                 clean_line = _normalize_text(clean_line)
                 if clean_line:
                     lines.append((clean_line, has_bold, is_italic))
