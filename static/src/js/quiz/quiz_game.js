@@ -53,6 +53,7 @@ export class QuizGame extends Component {
             loading: true,
             quiz: null,
             submitted: false,
+            isCheckingAll: false,
             score: 0,
             totalMarks: 0,
             results: [],
@@ -224,6 +225,13 @@ export class QuizGame extends Component {
     async submitQuiz() {
         if (this.state.submitted) return;
 
+        if (this.state.isTeacher) {
+            const confirmed = window.confirm("Do you really want to save your responses?");
+            if (!confirmed) {
+                return;
+            }
+        }
+
         // Build payload: { "questionId": [answerId, ...] }
         const answers = {};
         for (const question of this.state.quiz.questions) {
@@ -270,42 +278,81 @@ export class QuizGame extends Component {
      */
     async checkAnswer(question) {
         if (this.state.submitted || question.checked) return;
-        try {
-            const data = await this.orm.call(
-                "quiz.quiz",
-                "check_single_question",
-                [this.quizId, question.id]
-            );
-            const selectedIds = question.selected_answers;
-            const correctIds = data.correct_answer_ids;
-            const isCorrect =
-                correctIds.length > 0 &&
-                selectedIds.length === correctIds.length &&
-                selectedIds.every((id) => correctIds.includes(id));
 
-            question.result = {
-                question_id: question.id,
-                question_text: data.question_text,
-                is_correct: isCorrect,
-                correct_answer_ids: correctIds,
-                selected_answer_ids: selectedIds,
-                marks: data.marks,
-                answers: data.answers.map((a) => ({
-                    id: a.id,
-                    answer_text: a.answer_text,
-                    is_correct: a.is_correct,
-                    was_selected: selectedIds.includes(a.id),
-                })),
-            };
-            question.responseStats = data.response_stats || {};
-            question.showDual = data.show_dual || false;
-            question.totalRespondents = data.total_respondents || 0;
-            question.recentRespondents = data.recent_respondents || 0;
-            question.checked = true;
+        try {
+            await this._revealQuestionAnswer(question);
         } catch (error) {
             console.error("Error checking answer:", error);
             this.notification.add("Error checking answer. Please try again.", { type: "danger" });
         }
+    }
+
+    async checkAllAnswers() {
+        if (this.state.submitted || !this.state.isTeacher || this.state.isCheckingAll) return;
+
+        const toCheck = this.state.quiz.questions.filter((question) => !question.checked);
+        if (!toCheck.length) {
+            return;
+        }
+
+        this.state.isCheckingAll = true;
+        try {
+            const checkResults = await Promise.allSettled(
+                toCheck.map((question) => this._revealQuestionAnswer(question))
+            );
+            const failed = checkResults.filter((entry) => entry.status === "rejected").length;
+
+            if (failed) {
+                this.notification.add(
+                    `Checked ${toCheck.length - failed} question(s). ${failed} failed.`,
+                    { type: "warning" }
+                );
+            } else {
+                this.notification.add(
+                    "Correct answers revealed. Responses have not been saved.",
+                    { type: "info" }
+                );
+            }
+        } catch (error) {
+            console.error("Error checking all answers:", error);
+            this.notification.add("Error checking answers. Please try again.", { type: "danger" });
+        } finally {
+            this.state.isCheckingAll = false;
+        }
+    }
+
+    async _revealQuestionAnswer(question) {
+        const data = await this.orm.call(
+            "quiz.quiz",
+            "check_single_question",
+            [this.quizId, question.id]
+        );
+        const selectedIds = question.selected_answers;
+        const correctIds = data.correct_answer_ids;
+        const isCorrect =
+            correctIds.length > 0 &&
+            selectedIds.length === correctIds.length &&
+            selectedIds.every((id) => correctIds.includes(id));
+
+        question.result = {
+            question_id: question.id,
+            question_text: data.question_text,
+            is_correct: isCorrect,
+            correct_answer_ids: correctIds,
+            selected_answer_ids: selectedIds,
+            marks: data.marks,
+            answers: data.answers.map((a) => ({
+                id: a.id,
+                answer_text: a.answer_text,
+                is_correct: a.is_correct,
+                was_selected: selectedIds.includes(a.id),
+            })),
+        };
+        question.responseStats = data.response_stats || {};
+        question.showDual = data.show_dual || false;
+        question.totalRespondents = data.total_respondents || 0;
+        question.recentRespondents = data.recent_respondents || 0;
+        question.checked = true;
     }
 
     _stripHtml(html) {
@@ -418,6 +465,7 @@ export class QuizGame extends Component {
         // Mark subsequent submissions as retakes so onGameFinished handles them correctly
         this.state.retakeMode = true;
         this.state.submitted = false;
+        this.state.isCheckingAll = false;
         this.state.score = 0;
         this.state.results = [];
         this.state.submission_submitted = false;

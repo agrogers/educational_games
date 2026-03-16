@@ -164,40 +164,28 @@
 
                                             <!-- ── Percentage-pie stats (teacher Check view) ── -->
                                             <div t-if="ansStats" class="quiz-ans-stats ms-auto d-flex align-items-center gap-1 flex-shrink-0">
-
-                                                <!-- Total-respondents pie -->
-                                                <div class="quiz-pct-block" t-att-title="ansStats.total_count + ' of ' + question.totalRespondents + ' respondents'">
-                                                    <svg class="quiz-pct-pie" width="44" height="44" viewBox="0 0 36 36" aria-hidden="true">
-                                                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#dee2e6" stroke-width="4.5"/>
-                                                        <circle cx="18" cy="18" r="15.9" fill="none"
-                                                                t-att-stroke="ansStats.show_recent ? '#9ca3af' : '#7c3aed'"
-                                                                stroke-width="4.5"
-                                                                t-att-stroke-dasharray="ansStats.total_pct + ' 100'"
-                                                                stroke-linecap="round"
-                                                                transform="rotate(-90 18 18)"/>
-                                                        <text x="18" y="21.5" text-anchor="middle" font-size="7.5" font-weight="600"
-                                                              t-att-fill="ansStats.show_recent ? '#6b7280' : '#7c3aed'"
-                                                              t-esc="ansStats.total_pct + '%'"/>
-                                                    </svg>
-                                                    <div t-if="ansStats.show_recent" class="quiz-pct-label">all</div>
+                                                <t t-set="displayPct" t-value="ansStats.recent_count > 0 ? ansStats.recent_pct : ansStats.total_pct"/>
+                                                <div class="quiz-pct-block quiz-pct-combined"
+                                                     t-att-title="'All: ' + ansStats.total_count + ' of ' + question.totalRespondents + ' respondents · Recent: ' + (ansStats.recent_count > 0 ? (ansStats.recent_count + ' of ' + question.recentRespondents) : 'no recent data')">
+                                                    <div class="quiz-pct-viz"
+                                                         t-att-style="'--recent-pct:' + displayPct + ';'">
+                                                        <svg class="quiz-pct-pie" width="44" height="44" viewBox="0 0 36 36" aria-hidden="true">
+                                                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#dee2e6" stroke-width="4.5"/>
+                                                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#9ca3af"
+                                                                    stroke-width="4.5"
+                                                                    t-att-stroke-dasharray="ansStats.total_pct + ' 100'"
+                                                                    stroke-linecap="round"
+                                                                    transform="rotate(-90 18 18)"/>
+                                                        </svg>
+                                                        <div t-if="ansStats.recent_count > 0" class="quiz-pct-recent-fill"/>
+                                                        <!-- <div class="quiz-pct-value" t-esc="displayPct + '%'"/> -->
+                                                    </div>
+                                                    <div class="quiz-pct-legend">
+                                                        <span class="legend-all">ALL</span>
+                                                        <span t-if="ansStats.recent_count > 0" class="legend-sep">/</span>
+                                                        <span t-if="ansStats.recent_count > 0" class="legend-recent">RECENT</span>
+                                                    </div>
                                                 </div>
-
-                                                <!-- Last-hour pie (dual mode only) -->
-                                                <div t-if="ansStats.show_recent" class="quiz-pct-block"
-                                                     t-att-title="ansStats.recent_count + ' of ' + question.recentRespondents + ' in last hour'">
-                                                    <svg class="quiz-pct-pie" width="44" height="44" viewBox="0 0 36 36" aria-hidden="true">
-                                                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#dee2e6" stroke-width="4.5"/>
-                                                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#7c3aed"
-                                                                stroke-width="4.5"
-                                                                t-att-stroke-dasharray="ansStats.recent_pct + ' 100'"
-                                                                stroke-linecap="round"
-                                                                transform="rotate(-90 18 18)"/>
-                                                        <text x="18" y="21.5" text-anchor="middle" font-size="7.5" font-weight="600" fill="#7c3aed"
-                                                              t-esc="ansStats.recent_pct + '%'"/>
-                                                    </svg>
-                                                    <div class="quiz-pct-label quiz-pct-recent">1 hr</div>
-                                                </div>
-
                                             </div>
                                             <!-- ── / percentage-pie stats ── -->
 
@@ -255,11 +243,20 @@
                                 </button>
                             </div>
 
-                            <button t-else=""
-                                    class="quiz-btn-submit btn"
-                                    t-on-click="submitQuiz">
-                                Submit Quiz
-                            </button>
+                            <div t-else="" class="d-flex align-items-center gap-2">
+                                <button t-if="state.isTeacher"
+                                        class="btn btn-outline-secondary"
+                                        t-att-disabled="state.isCheckingAll"
+                                        t-on-click="checkAllAnswers">
+                                    <t t-if="state.isCheckingAll">Checking...</t>
+                                    <t t-else="">Check Answers</t>
+                                </button>
+                                <button class="quiz-btn-submit btn"
+                                        t-att-disabled="state.isCheckingAll"
+                                        t-on-click="submitQuiz">
+                                    Submit Quiz
+                                </button>
+                            </div>
                         </div>
 
                     </main><!-- /quiz-questions-area -->

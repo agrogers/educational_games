@@ -816,9 +816,31 @@ class Quiz(models.Model):
             q_limit = 0
             o_limit = 0
 
+        rng = random.SystemRandom()
+
         all_questions = list(quiz.question_ids)
         if q_limit > 0 and q_limit < len(all_questions):
-            all_questions = random.sample(all_questions, q_limit)
+            all_questions = rng.sample(all_questions, q_limit)
+
+        # Pre-fetch incorrect response counts for every question in this quiz so
+        # we can pick the "most-often-wrong" distractor without N+1 queries.
+        # result: {question_id: {answer_id: count, ...}, ...}
+        wrong_response_counts = {}
+        if o_limit > 0:
+            question_ids = [q.id for q in all_questions]
+            wrong_responses = self.env['quiz.response'].sudo().read_group(
+                domain=[
+                    ('question_id', 'in', question_ids),
+                    ('is_correct', '=', False),
+                ],
+                fields=['question_id', 'answer_id'],
+                groupby=['question_id', 'answer_id'],
+                lazy=False,
+            )
+            for row in wrong_responses:
+                qid = row['question_id'][0]
+                aid = row['answer_id'][0]
+                wrong_response_counts.setdefault(qid, {})[aid] = row['__count']
 
         questions = []
         for question in all_questions:
@@ -827,14 +849,25 @@ class Quiz(models.Model):
             if o_limit > 0 and o_limit < len(all_answers):
                 correct = [a for a in all_answers if a.is_correct]
                 wrong = [a for a in all_answers if not a.is_correct]
-                # Always keep all correct answers; fill remaining slots with random wrong ones
-                keep_wrong = max(0, o_limit - len(correct))
-                selected = correct + random.sample(wrong, min(keep_wrong, len(wrong)))
-                random.shuffle(selected)
+
+                # Pin the most-often-selected incorrect answer as a guaranteed distractor
+                counts = wrong_response_counts.get(question.id, {})
+                if counts and wrong:
+                    top_wrong = max(wrong, key=lambda a: counts.get(a.id, 0))
+                    remaining_wrong = [a for a in wrong if a is not top_wrong]
+                    pinned_wrong = [top_wrong]
+                else:
+                    pinned_wrong = []
+                    remaining_wrong = wrong
+
+                # Fill remaining slots with random wrong answers
+                keep_wrong = max(0, o_limit - len(correct) - len(pinned_wrong))
+                selected = correct + pinned_wrong + rng.sample(remaining_wrong, min(keep_wrong, len(remaining_wrong)))
+                rng.shuffle(selected)
                 answers = selected
             else:
                 answers = all_answers
-                random.shuffle(answers)
+                rng.shuffle(answers)
 
             questions.append({
                 'id': question.id,
@@ -861,7 +894,11 @@ class Quiz(models.Model):
             'total_marks': displayed_marks,
             'allow_resubmission': allow_resubmission,
             # quiz.id is always a positive integer from the ORM; safe for URL use
-            'header_image_url': f'/web/image/quiz.quiz/{quiz.id}/header_image' if quiz.header_image else None,
+            'header_image_url': (
+                f'/web/image/quiz.quiz/{quiz.id}/header_image'
+                if quiz.header_image
+                else '/educational_games/static/src/img/quiz_bg.jpg'
+            ),
             'questions': questions,
             'is_teacher': is_teacher,
         }
