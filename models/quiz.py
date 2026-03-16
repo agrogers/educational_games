@@ -968,9 +968,9 @@ class Quiz(models.Model):
                     a_recent = recent_by_ans.get(a_id, 0)
                     response_stats[str(a_id)] = {
                         'total_count': a_total,
-                        'total_pct': round(a_total / total_n * 100, 1) if total_n else 0,
+                        'total_pct': round(a_total / total_n * 100) if total_n else 0,
                         'recent_count': a_recent,
-                        'recent_pct': round(a_recent / recent_n * 100, 1) if recent_n else 0,
+                        'recent_pct': round(a_recent / recent_n * 100) if recent_n else 0,
                         'show_recent': show_dual,
                     }
                 res['response_stats'] = response_stats
@@ -1042,9 +1042,9 @@ class Quiz(models.Model):
             a_recent = recent_by_ans.get(a.id, 0)
             response_stats[str(a.id)] = {
                 'total_count': a_total,
-                'total_pct': round(a_total / total_n * 100, 1) if total_n else 0,
+                'total_pct': round(a_total / total_n * 100) if total_n else 0,
                 'recent_count': a_recent,
-                'recent_pct': round(a_recent / recent_n * 100, 1) if recent_n else 0,
+                'recent_pct': round(a_recent / recent_n * 100) if recent_n else 0,
                 'show_recent': show_dual,
             }
         # ──────────────────────────────────────────────────────────────────
