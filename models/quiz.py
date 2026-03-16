@@ -3,6 +3,8 @@ from odoo.exceptions import AccessError, UserError
 from odoo.tools import config
 from markupsafe import escape, Markup
 import base64
+from collections import Counter
+from datetime import timedelta
 import hashlib
 import hmac
 import json
@@ -896,6 +898,15 @@ class Quiz(models.Model):
                 score += question.marks
             total_marks += question.marks
 
+            answer_details = [
+                {
+                    'id': a.id,
+                    'answer_text': a.answer_text or '',
+                    'is_correct': a.is_correct,
+                    'was_selected': a.id in selected_ids,
+                }
+                for a in question.answer_ids
+            ]
             results.append({
                 'question_id': question.id,
                 'question_text': question.question_text or '',
@@ -903,16 +914,23 @@ class Quiz(models.Model):
                 'correct_answer_ids': list(correct_ids),
                 'selected_answer_ids': list(selected_ids),
                 'marks': question.marks,
-                'answers': [
-                    {
-                        'id': a.id,
-                        'answer_text': a.answer_text or '',
-                        'is_correct': a.is_correct,
-                        'was_selected': a.id in selected_ids,
-                    }
-                    for a in question.answer_ids
-                ],
+                'answers': answer_details,
             })
+
+        # Persist one quiz.response record for every answer the student selected
+        response_vals = []
+        for r in results:
+            for a in r['answers']:
+                if a['was_selected']:
+                    response_vals.append({
+                        'quiz_id': quiz.id,
+                        'question_id': r['question_id'],
+                        'answer_id': a['id'],
+                        'user_id': self.env.user.id,
+                        'is_correct': a['is_correct'],
+                    })
+        if response_vals:
+            self.env['quiz.response'].sudo().create(response_vals)
 
         return {
             'score': score,
@@ -948,6 +966,41 @@ class Quiz(models.Model):
             raise UserError("Question not found in this quiz.")
 
         correct_ids = set(question.answer_ids.filtered('is_correct').ids)
+
+        # ── Response statistics ────────────────────────────────────────────
+        cutoff = fields.Datetime.now() - timedelta(hours=1)
+        all_responses = self.env['quiz.response'].search(
+            [('question_id', '=', question.id)]
+        )
+        recent_responses = all_responses.filtered(
+            lambda r: r.create_date and r.create_date >= cutoff
+        )
+        total_n = len(all_responses)
+        recent_n = len(recent_responses)
+
+        # show_dual: True when there are BOTH older and recent responses so we
+        # need to display two separate percentages (total vs. last-60-min).
+        # If all responses fall within the last hour there is no need for a
+        # second figure — they are identical.
+        show_dual = total_n > 0 and recent_n > 0 and recent_n < total_n
+
+        # Count selections per answer in a single pass for O(n) complexity
+        total_by_ans = Counter(r.answer_id.id for r in all_responses)
+        recent_by_ans = Counter(r.answer_id.id for r in recent_responses)
+
+        response_stats = {}
+        for a in question.answer_ids:
+            a_total = total_by_ans.get(a.id, 0)
+            a_recent = recent_by_ans.get(a.id, 0)
+            response_stats[str(a.id)] = {
+                'total_count': a_total,
+                'total_pct': round(a_total / total_n * 100, 1) if total_n else 0,
+                'recent_count': a_recent,
+                'recent_pct': round(a_recent / recent_n * 100, 1) if recent_n else 0,
+                'show_recent': show_dual,
+            }
+        # ──────────────────────────────────────────────────────────────────
+
         return {
             'question_id': question.id,
             'question_text': question.question_text or '',
@@ -961,6 +1014,10 @@ class Quiz(models.Model):
                 }
                 for a in question.answer_ids
             ],
+            'response_stats': response_stats,
+            'show_dual': show_dual,
+            'total_respondents': total_n,
+            'recent_respondents': recent_n,
         }
 
 
@@ -1000,4 +1057,36 @@ class QuizAnswer(models.Model):
     sequence = fields.Integer(string='Sequence', default=10)
     answer_text = fields.Html(string='Answer', required=True, sanitize=True)
     is_correct = fields.Boolean(string='Correct Answer', default=False)
+
+
+class QuizResponse(models.Model):
+    """
+    Records each answer a student selects when submitting a quiz.
+
+    One record is created per selected answer per submission, so a student who
+    picks three options for a multi-answer question produces three rows.
+    ``is_correct`` reflects whether that specific answer option is a correct
+    one (copied from ``quiz.answer.is_correct`` at submission time).
+    """
+    _name = 'quiz.response'
+    _description = 'Quiz Question Response'
+    _order = 'create_date desc, id desc'
+
+    quiz_id = fields.Many2one(
+        'quiz.quiz', string='Quiz', required=True, ondelete='cascade', index=True,
+    )
+    question_id = fields.Many2one(
+        'quiz.question', string='Question', required=True, ondelete='cascade', index=True,
+    )
+    answer_id = fields.Many2one(
+        'quiz.answer', string='Selected Answer', required=True, ondelete='cascade',
+    )
+    user_id = fields.Many2one(
+        'res.users', string='Student', required=True,
+        default=lambda self: self.env.user, index=True,
+    )
+    is_correct = fields.Boolean(
+        string='Correct Answer',
+        help='Whether the selected answer option is a correct answer.',
+    )
 

@@ -367,3 +367,37 @@
 .o_quiz_page .final-score-num  { font-size: 2.6rem; font-weight: 900; line-height: 1; }
 .o_quiz_page .final-score-msg  { font-size: 1rem; opacity: 0.9; margin-top: 0.4rem; }
 .o_quiz_page .final-saved      { font-size: 0.82rem; opacity: 0.8; margin-top: 0.3rem; }
+
+/* ── Per-answer response statistics (teacher Check view) ────────────── */
+.o_quiz_page .quiz-ans-stats {
+    align-self: center;
+}
+.o_quiz_page .quiz-pct-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+.o_quiz_page .quiz-pct-pie {
+    display: block;
+    /* The SVG itself is 44×44; no extra sizing needed */
+}
+.o_quiz_page .quiz-pct-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-align: center;
+    line-height: 1;
+    margin-top: 1px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.o_quiz_page .quiz-pct-label.quiz-pct-recent {
+    color: #7c3aed;
+}
+.o_quiz_page .quiz-respondents-note {
+    font-size: 0.78rem;
+    color: #6b7280;
+    text-align: right;
+    padding-right: 0.25rem;
+}

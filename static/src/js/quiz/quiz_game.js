@@ -135,6 +135,10 @@ export class QuizGame extends Component {
                 q.selected_answers = [];
                 q.result = null; // populated after submission or individual check
                 q.checked = false; // true when teacher has revealed this question's answer
+                q.responseStats = {}; // per-answer-id response statistics
+                q.showDual = false;    // true when stats have both old + recent data
+                q.totalRespondents = 0;
+                q.recentRespondents = 0;
                 // Mark HTML strings as safe for t-out rendering
                 q.question_text = markup(q.question_text || "");
                 q.answers.forEach((a) => {
@@ -285,6 +289,10 @@ export class QuizGame extends Component {
                     was_selected: selectedIds.includes(a.id),
                 })),
             };
+            question.responseStats = data.response_stats || {};
+            question.showDual = data.show_dual || false;
+            question.totalRespondents = data.total_respondents || 0;
+            question.recentRespondents = data.recent_respondents || 0;
             question.checked = true;
         } catch (error) {
             console.error("Error checking answer:", error);
