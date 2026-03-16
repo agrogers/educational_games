@@ -427,7 +427,7 @@ export class QuizGame extends Component {
                 // Create a new submission copy and save to it
                 const newId = await createSubmissionCopy(this.orm, this.notification, this.currentSubmissionId);
                 if (newId) {
-                    const saved = await saveToApsSubmission(this.orm, this.notification, newId, finalScore, htmlReport);
+                    const saved = await saveToApsSubmission(this.orm, this.notification, newId, finalScore, htmlReport, this.state.totalMarks);
                     if (saved) {
                         this.currentSubmissionId = newId;
                         this.state.submission_submitted = true;
@@ -453,7 +453,7 @@ export class QuizGame extends Component {
         }
 
         const saved = await saveToApsSubmission(
-            this.orm, this.notification, this.currentSubmissionId, finalScore, htmlReport
+            this.orm, this.notification, this.currentSubmissionId, finalScore, htmlReport, this.state.totalMarks
         );
         if (saved) {
             this.state.submission_submitted = true;

@@ -52,7 +52,7 @@
 
                     <!-- TOC sidebar -->
                     <aside class="quiz-toc">
-                        <div class="quiz-toc-label">Q</div>
+                        <div class="quiz-toc-label"></div>
 
                         <t t-foreach="state.quiz.questions" t-as="tocQ" t-key="tocQ.id">
                             <t t-set="tocStatus" t-value="getQuestionStatus(tocQ)"/>

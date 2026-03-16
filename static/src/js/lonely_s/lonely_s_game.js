@@ -144,7 +144,7 @@ export class LonelySGame extends Component {
         const htmlReport = this._buildAnswerHtml(gameResults);
 
         const saved = await saveToApsSubmission(
-            this.orm, this.notification, this.resId, finalScore, htmlReport
+            this.orm, this.notification, this.resId, finalScore, htmlReport, this.numSentences
         );
         if (saved) {
             this.state.submission_state = 'submitted';

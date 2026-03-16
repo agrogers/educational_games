@@ -23,7 +23,7 @@
  *
  *   // When the game/quiz finishes:
  *   const saved = await saveToApsSubmission(
- *       this.orm, this.notification, this.resId, score, htmlReport
+ *       this.orm, this.notification, this.resId, score, htmlReport, outOfMarks
  *   );
  * ──────────────────────────────────────────────────────────────────────────
  */
@@ -42,15 +42,20 @@ export const APS_SUBMISSION_MODEL = "aps.resource.submission";
  * @param {number} submissionId  - ID of the submission record to update.
  * @param {number} score         - Numeric score to store.
  * @param {string} htmlReport    - HTML string stored in the answer field.
+ * @param {number|null} outOfMarks - Total marks for this attempt (updates out_of_marks). Pass null to skip.
  * @returns {Promise<boolean>}   - true on success, false on failure.
  */
-export async function saveToApsSubmission(orm, notification, submissionId, score, htmlReport) {
+export async function saveToApsSubmission(orm, notification, submissionId, score, htmlReport, outOfMarks = null) {
     try {
-        await orm.write(APS_SUBMISSION_MODEL, [submissionId], {
+        const vals = {
             score,
             answer: htmlReport,
             state: "submitted",
-        });
+        };
+        if (outOfMarks !== null && outOfMarks !== undefined) {
+            vals.out_of_marks = outOfMarks;
+        }
+        await orm.write(APS_SUBMISSION_MODEL, [submissionId], vals);
         notification.add("Results saved successfully!", { type: "success" });
         return true;
     } catch (error) {
