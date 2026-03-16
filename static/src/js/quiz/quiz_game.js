@@ -58,6 +58,7 @@ export class QuizGame extends Component {
             results: [],
             submission_submitted: false,
             activeQuestionId: null,
+            isTeacher: false,
             // retakeMode becomes true after resetQuiz so onGameFinished can
             // distinguish a first submission from a subsequent retake.
             // It also starts as true when the existing submission record is
@@ -132,7 +133,8 @@ export class QuizGame extends Component {
             // Add reactive selected-answer tracking to each question
             quizData.questions.forEach((q) => {
                 q.selected_answers = [];
-                q.result = null; // populated after submission
+                q.result = null; // populated after submission or individual check
+                q.checked = false; // true when teacher has revealed this question's answer
                 // Mark HTML strings as safe for t-out rendering
                 q.question_text = markup(q.question_text || "");
                 q.answers.forEach((a) => {
@@ -141,6 +143,7 @@ export class QuizGame extends Component {
             });
             this.state.quiz = quizData;
             this.state.totalMarks = quizData.total_marks;
+            this.state.isTeacher = quizData.is_teacher || false;
             if (typeof quizData.allow_resubmission === "boolean") {
                 this.state.allowResubmission = quizData.allow_resubmission;
             }
@@ -173,7 +176,7 @@ export class QuizGame extends Component {
      * @returns {'unanswered'|'answered'|'correct'|'incorrect'}
      */
     getQuestionStatus(question) {
-        if (this.state.submitted && question.result) {
+        if ((this.state.submitted || question.checked) && question.result) {
             return question.result.is_correct ? "correct" : "incorrect";
         }
         return question.selected_answers.length > 0 ? "answered" : "unanswered";
@@ -199,7 +202,7 @@ export class QuizGame extends Component {
      * Multiple-answer questions: toggles the answer on/off (checkbox behavior).
      */
     toggleAnswer(question, answer) {
-        if (this.state.submitted) return;
+        if (this.state.submitted || question.checked) return;
         this.state.activeQuestionId = question.id;
         if (question.allow_multiple) {
             const idx = question.selected_answers.indexOf(answer.id);
@@ -244,6 +247,48 @@ export class QuizGame extends Component {
         } catch (error) {
             console.error("Error submitting quiz:", error);
             this.notification.add("Error submitting quiz. Please try again.", { type: "danger" });
+        }
+    }
+
+    /**
+     * Teacher-only: reveal the correct answer(s) for a single question without
+     * submitting the whole quiz.  Populates question.result and sets
+     * question.checked = true so the template shows result styling for that
+     * question only.
+     */
+    async checkAnswer(question) {
+        if (this.state.submitted || question.checked) return;
+        try {
+            const data = await this.orm.call(
+                "quiz.quiz",
+                "check_single_question",
+                [this.quizId, question.id]
+            );
+            const selectedIds = question.selected_answers;
+            const correctIds = data.correct_answer_ids;
+            const isCorrect =
+                correctIds.length > 0 &&
+                selectedIds.length === correctIds.length &&
+                selectedIds.every((id) => correctIds.includes(id));
+
+            question.result = {
+                question_id: question.id,
+                question_text: data.question_text,
+                is_correct: isCorrect,
+                correct_answer_ids: correctIds,
+                selected_answer_ids: selectedIds,
+                marks: data.marks,
+                answers: data.answers.map((a) => ({
+                    id: a.id,
+                    answer_text: a.answer_text,
+                    is_correct: a.is_correct,
+                    was_selected: selectedIds.includes(a.id),
+                })),
+            };
+            question.checked = true;
+        } catch (error) {
+            console.error("Error checking answer:", error);
+            this.notification.add("Error checking answer. Please try again.", { type: "danger" });
         }
     }
 
