@@ -64,8 +64,8 @@
                                     <t t-elif="tocStatus === 'incorrect'">✗</t>
                                     <t t-else=""><t t-esc="tocQ_index + 1"/></t>
                                 </div>
-                                <!-- Points after submission -->
-                                <span t-if="state.submitted and tocQ.result"
+                                <!-- Points after submission or individual check -->
+                                <span t-if="(state.submitted or tocQ.checked) and tocQ.result"
                                       t-attf-class="quiz-toc-pts {{ tocStatus === 'correct' ? 'pts-ok' : 'pts-bad' }}">
                                     <t t-esc="tocQ.result.is_correct ? tocQ.marks : 0"/>pt
                                 </span>
@@ -91,7 +91,8 @@
                         <t t-foreach="state.quiz.questions" t-as="question" t-key="question.id">
                             <t t-set="qResult" t-value="question.result"/>
                             <t t-set="isActive" t-value="question.id === state.activeQuestionId"/>
-                            <t t-set="cardStatus" t-value="state.submitted and qResult ? (qResult.is_correct ? 'card-correct' : 'card-incorrect') : (isActive ? 'card-active' : '')"/>
+                            <t t-set="showResult" t-value="(state.submitted or question.checked) and qResult !== null"/>
+                            <t t-set="cardStatus" t-value="showResult ? (qResult.is_correct ? 'card-correct' : 'card-incorrect') : (isActive ? 'card-active' : '')"/>
 
                             <div class="quiz-question-wrap"
                                  t-att-data-question-id="question.id"
@@ -105,14 +106,14 @@
                                 <!-- Question card -->
                                 <div t-attf-class="quiz-question-card {{ cardStatus }}">
 
-                                    <!-- Result circle badge (top-right, after submission) -->
-                                    <div t-if="state.submitted and qResult"
+                                    <!-- Result circle badge (top-right, after submission or check) -->
+                                    <div t-if="showResult"
                                          t-attf-class="quiz-result-circle {{ qResult.is_correct ? 'result-correct' : 'result-incorrect' }}">
                                         <t t-if="qResult.is_correct">✓</t>
                                         <t t-else="">✗</t>
                                     </div>
 
-                                    <!-- Question text + marks badge -->
+                                    <!-- Question text + marks badge + teacher Check button -->
                                     <div class="d-flex align-items-start gap-2 mb-3">
                                         <div t-out="question.question_text" class="quiz-question-text flex-grow-1"/>
                                         <div class="d-flex flex-column gap-1 flex-shrink-0 mt-1">
@@ -121,6 +122,12 @@
                                             <span class="quiz-badge-marks">
                                                 <t t-esc="question.marks"/> mark<t t-if="question.marks !== 1">s</t>
                                             </span>
+                                            <!-- Check button: only for teachers, before the question is checked/submitted -->
+                                            <button t-if="state.isTeacher and !question.checked and !state.submitted"
+                                                    class="quiz-btn-check btn btn-sm"
+                                                    t-on-click.stop="() => this.checkAnswer(question)">
+                                                Check
+                                            </button>
                                         </div>
                                     </div>
 
@@ -133,22 +140,22 @@
 
                                         <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
                                              t-attf-class="quiz-answer-item
-                                                 {{ !state.submitted ? 'quiz-answer-option' : '' }}
-                                                 {{ !state.submitted and isSelected ? 'quiz-answer-selected' : '' }}
-                                                 {{ state.submitted and isCorrect ? 'quiz-answer-correct' : '' }}
-                                                 {{ state.submitted and wasSelected and !isCorrect ? 'quiz-answer-wrong' : '' }}">
+                                                 {{ !showResult ? 'quiz-answer-option' : '' }}
+                                                 {{ !showResult and isSelected ? 'quiz-answer-selected' : '' }}
+                                                 {{ showResult and isCorrect ? 'quiz-answer-correct' : '' }}
+                                                 {{ showResult and wasSelected and !isCorrect ? 'quiz-answer-wrong' : '' }}">
 
                                             <input t-if="question.allow_multiple"
                                                    type="checkbox"
                                                    class="form-check-input flex-shrink-0"
                                                    t-att-checked="isSelected"
-                                                   t-att-disabled="state.submitted"
+                                                   t-att-disabled="showResult"
                                                    style="cursor:pointer; pointer-events:none;"/>
                                             <input t-else=""
                                                    type="radio"
                                                    class="form-check-input flex-shrink-0"
                                                    t-att-checked="isSelected"
-                                                   t-att-disabled="state.submitted"
+                                                   t-att-disabled="showResult"
                                                    t-att-name="'q_' + question.id"
                                                    style="cursor:pointer; pointer-events:none;"/>
 

@@ -1,5 +1,5 @@
 from odoo import models, fields, api
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools import config
 from markupsafe import escape, Markup
 import base64
@@ -849,6 +849,10 @@ class Quiz(models.Model):
             })
 
         displayed_marks = sum(q['marks'] for q in questions)
+        is_teacher = (
+            self.env.user.has_group('aps_sis.group_aps_teacher') or
+            self.env.user.has_group('aps_sis.group_aps_manager')
+        )
         return {
             'id': quiz.id,
             'name': quiz.name,
@@ -857,6 +861,7 @@ class Quiz(models.Model):
             # quiz.id is always a positive integer from the ORM; safe for URL use
             'header_image_url': f'/web/image/quiz.quiz/{quiz.id}/header_image' if quiz.header_image else None,
             'questions': questions,
+            'is_teacher': is_teacher,
         }
 
     @api.model
@@ -913,6 +918,49 @@ class Quiz(models.Model):
             'score': score,
             'total_marks': total_marks,
             'results': results,
+        }
+
+    @api.model
+    def check_single_question(self, quiz_id, question_id):
+        """
+        For teachers: reveal the correct answer(s) for a single question without
+        submitting the whole quiz.  Only accessible to users in group_aps_teacher
+        or group_aps_manager.
+
+        :param quiz_id:     int – ID of the quiz the question belongs to
+        :param question_id: int – ID of the question to reveal
+        :returns: dict compatible with the per-question entries in submit_quiz_answers
+                  results list, with an additional ``selected_answer_ids`` key set
+                  from the caller-supplied selections (passed as ``selected_ids``).
+        """
+        if not (
+            self.env.user.has_group('aps_sis.group_aps_teacher') or
+            self.env.user.has_group('aps_sis.group_aps_manager')
+        ):
+            raise AccessError("Only teachers can check individual answers.")
+
+        quiz = self.browse(int(quiz_id))
+        if not quiz.exists():
+            raise UserError("Quiz not found.")
+
+        question = self.env['quiz.question'].browse(int(question_id))
+        if not question.exists() or question.quiz_id.id != quiz.id:
+            raise UserError("Question not found in this quiz.")
+
+        correct_ids = set(question.answer_ids.filtered('is_correct').ids)
+        return {
+            'question_id': question.id,
+            'question_text': question.question_text or '',
+            'correct_answer_ids': list(correct_ids),
+            'marks': question.marks,
+            'answers': [
+                {
+                    'id': a.id,
+                    'answer_text': a.answer_text or '',
+                    'is_correct': a.is_correct,
+                }
+                for a in question.answer_ids
+            ],
         }
 
 
