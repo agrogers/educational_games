@@ -238,6 +238,14 @@ export class QuizGame extends Component {
                 const question = this.state.quiz.questions.find((q) => q.id === r.question_id);
                 if (question) {
                     question.result = r;
+                    // Populate response stats when the server returns them (teacher submit)
+                    if (r.response_stats !== undefined) {
+                        question.responseStats = r.response_stats;
+                        question.showDual = r.show_dual || false;
+                        question.totalRespondents = r.total_respondents || 0;
+                        question.recentRespondents = r.recent_respondents || 0;
+                        question.checked = true;
+                    }
                 }
             });
 

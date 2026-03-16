@@ -137,7 +137,7 @@
                                         <t t-set="ansResult"   t-value="qResult and qResult.answers.find(a => a.id === answer.id)"/>
                                         <t t-set="isCorrect"   t-value="ansResult and ansResult.is_correct"/>
                                         <t t-set="wasSelected" t-value="ansResult and ansResult.was_selected"/>
-                                        <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[String(answer.id)]"/>
+                                        <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
 
                                         <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
                                              t-attf-class="quiz-answer-item
@@ -173,8 +173,8 @@
                                                                 t-att-stroke="ansStats.show_recent ? '#9ca3af' : '#7c3aed'"
                                                                 stroke-width="4.5"
                                                                 t-att-stroke-dasharray="ansStats.total_pct + ' 100'"
-                                                                stroke-dashoffset="25"
-                                                                stroke-linecap="round"/>
+                                                                stroke-linecap="round"
+                                                                transform="rotate(-90 18 18)"/>
                                                         <text x="18" y="21.5" text-anchor="middle" font-size="7.5" font-weight="600"
                                                               t-att-fill="ansStats.show_recent ? '#6b7280' : '#7c3aed'"
                                                               t-esc="ansStats.total_pct + '%'"/>
@@ -190,8 +190,8 @@
                                                         <circle cx="18" cy="18" r="15.9" fill="none" stroke="#7c3aed"
                                                                 stroke-width="4.5"
                                                                 t-att-stroke-dasharray="ansStats.recent_pct + ' 100'"
-                                                                stroke-dashoffset="25"
-                                                                stroke-linecap="round"/>
+                                                                stroke-linecap="round"
+                                                                transform="rotate(-90 18 18)"/>
                                                         <text x="18" y="21.5" text-anchor="middle" font-size="7.5" font-weight="600" fill="#7c3aed"
                                                               t-esc="ansStats.recent_pct + '%'"/>
                                                     </svg>

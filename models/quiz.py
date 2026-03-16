@@ -932,10 +932,58 @@ class Quiz(models.Model):
         if response_vals:
             self.env['quiz.response'].sudo().create(response_vals)
 
+        # ── Per-question response stats for teacher users ────────────────
+        is_teacher = (
+            self.env.user.has_group('aps_sis.group_aps_teacher') or
+            self.env.user.has_group('aps_sis.group_aps_manager')
+        )
+        if is_teacher:
+            cutoff = fields.Datetime.now() - timedelta(hours=1)
+            all_responses = self.env['quiz.response'].search([('quiz_id', '=', quiz.id)])
+            recent_responses = all_responses.filtered(
+                lambda r: r.create_date and r.create_date >= cutoff
+            )
+            # Pre-bucket by question so we only loop responses once
+            from collections import defaultdict
+            all_by_q = defaultdict(list)
+            recent_by_q = defaultdict(list)
+            for r in all_responses:
+                all_by_q[r.question_id.id].append(r.answer_id.id)
+            for r in recent_responses:
+                recent_by_q[r.question_id.id].append(r.answer_id.id)
+
+            for res in results:
+                qid = res['question_id']
+                q_all = all_by_q[qid]
+                q_recent = recent_by_q[qid]
+                total_n = len(q_all)
+                recent_n = len(q_recent)
+                show_dual = total_n > 0 and recent_n > 0 and recent_n < total_n
+                total_by_ans = Counter(q_all)
+                recent_by_ans = Counter(q_recent)
+                response_stats = {}
+                for a in res['answers']:
+                    a_id = a['id']
+                    a_total = total_by_ans.get(a_id, 0)
+                    a_recent = recent_by_ans.get(a_id, 0)
+                    response_stats[str(a_id)] = {
+                        'total_count': a_total,
+                        'total_pct': round(a_total / total_n * 100, 1) if total_n else 0,
+                        'recent_count': a_recent,
+                        'recent_pct': round(a_recent / recent_n * 100, 1) if recent_n else 0,
+                        'show_recent': show_dual,
+                    }
+                res['response_stats'] = response_stats
+                res['show_dual'] = show_dual
+                res['total_respondents'] = total_n
+                res['recent_respondents'] = recent_n
+        # ─────────────────────────────────────────────────────────────────
+
         return {
             'score': score,
             'total_marks': total_marks,
             'results': results,
+            'is_teacher': is_teacher,
         }
 
     @api.model
