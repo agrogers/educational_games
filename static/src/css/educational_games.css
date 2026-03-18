@@ -496,11 +496,10 @@
     opacity: 0.5;
 }
 
-.o_quiz_page .quiz-font-btn:hover,
-.o_quiz_page .quiz-font-btn:focus {
+.o_quiz_page .quiz-font-btn:hover {
     background: rgba(255, 255, 255, 0.25);
     border-color: rgba(255, 255, 255, 0.45);
-    color: white;
+    /* color: white; */
     outline: none;
 }
 
@@ -550,8 +549,8 @@
 .o_quiz_page .quiz-card-face {
     position: absolute;
     inset: 0;
-    border-radius: 7px;
-    border: 2px solid #1e293b;
+    border-radius: 0.5em;
+    border: 1px solid #00000044;
     overflow: hidden;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
@@ -559,18 +558,22 @@
 
 /* Front face: plain white background with centred letter */
 .o_quiz_page .quiz-card-front {
-    background: #ffffff;
+    background: #7c3aed;
+    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-
+.o_quiz_page .quiz-answer-unselected .quiz-card-front {
+    background: white;
+    transition: background 2s ease;
+}
 /* Back face: dark background acts as the card edge colour;
    rotated 180° so it is hidden initially */
 .o_quiz_page .quiz-card-back {
     transform: rotateY(180deg);
-    background: #1e293b;
-    padding: 4px;
+    background: #ffffff;
+    padding: 1px;
     display: flex;
     align-items: stretch;
 }
@@ -591,14 +594,20 @@
     height: 100%;
     object-fit: cover;
     display: block;
+    border-radius: 4px;
+    background-color: #4c1d95;
 }
 
 /* Letter (A, B, C, …) centred on the front face */
 .o_quiz_page .quiz-card-letter {
     font-size: 2rem;
     font-weight: 900;
-    color: #4f46e5;
+    color: white;
     pointer-events: none;
     user-select: none;
     line-height: 1;
+}
+.o_quiz_page .quiz-answer-unselected .quiz-card-letter  {
+    color: #4c1d95;
+    transition: color 1s ease;
 }

@@ -73,6 +73,11 @@ export class QuizGame extends Component {
             // Font size multiplier for question and answer text (em units).
             // Range: 0.7 – 1.5, step 0.1.
             fontSizeEm: 1.0,
+            // Toggle between playing-card style and classic radio/checkbox style.
+            useCards: true,
+            // When true each question gets a different random card-back;
+            // when false all questions share the same card-back image.
+            randomCardBacks: true,
         });
 
         this.resId = this._toInt(getParam("active_id")) || routeResId;
@@ -109,6 +114,17 @@ export class QuizGame extends Component {
         });
 
         onWillStart(async () => {
+            // Load persisted display preferences (font size, card mode).
+            try {
+                const prefs = await this.orm.call("quiz.preference", "get_preferences", []);
+                if (prefs) {
+                    this.state.fontSizeEm = prefs.font_size_em ?? 1.0;
+                    this.state.useCards = prefs.use_cards ?? true;
+                }
+            } catch (_e) {
+                // Preference table may not exist yet; keep defaults.
+            }
+
             // Last-ditch fallback: in direct `/odoo/action-.../<id>/...` URLs,
             // use that record id as quiz_id if no explicit quiz_id is present.
             if (!this.quizId && routeResId) {
@@ -135,6 +151,7 @@ export class QuizGame extends Component {
                 }
             );
             // Add reactive selected-answer tracking to each question
+            const sharedCardBack = this._randomCardBackUrl();
             quizData.questions.forEach((q) => {
                 q.selected_answers = [];
                 q.result = null; // populated after submission or individual check
@@ -143,6 +160,10 @@ export class QuizGame extends Component {
                 q.showDual = false;    // true when stats have both old + recent data
                 q.totalRespondents = 0;
                 q.recentRespondents = 0;
+                // Assign card-back image: random per question or shared across all.
+                q.cardBackUrl = this.state.randomCardBacks
+                    ? this._randomCardBackUrl()
+                    : sharedCardBack;
                 // Mark HTML strings as safe for t-out rendering
                 q.question_text = markup(q.question_text || "");
                 q.answers.forEach((a) => {
@@ -184,22 +205,29 @@ export class QuizGame extends Component {
         return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[index] || String(index + 1);
     }
 
-    /**
-     * Returns a deterministic random card-back image URL for a given answer ID.
-     * The same answer always gets the same image within a session, ensuring
-     * cards don't flicker on re-render.
-     */
-    getCardBackUrl(answerId) {
+    /** Pick a random card-back image URL from the pool. */
+    _randomCardBackUrl() {
         const images = [
-            "/educational_games/static/src/img/card_backs/card_back_red.svg",
-            "/educational_games/static/src/img/card_backs/card_back_blue.svg",
-            "/educational_games/static/src/img/card_backs/card_back_green.svg",
-            "/educational_games/static/src/img/card_backs/card_back_purple.svg",
-            "/educational_games/static/src/img/card_backs/card_back_orange.svg",
+            "/educational_games/static/src/img/card_backs/card_feather.jpg",
+            "/educational_games/static/src/img/card_backs/card_rainbow.jpg",
+            "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMm5wOW04ZGJ6ZnR2azJpY2QzOHdzNmJ1bTFwcTU3NzU1M3liZDJ6ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/aMMWn9Ogf3UOI/giphy.gif",
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaXhzZ2FwcHNwZmticDU3amwwa2t1NWJmbjJqdndoZ3oycDY1NDZrZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BqK5K4OD1X3RdlfJxH/giphy.gif",
+            "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExdGJxd2R3YnJ3YWx4OGl6M2o2aWp5bzcwZThrdGh5bDg5OHY0cnl5MyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/cYZkY9HeKgofpQnOUl/giphy.gif", /** Chiuaha Dog**/
+            "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdzZqeWllN2JyM29jcG91bXRoNGltcmxmb25iMTBkd2djeXZ6d2hrNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/rZ7A5ayCa2zVcMgsvl/giphy.gif", /** Cat kick duckling **/
+            "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGpsbnR4MzZzanY5NTcwbDdpYTliNTRvcm9sdjgxYjhzemN2dThjeiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/jkTTVVRZGbQ1fBIFOX/giphy.gif", /** Happy dinosuars **/
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaDJsbmJqYzN2eHk3OXhhYjk1cGlwdHEycWl3eDEzZGI3ZWFtbTBwbSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/H986cBWlQH0PXjcLQO/giphy.gif", /** Baby Yoda **/
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExYWN5cGVvOXlzZXFncGJxazVsNzR0eW9zZW01dndydXJ4dGw1ZG00NyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/Oi6tJtKNThC6I/giphy.gif", /** Frozen Yippie **/
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExam1jejl4a3dpM2xtbnYzMjY3ZXBzMnh4dm13OGlyc3RscDRvaGdsdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/EvYHHSntaIl5m/giphy.gif", /** Monster Hug **/
+            "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExdmsyMngxb2FmcHczdHE1dWJxNjZ5eHJ0cGh2c2gxcDJlYXU3OG92OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/sC2mGly8IxF2E/giphy.gif", /** Disney Dog Kiss **/
+            "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExc2dwajM0Ynlrbzk2YjNzbGZiYWc1MGwzeHQ4MTcyMDZzc2lzM3F0dCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/jAX4NpDPfcmUHwTNAf/giphy.gif", /** Motocross jump **/
+            "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExY2N3cG02dzE5aHN2ZXNqZnF0eGJ3enhndW4ydjlsZXYyeWF6ZXdpYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/RhSsbdJGG0ZvCMoTIl/giphy.gif", /** Motocross Backflip **/
+            "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExd2IzYTU2dm5ycHZ6bXN0OXJtaW1zN2wwZ2M4cnUwNTE1dml6eWlkZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BNR91YsnOC9I59011H/giphy.gif", /** Send it **/
+            "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExeTF0cDF2MW5wdWp1cmQyN2t2YXIxd2doNXVxdG9uamF2MG16dXVveSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1xkMJIvxeKiDS/giphy.gif", /** The Flash **/  
+            "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZm1iYm1nZHpvNXJ1YnRtazVpMXBzaDgzbWU4ZHBxbzBpMXMzazlhMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/14b13BDH3V81wc/giphy.gif", /** Baby groot **/
+            "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcG5uajZjYWVpc2R5NG0wZmpyaGJ3YWlhbWdhOG91bmNsYzNlcW04cyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ckAsLajQY6HxYHYRDX/giphy.gif", /** Surf **/
+            
         ];
-        // Knuth multiplicative hash: spreads IDs evenly across the image list.
-        const idx = ((answerId * 2654435761) >>> 0) % images.length;
-        return images[idx];
+        return images[Math.floor(Math.random() * images.length)];
     }
 
     /**
@@ -227,11 +255,18 @@ export class QuizGame extends Component {
         }
     }
 
+    /** Switch between card and classic radio/checkbox answer display. */
+    toggleCardMode() {
+        this.state.useCards = !this.state.useCards;
+        this._savePreferences();
+    }
+
     /** Increase the question/answer font size by one step (max 1.5em). */
     increaseFontSize() {
         const maxFontSize = 7;
         if (this.state.fontSizeEm < maxFontSize) {
             this.state.fontSizeEm = Math.min(maxFontSize, Math.round((this.state.fontSizeEm + 0.2) * 10) / 10);
+            this._savePreferences();
         }
     }
 
@@ -240,7 +275,16 @@ export class QuizGame extends Component {
         const minFontSize = 0.3;
         if (this.state.fontSizeEm > minFontSize) {
             this.state.fontSizeEm = Math.max(minFontSize, Math.round((this.state.fontSizeEm - 0.2) * 10) / 10);
+            this._savePreferences();
         }
+    }
+
+    /** Persist current display preferences to the database (fire-and-forget). */
+    _savePreferences() {
+        this.orm.call("quiz.preference", "set_preferences", [], {
+            use_cards: this.state.useCards,
+            font_size_em: this.state.fontSizeEm,
+        }).catch(() => {});
     }
 
     /**

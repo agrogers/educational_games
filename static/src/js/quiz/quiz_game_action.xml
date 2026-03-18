@@ -64,6 +64,12 @@
                                  alt=""
                                  aria-hidden="true"/>
                         </button>
+                        <button class="quiz-font-btn"
+                                t-att-title="state.useCards ? 'Switch to classic view' : 'Switch to card view'"
+                                t-on-click="toggleCardMode">
+                            <i t-attf-class="fa {{ state.useCards ? 'fa-list' : 'fa-th-large' }}"
+                               style="font-size:0.85rem;"/>
+                        </button>
                     </div>
                 </div>
 
@@ -153,6 +159,7 @@
                                     </div>
 
                                     <!-- Answer options -->
+                                    <t t-set="cardBackImg" t-value="question.cardBackUrl"/>
                                     <t t-foreach="question.answers" t-as="answer" t-key="answer.id">
                                         <t t-set="isSelected"  t-value="question.selected_answers.includes(answer.id)"/>
                                         <t t-set="ansResult"   t-value="qResult and qResult.answers.find(a => a.id === answer.id)"/>
@@ -161,31 +168,48 @@
                                         <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
                                         <!-- After reveal: wrong answers flip to back; correct stay front.
                                              Before reveal: non-selected flip when any answer is chosen. -->
-                                        <t t-set="cardFlipped" t-value="showResult ? !isCorrect : (!isSelected and question.selected_answers.length > 0)"/>
+                                        <t t-set="cardFlipped" t-value="showResult ? isCorrect : (isSelected and question.selected_answers.length > 0)"/>
 
                                         <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
                                              t-attf-class="quiz-answer-item
                                                  {{ !showResult ? 'quiz-answer-option' : '' }}
                                                  {{ !showResult and isSelected ? 'quiz-answer-selected' : '' }}
+                                                 {{ !showResult and !isSelected and question.selected_answers.length > 0 ? 'quiz-answer-unselected' : '' }}
                                                  {{ showResult and isCorrect ? 'quiz-answer-correct' : '' }}
                                                  {{ showResult and wasSelected and !isCorrect ? 'quiz-answer-wrong' : '' }}">
 
-                                            <!-- Playing card (replaces checkbox / radio) -->
-                                            <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }}">
-                                                <div class="quiz-card-inner">
-                                                    <!-- Front face: white card with answer letter -->
-                                                    <div class="quiz-card-face quiz-card-front">
-                                                        <span class="quiz-card-letter"><t t-esc="getAnswerLetter(answer_index)"/></span>
-                                                    </div>
-                                                    <!-- Back face: dark border + white inner border + random image -->
-                                                    <div class="quiz-card-face quiz-card-back">
-                                                        <div class="quiz-card-back-inner">
-                                                            <img t-att-src="getCardBackUrl(answer.id)"
-                                                                 class="quiz-card-back-img" alt=""/>
+                                            <!-- Card mode: playing-card indicator -->
+                                            <t t-if="state.useCards">
+                                                <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }}">
+                                                    <div class="quiz-card-inner">
+                                                        <div class="quiz-card-face quiz-card-front">
+                                                            <span class="quiz-card-letter"><t t-esc="getAnswerLetter(answer_index)"/></span>
+                                                        </div>
+                                                        <div class="quiz-card-face quiz-card-back">
+                                                            <div class="quiz-card-back-inner">
+                                                                <img t-att-src="cardBackImg"
+                                                                     class="quiz-card-back-img" alt=""/>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </t>
+                                            <!-- Classic mode: radio / checkbox -->
+                                            <t t-else="">
+                                                <input t-if="question.allow_multiple"
+                                                       type="checkbox"
+                                                       class="form-check-input me-2 flex-shrink-0"
+                                                       t-att-checked="isSelected"
+                                                       t-att-disabled="showResult"
+                                                       style="cursor:pointer; pointer-events:none;"/>
+                                                <input t-else=""
+                                                       type="radio"
+                                                       class="form-check-input me-2 flex-shrink-0"
+                                                       t-att-checked="isSelected"
+                                                       t-att-disabled="showResult"
+                                                       t-att-name="'q_' + question.id"
+                                                       style="cursor:pointer; pointer-events:none;"/>
+                                            </t>
 
                                             <div t-out="answer.answer_text" class="quiz-answer-text"
                                                  t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>

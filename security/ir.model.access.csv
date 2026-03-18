@@ -9,3 +9,4 @@ access_quiz_answer_teacher,quiz.answer teacher,model_quiz_answer,aps_sis.group_a
 access_quiz_answer_user,quiz.answer user,model_quiz_answer,base.group_user,1,0,0,0
 access_quiz_response_teacher,quiz.response teacher,model_quiz_response,aps_sis.group_aps_teacher,1,1,1,1
 access_quiz_response_user,quiz.response user,model_quiz_response,base.group_user,1,0,1,0
+access_quiz_preference_user,quiz.preference user,model_quiz_preference,base.group_user,1,1,1,0
