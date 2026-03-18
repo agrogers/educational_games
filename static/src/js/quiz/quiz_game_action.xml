@@ -159,7 +159,9 @@
                                         <t t-set="isCorrect"   t-value="ansResult and ansResult.is_correct"/>
                                         <t t-set="wasSelected" t-value="ansResult and ansResult.was_selected"/>
                                         <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
-                                        <t t-set="cardFlipped" t-value="!isSelected and question.selected_answers.length > 0 and !showResult"/>
+                                        <!-- After reveal: wrong answers flip to back; correct stay front.
+                                             Before reveal: non-selected flip when any answer is chosen. -->
+                                        <t t-set="cardFlipped" t-value="showResult ? !isCorrect : (!isSelected and question.selected_answers.length > 0)"/>
 
                                         <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
                                              t-attf-class="quiz-answer-item
