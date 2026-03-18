@@ -49,28 +49,20 @@
                         <button class="quiz-font-btn"
                                 title="Decrease font size"
                                 t-on-click="decreaseFontSize"
-                                t-att-disabled="state.fontSizeEm &lt;= 0.7">
-                            <!-- Decrease: big A on left, small A on right -->
-                            <svg viewBox="0 0 22 14" width="22" height="14" aria-hidden="true"
-                                 fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1,12 L4.5,2 L8,12" stroke-width="1.8"/>
-                                <path d="M2.5,8.5 h4" stroke-width="1.8"/>
-                                <path d="M11,12 L13.5,5.5 L16,12" stroke-width="1.4"/>
-                                <path d="M12,9.5 h3" stroke-width="1.4"/>
-                            </svg>
+                                t-att-disabled="state.fontSizeEm &lt;= 0.3">
+                            <img class="quiz-font-icon"
+                                 src="/educational_games/static/src/img/resize-font_down.svg"
+                                 alt=""
+                                 aria-hidden="true"/>
                         </button>
                         <button class="quiz-font-btn"
                                 title="Increase font size"
                                 t-on-click="increaseFontSize"
-                                t-att-disabled="state.fontSizeEm &gt;= 1.5">
-                            <!-- Increase: small A on left, big A on right -->
-                            <svg viewBox="0 0 22 14" width="22" height="14" aria-hidden="true"
-                                 fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1,12 L3.5,5.5 L6,12" stroke-width="1.4"/>
-                                <path d="M2,9.5 h3" stroke-width="1.4"/>
-                                <path d="M9,12 L13.5,2 L18,12" stroke-width="1.8"/>
-                                <path d="M10.5,8.5 h6" stroke-width="1.8"/>
-                            </svg>
+                                t-att-disabled="state.fontSizeEm &gt;= 7">
+                            <img class="quiz-font-icon"
+                                 src="/educational_games/static/src/img/resize-font_up.svg"
+                                 alt=""
+                                 aria-hidden="true"/>
                         </button>
                     </div>
                 </div>

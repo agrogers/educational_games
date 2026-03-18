@@ -206,15 +206,17 @@ export class QuizGame extends Component {
 
     /** Increase the question/answer font size by one step (max 1.5em). */
     increaseFontSize() {
-        if (this.state.fontSizeEm < 1.5) {
-            this.state.fontSizeEm = Math.min(1.5, Math.round((this.state.fontSizeEm + 0.1) * 10) / 10);
+        const maxFontSize = 7;
+        if (this.state.fontSizeEm < maxFontSize) {
+            this.state.fontSizeEm = Math.min(maxFontSize, Math.round((this.state.fontSizeEm + 0.2) * 10) / 10);
         }
     }
 
     /** Decrease the question/answer font size by one step (min 0.7em). */
     decreaseFontSize() {
-        if (this.state.fontSizeEm > 0.7) {
-            this.state.fontSizeEm = Math.max(0.7, Math.round((this.state.fontSizeEm - 0.1) * 10) / 10);
+        const minFontSize = 0.3;
+        if (this.state.fontSizeEm > minFontSize) {
+            this.state.fontSizeEm = Math.max(minFontSize, Math.round((this.state.fontSizeEm - 0.2) * 10) / 10);
         }
     }
 
