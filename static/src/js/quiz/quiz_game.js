@@ -70,6 +70,9 @@ export class QuizGame extends Component {
             // allowResubmission is True (Python bool) when set by action_preview_quiz,
             // or 'true' (string) when passed via a URL parameter.
             allowResubmission: allowResubmission,
+            // Font size multiplier for question and answer text (em units).
+            // Range: 0.7 – 1.5, step 0.1.
+            fontSizeEm: 1.0,
         });
 
         this.resId = this._toInt(getParam("active_id")) || routeResId;
@@ -198,6 +201,20 @@ export class QuizGame extends Component {
         const el = document.querySelector(`[data-question-id="${questionId}"]`);
         if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }
+
+    /** Increase the question/answer font size by one step (max 1.5em). */
+    increaseFontSize() {
+        if (this.state.fontSizeEm < 1.5) {
+            this.state.fontSizeEm = Math.min(1.5, Math.round((this.state.fontSizeEm + 0.1) * 10) / 10);
+        }
+    }
+
+    /** Decrease the question/answer font size by one step (min 0.7em). */
+    decreaseFontSize() {
+        if (this.state.fontSizeEm > 0.7) {
+            this.state.fontSizeEm = Math.max(0.7, Math.round((this.state.fontSizeEm - 0.1) * 10) / 10);
         }
     }
 

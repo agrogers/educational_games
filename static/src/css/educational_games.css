@@ -459,3 +459,45 @@
     text-align: right;
     padding-right: 0.25rem;
 }
+
+/* ── Font-size controls (header top-right) ──────────── */
+.o_quiz_page .quiz-font-controls {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.75rem;
+    z-index: 2;
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.o_quiz_page .quiz-font-btn {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 0.3rem;
+    color: rgba(255, 255, 255, 0.7);
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.o_quiz_page .quiz-font-btn:hover,
+.o_quiz_page .quiz-font-btn:focus {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: white;
+    outline: none;
+}
+
+.o_quiz_page .quiz-font-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+    pointer-events: none;
+}
