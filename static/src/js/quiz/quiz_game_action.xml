@@ -204,7 +204,7 @@
                                                                     transform="rotate(-90 18 18)"/>
                                                         </svg>
                                                         <div t-if="ansStats.recent_count > 0" class="quiz-pct-recent-fill"/>
-                                                        <!-- <div class="quiz-pct-value" t-esc="displayPct + '%'"/> -->
+                                                        <div t-if="ansStats.recent_count > 0" class="quiz-pct-value" t-esc="ansStats.recent_count"/>
                                                     </div>
                                                     <div class="quiz-pct-legend">
                                                         <span class="legend-all">ALL</span>
