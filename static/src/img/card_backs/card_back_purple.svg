@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 76">
+  <rect width="52" height="76" fill="#7c3aed"/>
+  <defs>
+    <pattern id="s" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="8" y2="8" stroke="#c4b5fd" stroke-width="0.6"/>
+      <line x1="8" y1="0" x2="0" y2="8" stroke="#c4b5fd" stroke-width="0.6"/>
+    </pattern>
+  </defs>
+  <rect width="52" height="76" fill="url(#s)"/>
+  <path d="M6 3 L8 7 L4 7Z" fill="#c4b5fd" opacity="0.9"/>
+  <path d="M46 3 L48 7 L44 7Z" fill="#c4b5fd" opacity="0.9"/>
+  <path d="M6 73 L8 69 L4 69Z" fill="#c4b5fd" opacity="0.9"/>
+  <path d="M46 73 L48 69 L44 69Z" fill="#c4b5fd" opacity="0.9"/>
+</svg>

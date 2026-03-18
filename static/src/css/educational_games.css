@@ -516,15 +516,17 @@
 }
 
 /* ── Playing-card answer selector ────────────────────────
-   Each answer option shows a 100px-high card to its left.
-   Unselected cards flip to reveal the coloured back face
-   when any answer in that question has been chosen.
+   CSS card frames (70 × 100px) with rounded corners and a dark border.
+   Front face: white with the answer letter.
+   Back face: dark edge, white inner border, random image fill.
+   Unselected cards flip to the back when any answer is chosen.
+   After reveal: wrong answers flip to back, correct stay on front.
    ──────────────────────────────────────────────────────── */
 
 /* Card outer container – supplies the 3-D eye-point */
 .o_quiz_page .quiz-answer-card {
     flex-shrink: 0;
-    width: 68px;
+    width: 70px;
     height: 100px;
     perspective: 500px;
     cursor: pointer;
@@ -544,41 +546,55 @@
     transform: rotateY(180deg);
 }
 
-/* Shared face styles */
+/* Shared face styles: dark border, rounded corners, hidden when facing away */
 .o_quiz_page .quiz-card-face {
     position: absolute;
     inset: 0;
+    border-radius: 7px;
+    border: 2px solid #1e293b;
+    overflow: hidden;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
 
-/* Front face: card image + letter overlay */
+/* Front face: plain white background with centred letter */
 .o_quiz_page .quiz-card-front {
+    background: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-/* Back face: rotated so it is hidden initially */
+/* Back face: dark background acts as the card edge colour;
+   rotated 180° so it is hidden initially */
 .o_quiz_page .quiz-card-back {
     transform: rotateY(180deg);
+    background: #1e293b;
+    padding: 4px;
+    display: flex;
+    align-items: stretch;
 }
 
-/* Card image fills the face */
-.o_quiz_page .quiz-card-img {
+/* White inner border on back face (classic playing-card look) */
+.o_quiz_page .quiz-card-back-inner {
+    flex: 1;
+    border-radius: 4px;
+    border: 2px solid #ffffff;
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;
+}
+
+/* Random image fills the inner area of the back face */
+.o_quiz_page .quiz-card-back-img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     display: block;
-    border-radius: 6px;
 }
 
-/* Letter (A, B, C, …) centred over the front image */
+/* Letter (A, B, C, …) centred on the front face */
 .o_quiz_page .quiz-card-letter {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     font-size: 2rem;
     font-weight: 900;
     color: #4f46e5;

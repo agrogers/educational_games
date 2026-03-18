@@ -173,14 +173,16 @@
                                             <!-- Playing card (replaces checkbox / radio) -->
                                             <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }}">
                                                 <div class="quiz-card-inner">
+                                                    <!-- Front face: white card with answer letter -->
                                                     <div class="quiz-card-face quiz-card-front">
-                                                        <img src="/educational_games/static/src/img/card_purple_front.png"
-                                                             class="quiz-card-img" alt=""/>
                                                         <span class="quiz-card-letter"><t t-esc="getAnswerLetter(answer_index)"/></span>
                                                     </div>
+                                                    <!-- Back face: dark border + white inner border + random image -->
                                                     <div class="quiz-card-face quiz-card-back">
-                                                        <img src="/educational_games/static/src/img/card_purple_back.png"
-                                                             class="quiz-card-img" alt=""/>
+                                                        <div class="quiz-card-back-inner">
+                                                            <img t-att-src="getCardBackUrl(answer.id)"
+                                                                 class="quiz-card-back-img" alt=""/>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

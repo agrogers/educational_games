@@ -185,6 +185,24 @@ export class QuizGame extends Component {
     }
 
     /**
+     * Returns a deterministic random card-back image URL for a given answer ID.
+     * The same answer always gets the same image within a session, ensuring
+     * cards don't flicker on re-render.
+     */
+    getCardBackUrl(answerId) {
+        const images = [
+            "/educational_games/static/src/img/card_backs/card_back_red.svg",
+            "/educational_games/static/src/img/card_backs/card_back_blue.svg",
+            "/educational_games/static/src/img/card_backs/card_back_green.svg",
+            "/educational_games/static/src/img/card_backs/card_back_purple.svg",
+            "/educational_games/static/src/img/card_backs/card_back_orange.svg",
+        ];
+        // Knuth multiplicative hash: spreads IDs evenly across the image list.
+        const idx = ((answerId * 2654435761) >>> 0) % images.length;
+        return images[idx];
+    }
+
+    /**
      * Returns the TOC/card status for a question.
      * @returns {'unanswered'|'answered'|'correct'|'incorrect'}
      */
