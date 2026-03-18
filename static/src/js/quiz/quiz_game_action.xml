@@ -26,7 +26,6 @@
             <!-- ── Quiz content ── -->
             <div t-else="">
 
-                <!-- ── Header ── -->
                 <div class="quiz-header">
                     <!-- Optional background image (behind overlay) -->
                     <div t-if="state.quiz.header_image_url"
@@ -44,6 +43,27 @@
                             <strong>Score: <t t-esc="state.score"/> / <t t-esc="state.totalMarks"/></strong>
                             <span t-if="state.submission_submitted" class="ms-2 quiz-saved-badge">✓ Saved</span>
                         </div>
+                    </div>
+                    <!-- Font-size controls (top-right, discrete) -->
+                    <div class="quiz-font-controls">
+                        <button class="quiz-font-btn"
+                                title="Decrease font size"
+                                t-on-click="decreaseFontSize"
+                                t-att-disabled="state.fontSizeEm &lt;= 0.3">
+                            <img class="quiz-font-icon"
+                                 src="/educational_games/static/src/img/resize-font_down.svg"
+                                 alt=""
+                                 aria-hidden="true"/>
+                        </button>
+                        <button class="quiz-font-btn"
+                                title="Increase font size"
+                                t-on-click="increaseFontSize"
+                                t-att-disabled="state.fontSizeEm &gt;= 7">
+                            <img class="quiz-font-icon"
+                                 src="/educational_games/static/src/img/resize-font_up.svg"
+                                 alt=""
+                                 aria-hidden="true"/>
+                        </button>
                     </div>
                 </div>
 
@@ -115,7 +135,8 @@
 
                                     <!-- Question text + marks badge + teacher Check button -->
                                     <div class="d-flex align-items-start gap-2 mb-3">
-                                        <div t-out="question.question_text" class="quiz-question-text flex-grow-1"/>
+                                        <div t-out="question.question_text" class="quiz-question-text flex-grow-1"
+                                             t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
                                         <div class="d-flex flex-column gap-1 flex-shrink-0 mt-1">
                                             <span t-if="question.allow_multiple"
                                                   class="quiz-badge-multi">Multi</span>
@@ -160,7 +181,8 @@
                                                    t-att-name="'q_' + question.id"
                                                    style="cursor:pointer; pointer-events:none;"/>
 
-                                            <div t-out="answer.answer_text" class="quiz-answer-text"/>
+                                            <div t-out="answer.answer_text" class="quiz-answer-text"
+                                                 t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
 
                                             <!-- ── Percentage-pie stats (teacher Check view) ── -->
                                             <div t-if="ansStats" class="quiz-ans-stats ms-auto d-flex align-items-center gap-1 flex-shrink-0">
