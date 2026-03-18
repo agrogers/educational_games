@@ -513,3 +513,75 @@
     cursor: default;
     pointer-events: none;
 }
+
+/* ── Playing-card answer selector ────────────────────────
+   Each answer option shows a 100px-high card to its left.
+   Unselected cards flip to reveal the coloured back face
+   when any answer in that question has been chosen.
+   ──────────────────────────────────────────────────────── */
+
+/* Card outer container – supplies the 3-D eye-point */
+.o_quiz_page .quiz-answer-card {
+    flex-shrink: 0;
+    width: 68px;
+    height: 100px;
+    perspective: 500px;
+    cursor: pointer;
+}
+
+/* Rotating layer – both faces live here */
+.o_quiz_page .quiz-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Flip state: rotate card to show back face */
+.o_quiz_page .quiz-answer-card.card-flipped .quiz-card-inner {
+    transform: rotateY(180deg);
+}
+
+/* Shared face styles */
+.o_quiz_page .quiz-card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Front face: card image + letter overlay */
+.o_quiz_page .quiz-card-front {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Back face: rotated so it is hidden initially */
+.o_quiz_page .quiz-card-back {
+    transform: rotateY(180deg);
+}
+
+/* Card image fills the face */
+.o_quiz_page .quiz-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    border-radius: 6px;
+}
+
+/* Letter (A, B, C, …) centred over the front image */
+.o_quiz_page .quiz-card-letter {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    font-weight: 900;
+    color: #4f46e5;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1;
+}

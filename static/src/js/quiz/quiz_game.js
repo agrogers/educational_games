@@ -179,6 +179,11 @@ export class QuizGame extends Component {
         }
     }
 
+    /** Returns the letter label (A, B, C, …) for the nth answer option. */
+    getAnswerLetter(index) {
+        return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[index] || String(index + 1);
+    }
+
     /**
      * Returns the TOC/card status for a question.
      * @returns {'unanswered'|'answered'|'correct'|'incorrect'}

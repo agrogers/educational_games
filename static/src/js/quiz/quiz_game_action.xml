@@ -159,6 +159,7 @@
                                         <t t-set="isCorrect"   t-value="ansResult and ansResult.is_correct"/>
                                         <t t-set="wasSelected" t-value="ansResult and ansResult.was_selected"/>
                                         <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
+                                        <t t-set="cardFlipped" t-value="!isSelected and question.selected_answers.length > 0 and !showResult"/>
 
                                         <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
                                              t-attf-class="quiz-answer-item
@@ -167,19 +168,20 @@
                                                  {{ showResult and isCorrect ? 'quiz-answer-correct' : '' }}
                                                  {{ showResult and wasSelected and !isCorrect ? 'quiz-answer-wrong' : '' }}">
 
-                                            <input t-if="question.allow_multiple"
-                                                   type="checkbox"
-                                                   class="form-check-input flex-shrink-0"
-                                                   t-att-checked="isSelected"
-                                                   t-att-disabled="showResult"
-                                                   style="cursor:pointer; pointer-events:none;"/>
-                                            <input t-else=""
-                                                   type="radio"
-                                                   class="form-check-input flex-shrink-0"
-                                                   t-att-checked="isSelected"
-                                                   t-att-disabled="showResult"
-                                                   t-att-name="'q_' + question.id"
-                                                   style="cursor:pointer; pointer-events:none;"/>
+                                            <!-- Playing card (replaces checkbox / radio) -->
+                                            <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }}">
+                                                <div class="quiz-card-inner">
+                                                    <div class="quiz-card-face quiz-card-front">
+                                                        <img src="/educational_games/static/src/img/card_purple_front.png"
+                                                             class="quiz-card-img" alt=""/>
+                                                        <span class="quiz-card-letter"><t t-esc="getAnswerLetter(answer_index)"/></span>
+                                                    </div>
+                                                    <div class="quiz-card-face quiz-card-back">
+                                                        <img src="/educational_games/static/src/img/card_purple_back.png"
+                                                             class="quiz-card-img" alt=""/>
+                                                    </div>
+                                                </div>
+                                            </div>
 
                                             <div t-out="answer.answer_text" class="quiz-answer-text"
                                                  t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
