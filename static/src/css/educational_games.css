@@ -298,7 +298,7 @@
     display: flex; align-items: center; gap: 0.75rem;
     border: 2px solid #e5e7eb;
     border-radius: 0.6rem;
-    padding: 0.65rem 0.9rem;
+    padding: 0rem 0rem;
     margin-bottom: 0.5rem;
     background: white;
     font-size: 0.95rem; color: #374151;
