@@ -76,6 +76,13 @@ class Quiz(models.Model):
     _order = 'name'
 
     name = fields.Char(string='Quiz Name', required=True)
+    subject_ids = fields.Many2many(
+        'aps.subject',
+        'educational_games_quiz_subject_rel',
+        'quiz_id',
+        'subject_id',
+        string='Subjects',
+    )
     description = fields.Html(string='Description')
     question_ids = fields.One2many('quiz.question', 'quiz_id', string='Questions')
     question_count = fields.Integer(

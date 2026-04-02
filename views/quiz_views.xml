@@ -10,9 +10,24 @@
         <field name="arch" type="xml">
             <list string="Quizzes">
                 <field name="name"/>
+                <field name="subject_ids" widget="many2many_tags" optional="show"/>
                 <field name="question_count"/>
                 <field name="total_marks"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_quiz_quiz_search" model="ir.ui.view">
+        <field name="name">quiz.quiz.search</field>
+        <field name="model">quiz.quiz</field>
+        <field name="arch" type="xml">
+            <search string="Search Quizzes">
+                <field name="name"/>
+                <field name="subject_ids"/>
+                <group expand="0" string="Group By">
+                    <filter string="Subject" name="group_by_subject" context="{'group_by': 'subject_ids'}"/>
+                </group>
+            </search>
         </field>
     </record>
 
@@ -48,6 +63,7 @@
                         <group>
                             <field name="question_count" readonly="1"/>
                             <field name="total_marks" readonly="1"/>
+                            <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
                             <field name="display_question_count"/>
                             <field name="display_option_count"/>
                             <field name="allow_resubmission"/>

@@ -54,6 +54,7 @@ export class QuizGame extends Component {
             quiz: null,
             submitted: false,
             isCheckingAll: false,
+            hasCheckedAllAnswers: false,
             score: 0,
             totalMarks: 0,
             results: [],
@@ -387,6 +388,11 @@ export class QuizGame extends Component {
                 toCheck.map((question) => this._revealQuestionAnswer(question))
             );
             const failed = checkResults.filter((entry) => entry.status === "rejected").length;
+            const succeeded = toCheck.length - failed;
+
+            if (succeeded > 0) {
+                this.state.hasCheckedAllAnswers = true;
+            }
 
             if (failed) {
                 this.notification.add(
@@ -405,6 +411,92 @@ export class QuizGame extends Component {
         } finally {
             this.state.isCheckingAll = false;
         }
+    }
+
+    _getAnswerResult(question, answerId) {
+        if (!question?.result?.answers) {
+            return null;
+        }
+        return question.result.answers.find((ans) => ans.id === answerId) || null;
+    }
+
+    _getAnswerTotalPct(question, answerId) {
+        const stats = question?.responseStats?.[answerId];
+        if (!stats) {
+            return 0;
+        }
+        const pct = Number(stats.total_pct ?? stats.recent_pct ?? 0);
+        return Number.isFinite(pct) ? pct : 0;
+    }
+
+    _getQuestionCorrectPct(question) {
+        if (!question?.checked || !question?.result?.answers?.length) {
+            return 0;
+        }
+
+        const correctAnswerIds = question.result.answers
+            .filter((ans) => ans.is_correct)
+            .map((ans) => ans.id);
+
+        if (!correctAnswerIds.length) {
+            return 0;
+        }
+
+        return correctAnswerIds.reduce(
+            (sum, answerId) => sum + this._getAnswerTotalPct(question, answerId),
+            0
+        );
+    }
+
+    sortQuestions() {
+        if (
+            this.state.submitted ||
+            !this.state.isTeacher ||
+            !this.state.hasCheckedAllAnswers ||
+            !this.state.quiz?.questions?.length
+        ) {
+            return;
+        }
+
+        const questionOrder = new Map(
+            this.state.quiz.questions.map((question, index) => [question.id, index])
+        );
+
+        for (const question of this.state.quiz.questions) {
+            if (!question?.checked || !question?.answers?.length) {
+                continue;
+            }
+
+            question.answers.sort((a, b) => {
+                const aResult = this._getAnswerResult(question, a.id);
+                const bResult = this._getAnswerResult(question, b.id);
+                const aCorrect = !!aResult?.is_correct;
+                const bCorrect = !!bResult?.is_correct;
+
+                if (aCorrect !== bCorrect) {
+                    return aCorrect ? -1 : 1;
+                }
+
+                if (!aCorrect && !bCorrect) {
+                    const pctDiff = this._getAnswerTotalPct(question, b.id) - this._getAnswerTotalPct(question, a.id);
+                    if (pctDiff !== 0) {
+                        return pctDiff;
+                    }
+                }
+
+                return a.id - b.id;
+            });
+        }
+
+        this.state.quiz.questions.sort((a, b) => {
+            const pctDiff = this._getQuestionCorrectPct(a) - this._getQuestionCorrectPct(b);
+            if (pctDiff !== 0) {
+                return pctDiff;
+            }
+            return (questionOrder.get(a.id) ?? 0) - (questionOrder.get(b.id) ?? 0);
+        });
+
+        this.notification.add("Questions sorted by lowest correct percentage.", { type: "info" });
     }
 
     async _revealQuestionAnswer(question) {
@@ -552,6 +644,7 @@ export class QuizGame extends Component {
         this.state.retakeMode = true;
         this.state.submitted = false;
         this.state.isCheckingAll = false;
+        this.state.hasCheckedAllAnswers = false;
         this.state.score = 0;
         this.state.results = [];
         this.state.submission_submitted = false;

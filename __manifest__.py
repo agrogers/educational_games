@@ -8,13 +8,13 @@
     'website': '',
     'depends': ['base', 'web', 'aps_sis'],
     'data': [
+        'security/ir.model.access.csv',
+        'views/quiz_views.xml',
         'views/quiz_actions.xml',
         'views/actions.xml',
         'views/educational_games_menu.xml',
         'views/educational_games_views.xml',
-        'views/quiz_views.xml',
         # 'views/html_iframe_wrapper.xml',
-        'security/ir.model.access.csv',
     ],
     'assets': {
         'web.assets_backend': [

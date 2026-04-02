@@ -217,13 +217,14 @@
                                             <!-- ── Percentage-pie stats (teacher Check view) ── -->
                                             <div t-if="ansStats" class="quiz-ans-stats ms-auto d-flex align-items-center gap-1 flex-shrink-0">
                                                 <t t-set="displayPct" t-value="ansStats.recent_count > 0 ? ansStats.recent_pct : ansStats.total_pct"/>
+                                                <t t-set="ansIsCorrect" t-value="ansResult ? ansResult.is_correct : answer.is_correct"/>
                                                 <div class="quiz-pct-block quiz-pct-combined"
                                                      t-att-title="'All: ' + ansStats.total_count + ' of ' + question.totalRespondents + ' respondents · Recent: ' + (ansStats.recent_count > 0 ? (ansStats.recent_count + ' of ' + question.recentRespondents) : 'no recent data')">
                                                     <div class="quiz-pct-viz"
-                                                         t-att-style="'--recent-pct:' + displayPct + ';'">
+                                                         t-att-style="'--recent-pct:' + displayPct + ';' + (ansIsCorrect ? '--quiz-pct-accent:#10b981;--quiz-pct-accent-soft:#d1fae5;' : '--quiz-pct-accent:#ef4444;--quiz-pct-accent-soft:#fee2e2;')">
                                                         <svg class="quiz-pct-pie" width="44" height="44" viewBox="0 0 36 36" aria-hidden="true">
                                                             <circle cx="18" cy="18" r="15.9" fill="none" stroke="#dee2e6" stroke-width="4.5"/>
-                                                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#9ca3af"
+                                                            <circle cx="18" cy="18" r="15.9" fill="none" t-att-stroke="ansIsCorrect ? '#10b981' : '#ef4444'"
                                                                     stroke-width="4.5"
                                                                     t-att-stroke-dasharray="ansStats.total_pct + ' 100'"
                                                                     stroke-linecap="round"
@@ -302,6 +303,12 @@
                                         t-on-click="checkAllAnswers">
                                     <t t-if="state.isCheckingAll">Checking...</t>
                                     <t t-else="">Check Answers</t>
+                                </button>
+                                <button t-if="state.isTeacher and state.hasCheckedAllAnswers"
+                                        class="btn btn-outline-primary"
+                                        t-att-disabled="state.isCheckingAll"
+                                        t-on-click="sortQuestions">
+                                    Sort Questions
                                 </button>
                                 <button class="quiz-btn-submit btn"
                                         t-att-disabled="state.isCheckingAll"

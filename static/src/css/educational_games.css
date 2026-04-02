@@ -396,6 +396,8 @@
     position: relative;
     width: 44px;
     height: 44px;
+    --quiz-pct-accent: #7c3aed;
+    --quiz-pct-accent-soft: #ede9fe;
 }
 .o_quiz_page .quiz-pct-recent-fill {
     position: absolute;
@@ -407,8 +409,8 @@
     border-radius: 50%;
     border: 1px solid #ffffff;
     background: conic-gradient(
-        #7c3aed 0 calc(var(--recent-pct) * 1%),
-        #ede9fe calc(var(--recent-pct) * 1%) 100%
+        var(--quiz-pct-accent) 0 calc(var(--recent-pct) * 1%),
+        var(--quiz-pct-accent-soft) calc(var(--recent-pct) * 1%) 100%
     );
 }
 .o_quiz_page .quiz-pct-value {
