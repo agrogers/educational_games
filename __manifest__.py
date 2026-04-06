@@ -9,8 +9,8 @@
     'depends': ['base', 'web', 'aps_sis'],
     'data': [
         'security/ir.model.access.csv',
-        'views/quiz_views.xml',
         'views/quiz_actions.xml',
+        'views/quiz_views.xml',
         'views/actions.xml',
         'views/educational_games_menu.xml',
         'views/educational_games_views.xml',
