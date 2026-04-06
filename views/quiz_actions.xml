@@ -9,6 +9,31 @@
         <field name="search_view_id" ref="educational_games.view_quiz_quiz_search"/>
     </record>
 
+    <!-- Questions list action -->
+    <record id="action_quiz_question_list" model="ir.actions.act_window">
+        <field name="name">Quiz Questions</field>
+        <field name="res_model">quiz.question</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="educational_games.view_quiz_question_search"/>
+    </record>
+
+    <!-- Question Tags list action -->
+    <record id="action_quiz_tag_list" model="ir.actions.act_window">
+        <field name="name">Question Tags</field>
+        <field name="res_model">quiz.tag</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Server action: bound to quiz.question → adds checkboxes + Action menu entry -->
+    <record id="action_quiz_question_assign_tags_server" model="ir.actions.server">
+        <field name="name">Assign Tags</field>
+        <field name="model_id" ref="educational_games.model_quiz_question"/>
+        <field name="binding_model_id" ref="educational_games.model_quiz_question"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_open_tag_wizard()</field>
+    </record>
+
     <!-- Client action: student quiz game (OWL component) -->
     <record id="action_quiz_game" model="ir.actions.client">
         <field name="name">Quiz</field>

@@ -125,6 +125,17 @@ class Quiz(models.Model):
             'If disabled, retakes run in practice mode only (no save).'
         ),
     )
+    filter_tag_ids = fields.Many2many(
+        'quiz.tag',
+        'quiz_quiz_filter_tag_rel',
+        'quiz_id',
+        'tag_id',
+        string='Filter by Tags',
+        help=(
+            'Limit questions to those that have at least one of these tags. '
+            'Leave empty to include all questions regardless of tag.'
+        ),
+    )
     quiz_url_params = fields.Char(
         string='APEX Game URL',
         compute='_compute_quiz_url_params',
@@ -171,12 +182,13 @@ class Quiz(models.Model):
         secret = (config.get('database.secret') or self.env.cr.dbname or 'odoo').encode()
         return hmac.new(secret, payload_json.encode(), hashlib.sha256).digest()
 
-    def _build_quiz_token(self, quiz_id, question_count=0, option_count=0, allow_resubmission=False):
+    def _build_quiz_token(self, quiz_id, question_count=0, option_count=0, allow_resubmission=False, filter_tag_ids=None):
         payload = {
             'quiz_id': int(quiz_id),
             'question_count': max(0, int(question_count or 0)),
             'option_count': max(0, int(option_count or 0)),
             'allow_resubmission': bool(allow_resubmission),
+            'filter_tag_ids': sorted(int(t) for t in (filter_tag_ids or [])),
         }
         payload_json = json.dumps(payload, separators=(',', ':'), sort_keys=True)
         signature = self._sign_quiz_payload(payload_json)
@@ -198,11 +210,12 @@ class Quiz(models.Model):
                 'question_count': max(0, int(payload.get('question_count') or 0)),
                 'option_count': max(0, int(payload.get('option_count') or 0)),
                 'allow_resubmission': bool(payload.get('allow_resubmission')),
+                'filter_tag_ids': [int(t) for t in (payload.get('filter_tag_ids') or [])],
             }
         except Exception:
             return None
 
-    @api.depends('display_question_count', 'display_option_count', 'allow_resubmission')
+    @api.depends('display_question_count', 'display_option_count', 'allow_resubmission', 'filter_tag_ids')
     def _compute_quiz_url_params(self):
         # Resolve the client action ID once for all records in this batch.
         # The format APEX expects is: action:<action_id>?quiz_id=<quiz_id>&quiz_token=<signed>
@@ -230,6 +243,7 @@ class Quiz(models.Model):
                 record.display_question_count,
                 record.display_option_count,
                 record.allow_resubmission,
+                record.filter_tag_ids.ids,
             )
             parts = [f'quiz_id={quiz_id}', f'quiz_token={token}']
             record.quiz_url_params = f'action:{action_id}?{"&".join(parts)}'
@@ -250,6 +264,7 @@ class Quiz(models.Model):
                 self.display_question_count,
                 self.display_option_count,
                 self.allow_resubmission,
+                self.filter_tag_ids.ids,
             ),
         }
         return {
@@ -817,15 +832,24 @@ class Quiz(models.Model):
             q_limit = token_data['question_count']
             o_limit = token_data['option_count']
             allow_resubmission = token_data['allow_resubmission']
+            filter_tag_ids = token_data.get('filter_tag_ids') or []
         else:
             # Unsigned URL parameters are intentionally ignored so students
             # cannot lower difficulty by editing query parameters.
             q_limit = 0
             o_limit = 0
+            filter_tag_ids = []
 
         rng = random.SystemRandom()
 
         all_questions = list(quiz.question_ids)
+
+        # Filter by tags when the token specifies tag IDs (backward compatible:
+        # an empty list means no filtering).
+        if filter_tag_ids:
+            tag_set = set(filter_tag_ids)
+            all_questions = [q for q in all_questions if tag_set.intersection(q.tag_ids.ids)]
+
         if q_limit > 0 and q_limit < len(all_questions):
             all_questions = rng.sample(all_questions, q_limit)
 
@@ -1113,6 +1137,19 @@ class Quiz(models.Model):
         }
 
 
+class QuizTag(models.Model):
+    _name = 'quiz.tag'
+    _description = 'Quiz Question Tag'
+    _order = 'name'
+
+    name = fields.Char(string='Tag Name', required=True)
+    description = fields.Char(string='Description')
+
+    _sql_constraints = [
+        ('name_uniq', 'UNIQUE(name)', 'Tag name must be unique.'),
+    ]
+
+
 class QuizQuestion(models.Model):
     _name = 'quiz.question'
     _description = 'Quiz Question'
@@ -1128,6 +1165,13 @@ class QuizQuestion(models.Model):
         help='If checked, students can select more than one answer.',
     )
     answer_ids = fields.One2many('quiz.answer', 'question_id', string='Answers')
+    tag_ids = fields.Many2many(
+        'quiz.tag',
+        'quiz_question_tag_rel',
+        'question_id',
+        'tag_id',
+        string='Tags',
+    )
     correct_answer_count = fields.Integer(
         string='Correct Answers',
         compute='_compute_correct_answer_count',
@@ -1138,6 +1182,18 @@ class QuizQuestion(models.Model):
     def _compute_correct_answer_count(self):
         for record in self:
             record.correct_answer_count = sum(1 for a in record.answer_ids if a.is_correct)
+
+    def action_open_tag_wizard(self):
+        """Open the tag assignment wizard for selected questions."""
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'quiz.question.tag.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_ids': self.ids,
+            },
+        }
 
 
 class QuizAnswer(models.Model):

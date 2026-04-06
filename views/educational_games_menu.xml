@@ -30,4 +30,6 @@
 
     <!-- Quiz sub-menu -->
     <menuitem id="menu_quiz_admin" name="Quizzes" parent="educational_games_menu" action="action_quiz_list" sequence="60" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_quiz_question_list" name="Questions" parent="educational_games_menu" action="educational_games.action_quiz_question_list" sequence="61" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_quiz_tag_list" name="Question Tags" parent="educational_games_menu" action="educational_games.action_quiz_tag_list" sequence="62" groups="aps_sis.group_aps_teacher"/>
 </odoo>

@@ -24,6 +24,7 @@
             <search string="Search Quizzes">
                 <field name="name"/>
                 <field name="subject_ids"/>
+                <field name="filter_tag_ids"/>
                 <group expand="0" string="Group By">
                     <filter string="Subject" name="group_by_subject" context="{'group_by': 'subject_ids'}"/>
                 </group>
@@ -67,6 +68,9 @@
                             <field name="display_question_count"/>
                             <field name="display_option_count"/>
                             <field name="allow_resubmission"/>
+                            <field name="filter_tag_ids" widget="many2many_tags"
+                                   options="{'no_create': False}"
+                                   help="Limit the quiz to questions that have at least one of these tags. Leave empty to include all questions."/>
                         </group>
                         <group class="quiz-form-header-image">
                             <field name="header_image" widget="image"
@@ -132,11 +136,20 @@
                         </page>
                         <!-- ── Questions tab ── -->
                         <page string="Questions" name="questions">
+                            <div class="mb-2">
+                                <button name="%(educational_games.action_quiz_question_list)d"
+                                        string="Open Questions List"
+                                        type="action"
+                                        class="btn btn-secondary"
+                                        icon="fa-external-link"
+                                        context="{'search_default_quiz_id': id}"/>
+                            </div>
                             <field name="question_ids" context="{'default_quiz_id': id}">
                                 <list string="Questions">
                                     <field name="sequence" widget="handle"/>
                                     <field name="question_text" widget="html" string="Question"/>
                                     <field name="marks"/>
+                                    <field name="tag_ids" widget="many2many_tags" optional="show"/>
                                     <field name="correct_answer_count" string="# Correct"/>
                                 </list>
                                 <!-- Inline popup form: question + all its answers on one page -->
@@ -149,6 +162,7 @@
                                         </group>
                                         <field name="question_text" widget="html"
                                                placeholder="Enter the question…"/>
+                                        <field name="tag_ids" widget="many2many_tags"/>
                                         <separator string="Answers"/>
                                         <field name="answer_ids">
                                             <list editable="bottom" string="Answers">
@@ -182,6 +196,133 @@
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_quiz_quiz_form"/>
         <field name="act_window_id" ref="educational_games.action_quiz_list"/>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
+         quiz.tag  –  List view
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_quiz_tag_list" model="ir.ui.view">
+        <field name="name">quiz.tag.list</field>
+        <field name="model">quiz.tag</field>
+        <field name="arch" type="xml">
+            <list string="Question Tags">
+                <field name="name"/>
+                <field name="description" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_quiz_tag_form" model="ir.ui.view">
+        <field name="name">quiz.tag.form</field>
+        <field name="model">quiz.tag</field>
+        <field name="arch" type="xml">
+            <form string="Question Tag">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="description"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
+         quiz.question  –  Standalone list view
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_quiz_question_list" model="ir.ui.view">
+        <field name="name">quiz.question.list</field>
+        <field name="model">quiz.question</field>
+        <field name="arch" type="xml">
+            <list string="Questions" multi_edit="1">
+                <header>
+                    <button name="action_open_tag_wizard" string="Assign Tags" type="object" icon="fa-tags"/>
+                </header>
+                <field name="quiz_id"/>
+                <field name="sequence" widget="handle"/>
+                <field name="question_text" widget="html"/>
+                <field name="marks"/>
+                <field name="tag_ids" widget="many2many_tags" optional="show"/>
+                <field name="correct_answer_count" string="# Correct"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_quiz_question_search" model="ir.ui.view">
+        <field name="name">quiz.question.search</field>
+        <field name="model">quiz.question</field>
+        <field name="arch" type="xml">
+            <search string="Search Questions">
+                <field name="question_text" string="Question"/>
+                <field name="quiz_id"/>
+                <field name="tag_ids"/>
+                <filter string="Multiple Answers" name="filter_multiple" domain="[('allow_multiple', '=', True)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Quiz" name="group_by_quiz" context="{'group_by': 'quiz_id'}"/>
+                    <filter string="Tags" name="group_by_tags" context="{'group_by': 'tag_ids'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
+         quiz.question  –  Standalone form view
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_quiz_question_form" model="ir.ui.view">
+        <field name="name">quiz.question.form</field>
+        <field name="model">quiz.question</field>
+        <field name="arch" type="xml">
+            <form string="Question">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="quiz_id"/>
+                            <field name="sequence"/>
+                            <field name="marks"/>
+                            <field name="allow_multiple"/>
+                        </group>
+                        <group>
+                            <field name="correct_answer_count" readonly="1" string="# Correct Answers"/>
+                        </group>
+                    </group>
+                    <field name="question_text" widget="html" placeholder="Enter the question…"/>
+                    <separator string="Tags"/>
+                    <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
+                    <separator string="Answers"/>
+                    <field name="answer_ids">
+                        <list editable="bottom" string="Answers">
+                            <field name="sequence" widget="handle"/>
+                            <field name="answer_text" widget="html" string="Answer Text"/>
+                            <field name="is_correct" string="Correct?"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
+         Wizard: Assign Tags to Multiple Questions
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_quiz_question_tag_wizard_form" model="ir.ui.view">
+        <field name="name">quiz.question.tag.wizard.form</field>
+        <field name="model">quiz.question.tag.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Assign Tags to Questions">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <p>Select the tags to assign to the selected question(s):</p>
+                    </div>
+                    <group>
+                        <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="apply_tags" string="Assign Tags" type="object" class="btn btn-primary"/>
+                    <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
     </record>
 
 </odoo>
