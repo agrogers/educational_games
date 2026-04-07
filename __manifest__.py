@@ -6,6 +6,7 @@
     'description': 'A collection of educational games to help students learn English grammar concepts.',
     'author': 'Your Name',
     'website': '',
+    'license': 'LGPL-3',
     'depends': ['base', 'web', 'aps_sis'],
     'data': [
         'security/ir.model.access.csv',
