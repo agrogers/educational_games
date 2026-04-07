@@ -1,6 +1,6 @@
 {
     'name': 'Educational Games',
-    'version': '18.0.1.0.4',
+    'version': '18.0.1.1.0',
     'category': 'Education',
     'summary': 'Educational games for learning English grammar',
     'description': 'A collection of educational games to help students learn English grammar concepts.',

@@ -10,64 +10,16 @@ import hmac
 import json
 import random
 import re
-import unicodedata
 
-# Extensible patterns for question and answer line detection.
-# Add new compiled regexes to support additional quiz text formats.
-_QUESTION_PATTERNS = [
-    # "1. What is..." or "1) What is..."
-    re.compile(r'^(\d+)[\.)\:]\s+(?P<text>.+)$'),
-    # "Question 1: What is..." or "Question 1. What is..."
-    re.compile(r'^Question\s+\d+[:\.\)]\s*(?P<text>.+)$', re.IGNORECASE),
-]
-
-_ANSWER_PATTERNS = [
-    # "A) text", "A. text", "A: text"
-    re.compile(r'^(?P<letter>[A-Za-z])[\)\.:]\s+(?P<text>.+)$'),
-]
-
-# Prefixes to strip from parsed text.
-_QUESTION_PREFIX_RE = re.compile(
-    r'^(?:Question\s+\d+[:\.\)]\s*|\d+[:\.\)]\s+)', re.IGNORECASE
+from .quiz_utils import (
+    _QUESTION_PATTERNS,
+    _ANSWER_PATTERNS,
+    _QUESTION_PREFIX_RE,
+    _ANSWER_PREFIX_RE,
+    _MD_BOLD_ITALIC_RE,
+    _MD_ITALIC_RE,
+    _normalize_text,
 )
-_ANSWER_PREFIX_RE = re.compile(
-    r'^[A-Za-z][\)\.:]\s+'
-)
-
-# Plain Markdown detection patterns (used in _extract_lines_from_html).
-# _MD_BOLD_ITALIC_RE: ***text*** — whole-line bold+italic wrap
-# _MD_ITALIC_RE:      *text*    — whole-line italic wrap (empty *  * is rejected)
-_MD_BOLD_ITALIC_RE = re.compile(r'^\*{3}(.+)\*{3}\s*$')
-_MD_ITALIC_RE = re.compile(r'^\*([^*]+)\*\s*$')
-
-
-def _normalize_text(text):
-    """
-    Normalise Unicode characters that are common in text copied from AI tools
-    (ChatGPT, NotebookLM, etc.) or word-processors.
-
-    Converts: smart quotes, non-breaking spaces, soft hyphens, zero-width chars,
-    en/em dashes, Unicode ellipsis, and leading bullet points.
-    """
-    text = unicodedata.normalize('NFC', text)
-    # Smart / curly quotes → straight quotes
-    text = text.replace('\u201c', '"').replace('\u201d', '"')
-    text = text.replace('\u2018', "'").replace('\u2019', "'")
-    # Non-breaking and other special spaces → regular space
-    text = re.sub(r'[\u00a0\u202f\u2007\u2009\u3000]', ' ', text)
-    # Soft hyphen (invisible, causes regex matching issues)
-    text = text.replace('\u00ad', '')
-    # Zero-width characters
-    text = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', text)
-    # En dash / em dash / horizontal bar → hyphen
-    text = re.sub(r'[\u2013\u2014\u2015]', '-', text)
-    # Unicode ellipsis → three dots
-    text = text.replace('\u2026', '...')
-    # Leading bullet points (common in ChatGPT / NotebookLM lists)
-    text = re.sub(r'^[\u2022\u2023\u25e6\u2043\u2219\u00b7]\s*', '', text.strip())
-    # Collapse multiple spaces
-    text = re.sub(r'  +', ' ', text)
-    return text.strip()
 
 
 class Quiz(models.Model):
@@ -84,7 +36,13 @@ class Quiz(models.Model):
         string='Subjects',
     )
     description = fields.Html(string='Description')
-    question_ids = fields.One2many('quiz.question', 'quiz_id', string='Questions')
+    question_ids = fields.Many2many(
+        'quiz.question',
+        'quiz_quiz_question_rel',
+        'quiz_id',
+        'question_id',
+        string='Questions',
+    )
     question_count = fields.Integer(
         string='Number of Questions',
         compute='_compute_question_count',
@@ -279,9 +237,18 @@ class Quiz(models.Model):
         }
 
     def action_delete_all_questions(self):
-        """Delete all questions (and their cascaded answers) for this quiz."""
+        """Delete all questions (and their cascaded answers) for this quiz.
+
+        Questions whose primary quiz (quiz_id) is this quiz are permanently
+        deleted.  Questions shared from another primary quiz are only removed
+        from this quiz's question_ids relation — they remain intact.
+        """
         for record in self:
-            record.question_ids.unlink()
+            owned = record.question_ids.filtered(lambda q: q.quiz_id == record)
+            shared = record.question_ids - owned
+            if shared:
+                record.question_ids = [(3, q.id) for q in shared]
+            owned.unlink()
         return {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
@@ -530,6 +497,7 @@ class Quiz(models.Model):
                     'question_text': escape(clean_q),
                     'marks': 1,
                 })
+                quiz_record.question_ids = [(4, current_question.id)]
                 q_seq += 10
                 ans_seq = 10
                 q_count += 1
@@ -569,6 +537,7 @@ class Quiz(models.Model):
                     'question_text': escape(q_text),
                     'marks': 1,
                 })
+                quiz_record.question_ids = [(4, current_question.id)]
                 q_seq += 10
                 ans_seq = 10
                 q_count += 1
@@ -1000,6 +969,10 @@ class Quiz(models.Model):
         if response_vals:
             self.env['quiz.response'].sudo().create(response_vals)
 
+        # Recompute stored stats on affected questions and their answers
+        affected_q_ids = [r['question_id'] for r in results]
+        self.env['quiz.question']._recompute_stats(affected_q_ids)
+
         # ── Per-question response stats for teacher users ────────────────
         is_teacher = (
             self.env.user.has_group('aps_sis.group_aps_teacher') or
@@ -1135,106 +1108,3 @@ class Quiz(models.Model):
             'total_respondents': total_n,
             'recent_respondents': recent_n,
         }
-
-
-class QuizTag(models.Model):
-    _name = 'quiz.tag'
-    _description = 'Quiz Question Tag'
-    _order = 'name'
-
-    name = fields.Char(string='Tag Name', required=True)
-    description = fields.Char(string='Description')
-
-    _sql_constraints = [
-        ('name_uniq', 'UNIQUE(name)', 'Tag name must be unique.'),
-    ]
-
-
-class QuizQuestion(models.Model):
-    _name = 'quiz.question'
-    _description = 'Quiz Question'
-    _order = 'quiz_id, sequence, id'
-
-    quiz_id = fields.Many2one('quiz.quiz', string='Quiz', required=True, ondelete='cascade')
-    sequence = fields.Integer(string='Sequence', default=10)
-    question_text = fields.Html(string='Question', required=True, sanitize=True)
-    marks = fields.Integer(string='Marks', default=1)
-    allow_multiple = fields.Boolean(
-        string='Allow Multiple Answers',
-        default=False,
-        help='If checked, students can select more than one answer.',
-    )
-    answer_ids = fields.One2many('quiz.answer', 'question_id', string='Answers')
-    tag_ids = fields.Many2many(
-        'quiz.tag',
-        'quiz_question_tag_rel',
-        'question_id',
-        'tag_id',
-        string='Tags',
-    )
-    correct_answer_count = fields.Integer(
-        string='Correct Answers',
-        compute='_compute_correct_answer_count',
-        store=True,
-    )
-
-    @api.depends('answer_ids.is_correct')
-    def _compute_correct_answer_count(self):
-        for record in self:
-            record.correct_answer_count = sum(1 for a in record.answer_ids if a.is_correct)
-
-    def action_open_tag_wizard(self):
-        """Open the tag assignment wizard for selected questions."""
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': 'quiz.question.tag.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'active_ids': self.ids,
-            },
-        }
-
-
-class QuizAnswer(models.Model):
-    _name = 'quiz.answer'
-    _description = 'Quiz Answer'
-    _order = 'question_id, sequence, id'
-
-    question_id = fields.Many2one('quiz.question', string='Question', required=True, ondelete='cascade')
-    sequence = fields.Integer(string='Sequence', default=10)
-    answer_text = fields.Html(string='Answer', required=True, sanitize=True)
-    is_correct = fields.Boolean(string='Correct Answer', default=False)
-
-
-class QuizResponse(models.Model):
-    """
-    Records each answer a student selects when submitting a quiz.
-
-    One record is created per selected answer per submission, so a student who
-    picks three options for a multi-answer question produces three rows.
-    ``is_correct`` reflects whether that specific answer option is a correct
-    one (copied from ``quiz.answer.is_correct`` at submission time).
-    """
-    _name = 'quiz.response'
-    _description = 'Quiz Question Response'
-    _order = 'create_date desc, id desc'
-
-    quiz_id = fields.Many2one(
-        'quiz.quiz', string='Quiz', required=True, ondelete='cascade', index=True,
-    )
-    question_id = fields.Many2one(
-        'quiz.question', string='Question', required=True, ondelete='cascade', index=True,
-    )
-    answer_id = fields.Many2one(
-        'quiz.answer', string='Selected Answer', required=True, ondelete='cascade',
-    )
-    user_id = fields.Many2one(
-        'res.users', string='Student', required=True,
-        default=lambda self: self.env.user, index=True,
-    )
-    is_correct = fields.Boolean(
-        string='Correct Answer',
-        help='Whether the selected answer option is a correct answer.',
-    )
-

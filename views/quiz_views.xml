@@ -142,7 +142,7 @@
                                         type="action"
                                         class="btn btn-secondary"
                                         icon="fa-external-link"
-                                        context="{'search_default_quiz_id': id}"/>
+                                        context="{'search_default_all_quiz_ids': id}"/>
                             </div>
                             <field name="question_ids" context="{'default_quiz_id': id}">
                                 <list string="Questions">
@@ -150,7 +150,10 @@
                                     <field name="question_text" widget="html" string="Question"/>
                                     <field name="marks"/>
                                     <field name="tag_ids" widget="many2many_tags" optional="show"/>
-                                    <field name="correct_answer_count" string="# Correct"/>
+                                    <field name="correct_answer_count" string="Correct Options"/>
+                                    <field name="attempt_count" string="Attempts" optional="show"/>
+                                    <field name="pct_correct_all" string="% Correct" optional="show"/>
+                                    <field name="pct_correct_recent" string="% Correct (1h)" optional="hide"/>
                                 </list>
                                 <!-- Inline popup form: question + all its answers on one page -->
                                 <form string="Question">
@@ -159,10 +162,10 @@
                                             <field name="sequence"/>
                                             <field name="marks"/>
                                             <field name="allow_multiple"/>
+                                            <field name="tag_ids" widget="many2many_tags"/>
                                         </group>
                                         <field name="question_text" widget="html"
                                                placeholder="Enter the question…"/>
-                                        <field name="tag_ids" widget="many2many_tags"/>
                                         <separator string="Answers"/>
                                         <field name="answer_ids">
                                             <list editable="bottom" string="Answers">
@@ -170,6 +173,9 @@
                                                 <field name="answer_text" widget="html"
                                                        string="Answer Text"/>
                                                 <field name="is_correct" string="Correct?"/>
+                                                <field name="select_count" string="Selected" optional="show"/>
+                                                <field name="select_pct_all" string="% (All)" optional="show"/>
+                                                <field name="select_pct_recent" string="% (1h)" optional="hide"/>
                                             </list>
                                         </field>
                                     </sheet>
@@ -243,7 +249,10 @@
                 <field name="question_text" widget="html"/>
                 <field name="marks"/>
                 <field name="tag_ids" widget="many2many_tags" optional="show"/>
-                <field name="correct_answer_count" string="# Correct"/>
+                <field name="correct_answer_count" string="Correct Options"/>
+                <field name="attempt_count" string="Attempts" optional="show"/>
+                <field name="pct_correct_all" string="% Correct" optional="show"/>
+                <field name="pct_correct_recent" string="% Correct (1h)" optional="hide"/>
             </list>
         </field>
     </record>
@@ -255,6 +264,7 @@
             <search string="Search Questions">
                 <field name="question_text" string="Question"/>
                 <field name="quiz_id"/>
+                <field name="all_quiz_ids" string="Quiz"/>
                 <field name="tag_ids"/>
                 <filter string="Multiple Answers" name="filter_multiple" domain="[('allow_multiple', '=', True)]"/>
                 <group expand="0" string="Group By">
@@ -276,24 +286,33 @@
                 <sheet>
                     <group>
                         <group>
-                            <field name="quiz_id"/>
+                            <field name="quiz_id" string="Primary Quiz"/>
                             <field name="sequence"/>
                             <field name="marks"/>
                             <field name="allow_multiple"/>
+                            <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
                         </group>
                         <group>
-                            <field name="correct_answer_count" readonly="1" string="# Correct Answers"/>
+                            <field name="correct_answer_count" readonly="1" string="Correct Options"/>
+                            <field name="attempt_count" readonly="1" string="Attempts"/>
+                            <field name="pct_correct_all" readonly="1" string="% Correct (All)"/>
+                            <field name="pct_correct_recent" readonly="1" string="% Correct (1h)"/>
                         </group>
                     </group>
                     <field name="question_text" widget="html" placeholder="Enter the question…"/>
-                    <separator string="Tags"/>
-                    <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
+                    <group>
+                        <field name="all_quiz_ids" widget="many2many_tags" options="{'no_create': True}"
+                               help="All quizzes this question belongs to."/>
+                    </group>
                     <separator string="Answers"/>
                     <field name="answer_ids">
                         <list editable="bottom" string="Answers">
                             <field name="sequence" widget="handle"/>
                             <field name="answer_text" widget="html" string="Answer Text"/>
                             <field name="is_correct" string="Correct?"/>
+                            <field name="select_count" readonly="1" string="Selected" optional="show"/>
+                            <field name="select_pct_all" readonly="1" string="% (All)" optional="show"/>
+                            <field name="select_pct_recent" readonly="1" string="% (1h)" optional="hide"/>
                         </list>
                     </field>
                 </sheet>
