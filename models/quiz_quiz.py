@@ -969,9 +969,11 @@ class Quiz(models.Model):
         if response_vals:
             self.env['quiz.response'].sudo().create(response_vals)
 
-        # Recompute stored stats on affected questions and their answers
+        # Recompute stored stats on affected questions and their answers.
+        # Use sudo() because students do not have write access to quiz.question
+        # or quiz.answer (the stats fields are teacher-facing read-only counters).
         affected_q_ids = [r['question_id'] for r in results]
-        self.env['quiz.question']._recompute_stats(affected_q_ids)
+        self.env['quiz.question'].sudo()._recompute_stats(affected_q_ids)
 
         # ── Per-question response stats for teacher users ────────────────
         is_teacher = (
