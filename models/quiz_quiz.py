@@ -1,7 +1,6 @@
 from odoo import models, fields, api
 from odoo.exceptions import AccessError, UserError
 from odoo.tools import config
-from markupsafe import escape, Markup
 import base64
 from collections import Counter
 from datetime import timedelta
@@ -10,16 +9,7 @@ import hmac
 import json
 import random
 import re
-
-from .quiz_utils import (
-    _QUESTION_PATTERNS,
-    _ANSWER_PATTERNS,
-    _QUESTION_PREFIX_RE,
-    _ANSWER_PREFIX_RE,
-    _MD_BOLD_ITALIC_RE,
-    _MD_ITALIC_RE,
-    _normalize_text,
-)
+import uuid
 
 
 class Quiz(models.Model):
@@ -94,6 +84,49 @@ class Quiz(models.Model):
             'Leave empty to include all questions regardless of tag.'
         ),
     )
+    filter_subject_ids = fields.Many2many(
+        'aps.subject',
+        'educational_games_quiz_filter_subject_rel',
+        'quiz_id',
+        'subject_id',
+        string='Filter by Subjects',
+        help='Limit questions to those linked to at least one of these subjects.',
+    )
+    filter_min_attempts = fields.Char(
+        string='Min Attempts',
+        help='Only include questions attempted at least this many times overall.',
+    )
+    filter_max_attempts = fields.Char(
+        string='Max Attempts',
+        help='Only include questions attempted no more than this many times overall.',
+    )
+    filter_max_pct_correct = fields.Char(
+        string='Max % Correct',
+        help='Only include questions whose overall % correct is at or below this value.',
+    )
+    filter_student_weighted_score_pct = fields.Char(
+        string="Student's Own Weighted Score %",
+        help=(
+            'Exclude a question when the student has reached at least this weighted score percentage. '
+            'Most recent attempt has weight 1, next 1/2, next 1/3, and so on.'
+        ),
+    )
+    filter_student_attempts = fields.Char(
+        string="Student's Attempts",
+        help='Only consider excluding a question when the student has attempted it at least this many times.',
+    )
+    bulk_add_question_ids_text = fields.Text(
+        string='Question IDs',
+        help='Paste question IDs separated by commas and/or whitespace.',
+    )
+    bulk_add_question_ids = fields.Many2many(
+        'quiz.question',
+        'educational_games_quiz_bulk_add_question_rel',
+        'quiz_id',
+        'question_id',
+        string='Questions to Add',
+        help='Staged questions found by the Check button before adding to this quiz.',
+    )
     quiz_url_params = fields.Char(
         string='APEX Game URL',
         compute='_compute_quiz_url_params',
@@ -103,20 +136,6 @@ class Quiz(models.Model):
             'Paste it into the resource URL field in the APEX module.'
         ),
     )
-    bulk_text = fields.Html(
-        string='Paste Quiz Text',
-        sanitize=True,
-        help=(
-            'Paste formatted quiz text here to auto-create questions and answers. '
-            'Bold the entire question line and each correct answer line. '
-            'Example:\n'
-            '**1. What is the capital of France?**\n'
-            'A) London\n'
-            '**B) Paris**\n'
-            'C) Berlin'
-        ),
-    )
-
     @api.depends('question_ids')
     def _compute_question_count(self):
         for record in self:
@@ -126,6 +145,159 @@ class Quiz(models.Model):
     def _compute_total_marks(self):
         for record in self:
             record.total_marks = sum(q.marks for q in record.question_ids)
+
+    @staticmethod
+    def _sanitize_nonnegative_int(value):
+        if value in (False, None, ''):
+            return 0
+        return max(0, int(str(value).strip() or 0))
+
+    def _get_quiz_filter_payload(self):
+        return {
+            'filter_tag_ids': sorted(self.filter_tag_ids.ids),
+            'filter_subject_ids': sorted(self.filter_subject_ids.ids),
+            'filter_min_attempts': self._sanitize_nonnegative_int(self.filter_min_attempts),
+            'filter_max_attempts': self._sanitize_nonnegative_int(self.filter_max_attempts),
+            'filter_max_pct_correct': self._sanitize_nonnegative_int(self.filter_max_pct_correct),
+            'filter_student_weighted_score_pct': self._sanitize_nonnegative_int(self.filter_student_weighted_score_pct),
+            'filter_student_attempts': self._sanitize_nonnegative_int(self.filter_student_attempts),
+        }
+
+    @classmethod
+    def _normalize_quiz_filter_payload(cls, payload):
+        payload = payload or {}
+        return {
+            'filter_tag_ids': sorted(int(tag_id) for tag_id in (payload.get('filter_tag_ids') or [])),
+            'filter_subject_ids': sorted(int(subject_id) for subject_id in (payload.get('filter_subject_ids') or [])),
+            'filter_min_attempts': cls._sanitize_nonnegative_int(payload.get('filter_min_attempts')),
+            'filter_max_attempts': cls._sanitize_nonnegative_int(payload.get('filter_max_attempts')),
+            'filter_max_pct_correct': cls._sanitize_nonnegative_int(payload.get('filter_max_pct_correct')),
+            'filter_student_weighted_score_pct': cls._sanitize_nonnegative_int(payload.get('filter_student_weighted_score_pct')),
+            'filter_student_attempts': cls._sanitize_nonnegative_int(payload.get('filter_student_attempts')),
+        }
+
+    def _build_filter_summary(self, filter_payload):
+        filter_payload = self._normalize_quiz_filter_payload(filter_payload)
+        parts = []
+
+        if filter_payload['filter_tag_ids']:
+            tags = self.env['quiz.tag'].sudo().browse(filter_payload['filter_tag_ids']).exists().mapped('name')
+            parts.append(f"Tags: {', '.join(tags)}")
+        if filter_payload['filter_subject_ids']:
+            subjects = self.env['aps.subject'].sudo().browse(filter_payload['filter_subject_ids']).exists().mapped('name')
+            parts.append(f"Subjects: {', '.join(subjects)}")
+
+        min_attempts = filter_payload['filter_min_attempts']
+        max_attempts = filter_payload['filter_max_attempts']
+        if min_attempts and max_attempts:
+            parts.append(f"Attempts between {min_attempts} and {max_attempts}")
+        elif min_attempts:
+            parts.append(f"Attempts at least {min_attempts}")
+        elif max_attempts:
+            parts.append(f"Attempts at most {max_attempts}")
+
+        if filter_payload['filter_max_pct_correct']:
+            parts.append(f"Overall % correct at most {filter_payload['filter_max_pct_correct']}%")
+
+        student_attempts = filter_payload['filter_student_attempts']
+        student_weighted = filter_payload['filter_student_weighted_score_pct']
+        if student_attempts and student_weighted:
+            parts.append(
+                f"Exclude if your attempts are at least {student_attempts} and your weighted score is at least {student_weighted}%"
+            )
+        elif student_attempts:
+            parts.append(f"Exclude if your attempts are at least {student_attempts}")
+        elif student_weighted:
+            parts.append(f"Exclude if your weighted score is at least {student_weighted}%")
+
+        return 'Active filters: ' + ' | '.join(parts) if parts else ''
+
+    @staticmethod
+    def _response_attempt_group_key(response):
+        if response.attempt_token:
+            return response.attempt_token
+        if response.create_date:
+            return f"legacy:{fields.Datetime.to_string(response.create_date)[:19]}"
+        return f"legacy-id:{response.id}"
+
+    def _get_student_question_attempt_stats(self, questions, user=None):
+        user = user or self.env.user
+        if not questions:
+            return {}
+
+        responses = self.env['quiz.response'].sudo().search(
+            [('question_id', 'in', questions.ids), ('user_id', '=', user.id)],
+            order='create_date desc, id desc',
+        )
+
+        grouped = {}
+        for response in responses:
+            question_groups = grouped.setdefault(response.question_id.id, {})
+            group_key = self._response_attempt_group_key(response)
+            group = question_groups.setdefault(group_key, {'selected_ids': set()})
+            group['selected_ids'].add(response.answer_id.id)
+
+        stats = {}
+        for question in questions:
+            attempts = list(grouped.get(question.id, {}).values())
+            correct_ids = set(question.answer_ids.filtered('is_correct').ids)
+            weighted_total = 0.0
+            weight_sum = 0.0
+
+            for index, attempt in enumerate(attempts, start=1):
+                weight = 1.0 / index
+                attempt_score = 100.0 if correct_ids and attempt['selected_ids'] == correct_ids else 0.0
+                weighted_total += attempt_score * weight
+                weight_sum += weight
+
+            stats[question.id] = {
+                'attempt_count': len(attempts),
+                'weighted_score_pct': round(weighted_total / weight_sum, 1) if weight_sum else None,
+            }
+
+        return stats
+
+    def _question_matches_filter_payload(self, question, filter_payload, student_stats=None):
+        filter_payload = self._normalize_quiz_filter_payload(filter_payload)
+        student_stats = student_stats or {}
+
+        if filter_payload['filter_tag_ids']:
+            if not set(filter_payload['filter_tag_ids']).intersection(question.tag_ids.ids):
+                return False
+
+        if filter_payload['filter_subject_ids']:
+            if not set(filter_payload['filter_subject_ids']).intersection(question.subject_ids.ids):
+                return False
+
+        min_attempts = filter_payload['filter_min_attempts']
+        if min_attempts and question.attempt_count < min_attempts:
+            return False
+
+        max_attempts = filter_payload['filter_max_attempts']
+        if max_attempts and question.attempt_count > max_attempts:
+            return False
+
+        max_pct_correct = filter_payload['filter_max_pct_correct']
+        if max_pct_correct and question.pct_correct_all > max_pct_correct:
+            return False
+
+        student_attempt_threshold = filter_payload['filter_student_attempts']
+        student_weighted_threshold = filter_payload['filter_student_weighted_score_pct']
+        if student_attempt_threshold or student_weighted_threshold:
+            question_stats = student_stats.get(question.id, {'attempt_count': 0, 'weighted_score_pct': None})
+            meets_attempt_threshold = (
+                question_stats['attempt_count'] >= student_attempt_threshold
+                if student_attempt_threshold else True
+            )
+            weighted_score = question_stats['weighted_score_pct']
+            meets_weighted_threshold = (
+                weighted_score is not None and weighted_score >= student_weighted_threshold
+                if student_weighted_threshold else True
+            )
+            if meets_attempt_threshold and meets_weighted_threshold:
+                return False
+
+        return True
 
     @staticmethod
     def _b64url_encode(data):
@@ -140,14 +312,14 @@ class Quiz(models.Model):
         secret = (config.get('database.secret') or self.env.cr.dbname or 'odoo').encode()
         return hmac.new(secret, payload_json.encode(), hashlib.sha256).digest()
 
-    def _build_quiz_token(self, quiz_id, question_count=0, option_count=0, allow_resubmission=False, filter_tag_ids=None):
+    def _build_quiz_token(self, quiz_id, question_count=0, option_count=0, allow_resubmission=False, filter_payload=None):
         payload = {
             'quiz_id': int(quiz_id),
             'question_count': max(0, int(question_count or 0)),
             'option_count': max(0, int(option_count or 0)),
             'allow_resubmission': bool(allow_resubmission),
-            'filter_tag_ids': sorted(int(t) for t in (filter_tag_ids or [])),
         }
+        payload.update(self._normalize_quiz_filter_payload(filter_payload))
         payload_json = json.dumps(payload, separators=(',', ':'), sort_keys=True)
         signature = self._sign_quiz_payload(payload_json)
         return f"{self._b64url_encode(payload_json.encode())}.{self._b64url_encode(signature)}"
@@ -163,17 +335,29 @@ class Quiz(models.Model):
             if not hmac.compare_digest(signature, expected):
                 return None
             payload = json.loads(payload_json)
+            filter_payload = self._normalize_quiz_filter_payload(payload)
             return {
                 'quiz_id': int(payload.get('quiz_id') or 0),
                 'question_count': max(0, int(payload.get('question_count') or 0)),
                 'option_count': max(0, int(payload.get('option_count') or 0)),
                 'allow_resubmission': bool(payload.get('allow_resubmission')),
-                'filter_tag_ids': [int(t) for t in (payload.get('filter_tag_ids') or [])],
+                **filter_payload,
             }
         except Exception:
             return None
 
-    @api.depends('display_question_count', 'display_option_count', 'allow_resubmission', 'filter_tag_ids')
+    @api.depends(
+        'display_question_count',
+        'display_option_count',
+        'allow_resubmission',
+        'filter_tag_ids',
+        'filter_subject_ids',
+        'filter_min_attempts',
+        'filter_max_attempts',
+        'filter_max_pct_correct',
+        'filter_student_weighted_score_pct',
+        'filter_student_attempts',
+    )
     def _compute_quiz_url_params(self):
         # Resolve the client action ID once for all records in this batch.
         # The format APEX expects is: action:<action_id>?quiz_id=<quiz_id>&quiz_token=<signed>
@@ -201,7 +385,7 @@ class Quiz(models.Model):
                 record.display_question_count,
                 record.display_option_count,
                 record.allow_resubmission,
-                record.filter_tag_ids.ids,
+                record._get_quiz_filter_payload(),
             )
             parts = [f'quiz_id={quiz_id}', f'quiz_token={token}']
             record.quiz_url_params = f'action:{action_id}?{"&".join(parts)}'
@@ -222,7 +406,7 @@ class Quiz(models.Model):
                 self.display_question_count,
                 self.display_option_count,
                 self.allow_resubmission,
-                self.filter_tag_ids.ids,
+                self._get_quiz_filter_payload(),
             ),
         }
         return {
@@ -255,6 +439,88 @@ class Quiz(models.Model):
             'res_id': self[:1].id,
             'view_mode': 'form',
             'target': 'current',
+        }
+
+    def action_bulk_check_question_ids(self):
+        self.ensure_one()
+        if not self.id:
+            raise UserError('Please save the quiz before using Bulk Add.')
+
+        ids = [int(v) for v in re.findall(r'\d+', self.bulk_add_question_ids_text or '')]
+        if not ids:
+            raise UserError('Please paste at least one numeric question ID.')
+
+        ordered_unique_ids = list(dict.fromkeys(ids))
+        questions = self.env['quiz.question'].search([('id', 'in', ordered_unique_ids)])
+        found_map = {q.id: q for q in questions}
+        ordered_questions = self.env['quiz.question'].browse([
+            qid for qid in ordered_unique_ids if qid in found_map
+        ])
+
+        self.bulk_add_question_ids = [(6, 0, ordered_questions.ids)]
+
+        missing_ids = [qid for qid in ordered_unique_ids if qid not in found_map]
+        if missing_ids:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Check Completed With Missing IDs',
+                    'message': (
+                        f'Loaded {len(ordered_questions)} question(s). '
+                        f'Missing IDs: {", ".join(str(i) for i in missing_ids)}'
+                    ),
+                    'type': 'warning',
+                    'sticky': True,
+                    'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+                },
+            }
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Check Completed',
+                'message': f'Loaded {len(ordered_questions)} question(s) for review.',
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
+
+    def action_bulk_add_questions(self):
+        self.ensure_one()
+        if not self.id:
+            raise UserError('Please save the quiz before adding questions.')
+
+        staged_questions = self.bulk_add_question_ids
+        if not staged_questions:
+            raise UserError('No staged questions found. Click Check first.')
+
+        existing_ids = set(self.question_ids.ids)
+        to_add = staged_questions.filtered(lambda q: q.id not in existing_ids)
+        first_time_questions = to_add.filtered(lambda q: not q.quiz_id and not q.all_quiz_ids)
+
+        if to_add:
+            self.question_ids = [(4, q.id) for q in to_add]
+        if first_time_questions:
+            first_time_questions.write({'quiz_id': self.id})
+
+        self.bulk_add_question_ids = [(5, 0, 0)]
+
+        skipped = len(staged_questions) - len(to_add)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Questions Added',
+                'message': (
+                    f'Added {len(to_add)} question(s) to this quiz. '
+                    f'Skipped {skipped} already-linked question(s).'
+                ),
+                'type': 'success',
+                'sticky': False,
+            },
         }
 
     @api.model
@@ -293,486 +559,6 @@ class Quiz(models.Model):
         new_sub = original.copy(defaults)
         return new_sub.id
 
-    def action_cleanup_bulk_text(self):
-        """
-        Normalise the bulk_text field: fix Unicode/special characters from AI
-        copy-paste and rebuild with clean, simple HTML structure.
-
-        Bold/italic formatting is preserved so that the import still works
-        correctly after a clean-up.
-        """
-        for record in self:
-            if not record.bulk_text or not record.bulk_text.strip():
-                raise UserError("Nothing in the text field to clean up.")
-
-            parsed_lines = self._extract_lines_from_html(record.bulk_text)
-            if not parsed_lines:
-                raise UserError("Could not extract any text from the field.")
-
-            parts = []
-            for (text, has_bold, is_italic) in parsed_lines:
-                safe = escape(text)
-                if is_italic and has_bold:
-                    parts.append(Markup('<p><em><strong>{}</strong></em></p>').format(safe))
-                elif is_italic:
-                    parts.append(Markup('<p><em>{}</em></p>').format(safe))
-                elif has_bold:
-                    parts.append(Markup('<p><strong>{}</strong></p>').format(safe))
-                else:
-                    parts.append(Markup('<p>{}</p>').format(safe))
-
-            record.bulk_text = Markup('').join(parts)
-
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': self._name,
-            'res_id': self[:1].id,
-            'view_mode': 'form',
-            'target': 'current',
-        }
-
-    def action_preview_bulk_text(self):
-        """
-        Colour-code the bulk_text to show what the importer will parse — without
-        creating any records.
-
-        Colour key (visible in the HTML editor):
-          · Dark indigo + italic  = question line
-          · Green + bold          = correct answer
-          · Red                   = other answer option
-          · Grey                  = unrecognised line
-
-        The rebuilt HTML also uses semantic <em>/<strong> tags so that
-        clicking Import straight after a preview will work correctly.
-        """
-        _COLORS = {
-            # (css-color, bold, italic)
-            'question':       ('#1e1b4b', True,  True),
-            'answer_correct': ('#15803d', True,  False),
-            'answer_option':  ('#9a3412', False, False),
-            'unknown':        ('#9ca3af', False, False),
-        }
-
-        for record in self:
-            if not record.bulk_text or not record.bulk_text.strip():
-                raise UserError("Nothing in the text field to preview.")
-
-            parsed_lines = self._extract_lines_from_html(record.bulk_text)
-            if not parsed_lines:
-                raise UserError("Could not extract any text from the field.")
-
-            categorized = self._preview_parse_lines(parsed_lines)
-
-            parts = []
-            prev_category = None
-            for (text, category) in categorized:
-                # Blank spacer line before each new question for readability
-                if category == 'question' and prev_category is not None:
-                    parts.append(Markup('<p><br/></p>'))
-
-                color, is_bold, is_italic = _COLORS[category]
-                safe = escape(text)
-
-                if is_bold and is_italic:
-                    inner = Markup(
-                        '<em><strong style="color:{color}">{text}</strong></em>'
-                    ).format(color=color, text=safe)
-                    parts.append(Markup('<p>{}</p>').format(inner))
-                elif is_bold:
-                    inner = Markup(
-                        '<strong style="color:{color}">{text}</strong>'
-                    ).format(color=color, text=safe)
-                    parts.append(Markup('<p>{}</p>').format(inner))
-                else:
-                    parts.append(Markup(
-                        '<p style="color:{color}">{text}</p>'
-                    ).format(color=color, text=safe))
-
-                prev_category = category
-
-            record.bulk_text = Markup('').join(parts)
-
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': self._name,
-            'res_id': self[:1].id,
-            'view_mode': 'form',
-            'target': 'current',
-        }
-
-    def action_parse_bulk_text(self):
-        """Parse the bulk_text HTML field and auto-create questions and answers."""
-        total_q = 0
-        total_a = 0
-        for record in self:
-            if not record.bulk_text or not record.bulk_text.strip():
-                raise UserError(
-                    "No text to parse. Please paste quiz text into the 'Paste Quiz Text' field first."
-                )
-            q_count, a_count = self._parse_and_create_questions(record)
-            total_q += q_count
-            total_a += a_count
-            # Intentionally NOT clearing bulk_text so the user can review / re-edit
-        if total_q == 0:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Import Failed',
-                    'message': (
-                        'No questions could be parsed from the pasted text. '
-                        'Try the "Clean Up Text" or "Preview Import" buttons first.'
-                    ),
-                    'type': 'warning',
-                    'sticky': True,
-                },
-            }
-        # Reload the form so the Questions tab shows the new records
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': self._name,
-            'res_id': self[:1].id,
-            'view_mode': 'form',
-            'target': 'current',
-            'context': {
-                'notification': {
-                    'title': 'Import Successful',
-                    'message': (
-                        f'Imported {total_q} question(s) with {total_a} answer(s). '
-                        'The original text has been kept in the field for reference.'
-                    ),
-                    'type': 'success',
-                },
-            },
-        }
-
-    def _parse_and_create_questions(self, quiz_record):
-        """Parse formatted quiz text (HTML or plain) into questions and answers.
-
-        Strategy 1 (primary) – formatting-based:
-            Italic line  → new question
-            Following non-italic lines → answers (bold = correct)
-
-        Strategy 2 (fallback) – pattern-based:
-            Lines matching _QUESTION_PATTERNS → question
-            Lines matching _ANSWER_PATTERNS  → answer
-
-        Returns (question_count, answer_count).
-        """
-        text = quiz_record.bulk_text or ''
-        parsed_lines = self._extract_lines_from_html(text)
-
-        # Try formatting-based parsing first
-        q_count, a_count = self._parse_by_formatting(quiz_record, parsed_lines)
-        if q_count > 0:
-            return q_count, a_count
-
-        # Fallback to pattern-based parsing
-        return self._parse_by_patterns(quiz_record, parsed_lines)
-
-    def _parse_by_formatting(self, quiz_record, parsed_lines):
-        """Strategy 1: italic line = question, subsequent lines = answers, bold = correct."""
-        # Check if any italic lines exist; if not this strategy is not applicable
-        if not any(is_italic for (_, _, is_italic) in parsed_lines):
-            return 0, 0
-
-        current_question = None
-        existing_sequences = [q.sequence for q in quiz_record.question_ids]
-        q_seq = (max(existing_sequences) + 10) if existing_sequences else 10
-        ans_seq = 10
-        q_count = 0
-        a_count = 0
-
-        for (line_text, has_bold, is_italic) in parsed_lines:
-            line_text = line_text.strip()
-            if not line_text:
-                continue
-
-            if is_italic:
-                # New question – strip prefix like "Question 1:"
-                clean_q = self._clean_question_text(line_text)
-                current_question = self.env['quiz.question'].create({
-                    'quiz_id': quiz_record.id,
-                    'sequence': q_seq,
-                    'question_text': escape(clean_q),
-                    'marks': 1,
-                })
-                quiz_record.question_ids = [(4, current_question.id)]
-                q_seq += 10
-                ans_seq = 10
-                q_count += 1
-            elif current_question:
-                # Answer line – strip prefix like "A.", bold means correct
-                clean_a = self._clean_answer_text(line_text)
-                self.env['quiz.answer'].create({
-                    'question_id': current_question.id,
-                    'sequence': ans_seq,
-                    'answer_text': escape(clean_a),
-                    'is_correct': has_bold,
-                })
-                ans_seq += 10
-                a_count += 1
-
-        return q_count, a_count
-
-    def _parse_by_patterns(self, quiz_record, parsed_lines):
-        """Strategy 2: regex-based question/answer detection."""
-        current_question = None
-        existing_sequences = [q.sequence for q in quiz_record.question_ids]
-        q_seq = (max(existing_sequences) + 10) if existing_sequences else 10
-        ans_seq = 10
-        q_count = 0
-        a_count = 0
-
-        for (line_text, has_bold, _is_italic) in parsed_lines:
-            line_text = line_text.strip()
-            if not line_text:
-                continue
-
-            q_text = self._match_question_line(line_text)
-            if q_text is not None:
-                current_question = self.env['quiz.question'].create({
-                    'quiz_id': quiz_record.id,
-                    'sequence': q_seq,
-                    'question_text': escape(q_text),
-                    'marks': 1,
-                })
-                quiz_record.question_ids = [(4, current_question.id)]
-                q_seq += 10
-                ans_seq = 10
-                q_count += 1
-                continue
-
-            a_result = self._match_answer_line(line_text, has_bold)
-            if a_result and current_question:
-                answer_text, answer_is_correct = a_result
-                self.env['quiz.answer'].create({
-                    'question_id': current_question.id,
-                    'sequence': ans_seq,
-                    'answer_text': escape(answer_text),
-                    'is_correct': answer_is_correct,
-                })
-                ans_seq += 10
-                a_count += 1
-
-        return q_count, a_count
-
-    @staticmethod
-    def _clean_question_text(text):
-        """Strip common question prefixes like 'Question 1:', '1.', '1)' etc."""
-        return _QUESTION_PREFIX_RE.sub('', text).strip()
-
-    @staticmethod
-    def _clean_answer_text(text):
-        """Strip common answer prefixes like 'A.', 'A)', 'A:' etc."""
-        return _ANSWER_PREFIX_RE.sub('', text).strip()
-
-    @staticmethod
-    def _match_question_line(line_text):
-        """Match a question line against _QUESTION_PATTERNS. Returns question text or None."""
-        for pattern in _QUESTION_PATTERNS:
-            m = pattern.match(line_text)
-            if m:
-                return m.group('text')
-        return None
-
-    @staticmethod
-    def _match_answer_line(line_text, line_has_bold):
-        """Match an answer line and determine correctness.
-
-        Returns (answer_text, is_correct) or None.
-        Detects inline **markdown bold** markers within the answer text.
-        """
-        for pattern in _ANSWER_PATTERNS:
-            m = pattern.match(line_text)
-            if m:
-                raw_text = m.group('text')
-                # Check for inline **bold** markers (e.g. "**Hydraulic action**.")
-                bold_match = re.match(r'^\*\*(.+?)\*\*(.?)\s*$', raw_text)
-                if bold_match:
-                    return (bold_match.group(1) + bold_match.group(2)).strip(), True
-                return raw_text, line_has_bold
-        return None
-
-    @staticmethod
-    def _preview_parse_lines(parsed_lines):
-        """
-        Categorise parsed lines without creating any database records.
-
-        Returns list of (text, category) where category is one of:
-        'question', 'answer_correct', 'answer_option', 'unknown'.
-        """
-        has_italic = any(is_italic for (_, _, is_italic) in parsed_lines)
-        result = []
-
-        if has_italic:
-            seen_question = False
-            for (text, has_bold, is_italic) in parsed_lines:
-                if is_italic:
-                    result.append((text, 'question'))
-                    seen_question = True
-                elif seen_question:
-                    result.append((text, 'answer_correct' if has_bold else 'answer_option'))
-                else:
-                    result.append((text, 'unknown'))
-        else:
-            has_question = False
-            for (text, has_bold, _) in parsed_lines:
-                if Quiz._match_question_line(text) is not None:
-                    result.append((text, 'question'))
-                    has_question = True
-                elif has_question:
-                    a_result = Quiz._match_answer_line(text, has_bold)
-                    if a_result:
-                        _, is_correct = a_result
-                        result.append((text, 'answer_correct' if is_correct else 'answer_option'))
-                    else:
-                        result.append((text, 'unknown'))
-                else:
-                    result.append((text, 'unknown'))
-
-        return result
-
-    @staticmethod
-    def _extract_lines_from_html(html_text):
-        """
-        Return a list of (text, has_bold, is_italic) tuples from HTML quiz content.
-
-        Improvements over v1:
-        - Only *leaf* block elements are processed to avoid duplicate text from
-          nested containers (e.g. <div><p>…</p></div>).
-        - Inline styles (font-weight / font-style on <span>, <p>, etc.) are
-          detected in addition to semantic <strong>/<em> tags.
-        - All extracted text is passed through _normalize_text() to fix
-          copy-paste artefacts from ChatGPT, NotebookLM, etc.
-
-        has_bold:   True when the line contains <strong>/<b>, bold inline style,
-                    or ** markdown markers.
-        is_italic:  True when the majority of the line's text is in italic tags,
-                    has italic inline style, or is wrapped in *single asterisks*.
-
-        Supported plain-Markdown inputs (checked before HTML styling):
-          *question text*        → italic (question)
-          **correct answer**     → bold (correct answer)
-          ***bold+italic text*** → bold + italic
-        """
-        lines = []
-        BLOCK_TAGS = frozenset(('p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'))
-
-        def _elem_is_bold(el):
-            if el.tag in ('strong', 'b'):
-                return True
-            s = el.get('style', '')
-            if s and re.search(r'font-weight\s*:\s*(bold|[6-9]00)', s, re.I):
-                return True
-            return False
-
-        def _elem_is_italic(el):
-            if el.tag in ('em', 'i'):
-                return True
-            s = el.get('style', '')
-            if s and re.search(r'font-style\s*:\s*italic', s, re.I):
-                return True
-            return False
-
-        try:
-            from lxml import html as lxml_html
-            tree = lxml_html.fragment_fromstring(html_text, create_parent='div')
-
-            for elem in tree.iter():
-                if elem.tag not in BLOCK_TAGS:
-                    continue
-                # Only process leaf blocks — skip elements that contain nested blocks
-                if any(child.tag in BLOCK_TAGS for child in elem.iter() if child is not elem):
-                    continue
-
-                raw_text = _normalize_text(''.join(elem.itertext()))
-                if not raw_text:
-                    continue
-
-                total_len = len(raw_text)
-
-                # Markdown markers take priority over HTML element styling.
-                has_bold = False
-                is_italic = False
-
-                # Bold + italic: ***text***
-                _m = _MD_BOLD_ITALIC_RE.match(raw_text)
-                if _m:
-                    raw_text = _m.group(1).strip()
-                    has_bold = True
-                    is_italic = True
-                else:
-                    # Bold: ** markers (whole-line wrap or inline occurrences)
-                    if '**' in raw_text:
-                        has_bold = True
-                        raw_text = raw_text.replace('**', '').strip()
-                    # Italic: *text* single-asterisk whole-line wrap
-                    _m = _MD_ITALIC_RE.match(raw_text)
-                    if _m:
-                        raw_text = _m.group(1).strip()
-                        is_italic = True
-
-                    # Fall back to HTML element inspection when no Markdown found
-                    if not has_bold:
-                        bold_len = sum(
-                            len(_normalize_text(''.join(c.itertext())))
-                            for c in elem.iter()
-                            if c is not elem and _elem_is_bold(c)
-                        )
-                        has_bold = bool(bold_len) and bold_len >= total_len * 0.3
-                    if not is_italic:
-                        italic_len = sum(
-                            len(_normalize_text(''.join(c.itertext())))
-                            for c in elem.iter()
-                            if c is not elem and _elem_is_italic(c)
-                        )
-                        is_italic = bool(italic_len) and italic_len >= total_len * 0.5
-
-                if raw_text:
-                    lines.append((raw_text, has_bold, is_italic))
-
-        except Exception:
-            # Fallback: strip all HTML tags and handle markdown markers
-            clean = re.sub(r'<[^>]+>', '\n', html_text)
-            for line in clean.split('\n'):
-                line = _normalize_text(line)
-                if not line:
-                    continue
-                has_bold = '**' in line
-                is_italic = False
-                clean_line = line
-                # Bold + italic: ***text***
-                _m = _MD_BOLD_ITALIC_RE.match(line)
-                if _m:
-                    clean_line = _m.group(1).strip()
-                    has_bold = True
-                    is_italic = True
-                elif has_bold:
-                    clean_line = line.replace('**', '').strip()
-                    # After stripping **, check if remainder is *text* wrapped
-                    _m = _MD_ITALIC_RE.match(clean_line)
-                    if _m:
-                        clean_line = _m.group(1).strip()
-                        is_italic = True
-                else:
-                    # Italic: *text* whole-line wrap or line that starts with lone *
-                    _m = _MD_ITALIC_RE.match(line)
-                    if _m:
-                        clean_line = _m.group(1).strip()
-                        is_italic = True
-                    elif line.startswith('*') and not line.startswith('**'):
-                        is_italic = True
-                        # Strip only the leading * and (if present) trailing *
-                        clean_line = line[1:]
-                        if clean_line.endswith('*'):
-                            clean_line = clean_line[:-1]
-                        clean_line = clean_line.strip()
-                clean_line = _normalize_text(clean_line)
-                if clean_line:
-                    lines.append((clean_line, has_bold, is_italic))
-        return lines
-
     @api.model
     def get_quiz_for_student(self, quiz_id, question_count=0, option_count=0, quiz_token=None):
         """
@@ -801,23 +587,24 @@ class Quiz(models.Model):
             q_limit = token_data['question_count']
             o_limit = token_data['option_count']
             allow_resubmission = token_data['allow_resubmission']
-            filter_tag_ids = token_data.get('filter_tag_ids') or []
+            filter_payload = self._normalize_quiz_filter_payload(token_data)
         else:
             # Unsigned URL parameters are intentionally ignored so students
             # cannot lower difficulty by editing query parameters.
             q_limit = 0
             o_limit = 0
-            filter_tag_ids = []
+            filter_payload = self._normalize_quiz_filter_payload({})
 
         rng = random.SystemRandom()
 
         all_questions = list(quiz.question_ids)
 
-        # Filter by tags when the token specifies tag IDs (backward compatible:
-        # an empty list means no filtering).
-        if filter_tag_ids:
-            tag_set = set(filter_tag_ids)
-            all_questions = [q for q in all_questions if tag_set.intersection(q.tag_ids.ids)]
+        student_stats = self._get_student_question_attempt_stats(quiz.question_ids, self.env.user)
+
+        all_questions = [
+            question for question in all_questions
+            if self._question_matches_filter_payload(question, filter_payload, student_stats)
+        ]
 
         if q_limit > 0 and q_limit < len(all_questions):
             all_questions = rng.sample(all_questions, q_limit)
@@ -845,6 +632,10 @@ class Quiz(models.Model):
         questions = []
         for question in all_questions:
             all_answers = list(question.answer_ids)
+            question_student_stats = student_stats.get(
+                question.id,
+                {'attempt_count': 0, 'weighted_score_pct': None},
+            )
 
             if o_limit > 0 and o_limit < len(all_answers):
                 correct = [a for a in all_answers if a.is_correct]
@@ -874,6 +665,8 @@ class Quiz(models.Model):
                 'question_text': question.question_text or '',
                 'marks': question.marks,
                 'allow_multiple': question.allow_multiple,
+                'student_attempt_count': question_student_stats['attempt_count'],
+                'student_weighted_score_pct': round(question_student_stats['weighted_score_pct'] or 0),
                 'answers': [
                     {
                         'id': a.id,
@@ -893,6 +686,7 @@ class Quiz(models.Model):
             'name': quiz.name,
             'total_marks': displayed_marks,
             'allow_resubmission': allow_resubmission,
+            'filter_summary': quiz._build_filter_summary(filter_payload),
             # quiz.id is always a positive integer from the ORM; safe for URL use
             'header_image_url': (
                 f'/web/image/quiz.quiz/{quiz.id}/header_image'
@@ -904,7 +698,7 @@ class Quiz(models.Model):
         }
 
     @api.model
-    def submit_quiz_answers(self, quiz_id, answers):
+    def submit_quiz_answers(self, quiz_id, answers, quiz_token=None):
         """
         Validate answers server-side and return scoring details.
 
@@ -917,9 +711,24 @@ class Quiz(models.Model):
         if not quiz.exists():
             raise UserError("Quiz not found.")
 
+        token_data = self._decode_quiz_token(quiz_token) if quiz_token else None
+        filter_payload = self._normalize_quiz_filter_payload(token_data or {})
+        has_active_filters = any([
+            token_data and token_data.get('question_count'),
+            token_data and token_data.get('option_count'),
+            filter_payload['filter_tag_ids'],
+            filter_payload['filter_subject_ids'],
+            filter_payload['filter_min_attempts'] is not None,
+            filter_payload['filter_max_attempts'] is not None,
+            filter_payload['filter_max_pct_correct'] is not None,
+            filter_payload['filter_student_weighted_score_pct'] is not None,
+            filter_payload['filter_student_attempts'] is not None,
+        ])
+
         score = 0
         results = []
         total_marks = 0
+        attempted_question_count = 0
 
         # Only score the questions that the student actually received (keys in answers)
         submitted_ids = {int(k) for k in answers}
@@ -929,6 +738,9 @@ class Quiz(models.Model):
             q_id = str(question.id)
             selected_ids = set(int(i) for i in (answers.get(q_id) or []))
             correct_ids = set(question.answer_ids.filtered('is_correct').ids)
+
+            if selected_ids:
+                attempted_question_count += 1
 
             is_correct = bool(correct_ids) and selected_ids == correct_ids
             if is_correct:
@@ -954,8 +766,12 @@ class Quiz(models.Model):
                 'answers': answer_details,
             })
 
+        if not has_active_filters and attempted_question_count < len(questions_to_score):
+            total_marks = max(10, attempted_question_count)
+
         # Persist one quiz.response record for every answer the student selected
         response_vals = []
+        attempt_tokens = {result['question_id']: uuid.uuid4().hex for result in results}
         for r in results:
             for a in r['answers']:
                 if a['was_selected']:
@@ -964,6 +780,7 @@ class Quiz(models.Model):
                         'question_id': r['question_id'],
                         'answer_id': a['id'],
                         'user_id': self.env.user.id,
+                        'attempt_token': attempt_tokens[r['question_id']],
                         'is_correct': a['is_correct'],
                     })
         if response_vals:

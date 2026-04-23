@@ -27,6 +27,12 @@ class QuizResponse(models.Model):
         'res.users', string='Student', required=True,
         default=lambda self: self.env.user, index=True,
     )
+    attempt_token = fields.Char(
+        string='Attempt Token',
+        index=True,
+        copy=False,
+        help='Groups all selected answers that belong to the same question attempt.',
+    )
     is_correct = fields.Boolean(
         string='Correct Answer',
         help='Whether the selected answer option is a correct answer.',

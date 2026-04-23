@@ -14,6 +14,7 @@ class QuizPreference(models.Model):
     )
     use_cards = fields.Boolean(default=True)
     font_size_em = fields.Float(default=1.0)
+    answer_columns = fields.Integer(default=1)
 
     _sql_constraints = [
         ("user_uniq", "unique(user_id)", "Only one preference record per user."),
@@ -27,19 +28,22 @@ class QuizPreference(models.Model):
             return {
                 "use_cards": pref.use_cards,
                 "font_size_em": pref.font_size_em,
+                "answer_columns": min(max(int(pref.answer_columns or 1), 1), 4),
             }
         return {
             "use_cards": True,
             "font_size_em": 1.0,
+            "answer_columns": 1,
         }
 
     @api.model
-    def set_preferences(self, use_cards, font_size_em):
+    def set_preferences(self, use_cards, font_size_em, answer_columns=1):
         """Create or update the current user's quiz display preferences."""
         pref = self.search([("user_id", "=", self.env.uid)], limit=1)
         vals = {
             "use_cards": bool(use_cards),
             "font_size_em": float(font_size_em),
+            "answer_columns": min(max(int(answer_columns or 1), 1), 4),
         }
         if pref:
             pref.write(vals)

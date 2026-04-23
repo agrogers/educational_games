@@ -1,8 +1,10 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_game_result_user,game.result,model_game_result,base.group_user,1,1,1,1
 access_game_data_user,game.data,model_game_data,base.group_user,1,1,1,1
+access_quiz_tag_user,quiz.tag user,model_quiz_tag,base.group_user,1,0,0,0
 access_quiz_tag_teacher,quiz.tag teacher,model_quiz_tag,aps_sis.group_aps_teacher,1,1,1,1
 access_quiz_question_tag_wizard,wizard question tag assign,model_quiz_question_tag_wizard,aps_sis.group_aps_teacher,1,1,1,1
+access_quiz_question_import_wizard,wizard question import,model_quiz_question_import_wizard,aps_sis.group_aps_teacher,1,1,1,1
 access_ir_actions_server_teacher,ir.actions.server teacher,base.model_ir_actions_server,aps_sis.group_aps_teacher,1,0,0,0
 access_quiz_quiz_teacher,quiz.quiz teacher,model_quiz_quiz,aps_sis.group_aps_teacher,1,1,1,1
 access_quiz_quiz_user,quiz.quiz user,model_quiz_quiz,base.group_user,1,0,0,0

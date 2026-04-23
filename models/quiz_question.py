@@ -26,12 +26,31 @@ class QuizQuestion(models.Model):
         help='If checked, students can select more than one answer.',
     )
     answer_ids = fields.One2many('quiz.answer', 'question_id', string='Answers')
+    correct_answer = fields.Html(
+        string='Correct Answer',
+        compute='_compute_correct_answer',
+        store=True,
+        readonly=True,
+        sanitize=True,
+        help='Stored text of the correct answer option(s).',
+    )
     tag_ids = fields.Many2many(
         'quiz.tag',
         'quiz_question_tag_rel',
         'question_id',
         'tag_id',
         string='Tags',
+    )
+    subject_ids = fields.Many2many(
+        'aps.subject',
+        'educational_games_question_subject_rel',
+        'question_id',
+        'subject_id',
+        string='Subjects',
+    )
+    import_group = fields.Integer(
+        string='Import Group',
+        help='Optional grouping ID used to identify questions imported together.',
     )
     correct_answer_count = fields.Integer(
         string='Correct Answers',
@@ -63,6 +82,17 @@ class QuizQuestion(models.Model):
     def _compute_correct_answer_count(self):
         for record in self:
             record.correct_answer_count = sum(1 for a in record.answer_ids if a.is_correct)
+
+    @api.depends('answer_ids.is_correct', 'answer_ids.answer_text', 'answer_ids.sequence')
+    def _compute_correct_answer(self):
+        for record in self:
+            correct_answers = record.answer_ids.filtered('is_correct').sorted('sequence')
+            if not correct_answers:
+                record.correct_answer = False
+            elif len(correct_answers) == 1:
+                record.correct_answer = correct_answers.answer_text
+            else:
+                record.correct_answer = '<br/>'.join(a.answer_text or '' for a in correct_answers)
 
     @api.model
     def _recompute_stats(self, question_ids):
@@ -133,7 +163,7 @@ class QuizQuestion(models.Model):
                 )
 
     def action_open_tag_wizard(self):
-        """Open the tag assignment wizard for selected questions."""
+        """Open the bulk modify wizard for selected questions."""
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'quiz.question.tag.wizard',
@@ -141,5 +171,6 @@ class QuizQuestion(models.Model):
             'target': 'new',
             'context': {
                 'active_ids': self.ids,
+                'default_question_ids': [(6, 0, self.ids)],
             },
         }

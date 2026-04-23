@@ -8,3 +8,4 @@ from . import quiz_quiz
 from . import quiz_response
 from . import quiz_preference
 from . import quiz_tag_wizard
+from . import quiz_question_import_wizard

@@ -24,11 +24,13 @@ export class QuizGame extends Component {
         const storageKey = this._getLaunchStorageKey();
         const storedParams = this._loadStoredLaunchParams(storageKey);
 
-        // Context lookup precedence:
-        // 1) action.context (runtime launch), 2) action.params (router),
-        // 3) URL query string (direct URL), 4) sessionStorage (hard-refresh fallback).
+        // Launch-context precedence:
+        // 1) URL query string (shared/direct launch), 2) action.params (router),
+        // 3) action.context (runtime launch), 4) sessionStorage (hard-refresh fallback).
+        // Direct URLs must win so copied student links can override generic
+        // client-action context such as active_model=quiz.quiz.
         const getParam = (key) => {
-            for (const source of [context, actionParams, urlParams, storedParams]) {
+            for (const source of [urlParams, actionParams, context, storedParams]) {
                 if (!source) {
                     continue;
                 }
@@ -52,6 +54,7 @@ export class QuizGame extends Component {
         this.state = useState({
             loading: true,
             quiz: null,
+            loadError: "",
             submitted: false,
             isCheckingAll: false,
             hasCheckedAllAnswers: false,
@@ -76,9 +79,12 @@ export class QuizGame extends Component {
             fontSizeEm: 1.0,
             // Toggle between playing-card style and classic radio/checkbox style.
             useCards: true,
+            // Number of answer columns: 1, 2, or 3.
+            answerColumns: 1,
             // When true each question gets a different random card-back;
             // when false all questions share the same card-back image.
             randomCardBacks: true,
+            questionOrderMode: "random",
         });
 
         this.resId = this._toInt(getParam("active_id")) || routeResId;
@@ -121,6 +127,7 @@ export class QuizGame extends Component {
                 if (prefs) {
                     this.state.fontSizeEm = prefs.font_size_em ?? 1.0;
                     this.state.useCards = prefs.use_cards ?? true;
+                    this.state.answerColumns = prefs.answer_columns ?? 1;
                 }
             } catch (_e) {
                 // Preference table may not exist yet; keep defaults.
@@ -141,6 +148,7 @@ export class QuizGame extends Component {
 
     async loadQuiz() {
         try {
+            this.state.loadError = "";
             const quizData = await this.orm.call(
                 "quiz.quiz",
                 "get_quiz_for_student",
@@ -151,9 +159,11 @@ export class QuizGame extends Component {
                     option_count: this.optionCount,
                 }
             );
+            this._shuffleArray(quizData.questions);
             // Add reactive selected-answer tracking to each question
             const sharedCardBack = this._randomCardBackUrl();
-            quizData.questions.forEach((q) => {
+            quizData.questions.forEach((q, index) => {
+                q.randomOrderIndex = index;
                 q.selected_answers = [];
                 q.result = null; // populated after submission or individual check
                 q.checked = false; // true when teacher has revealed this question's answer
@@ -174,6 +184,7 @@ export class QuizGame extends Component {
             this.state.quiz = quizData;
             this.state.totalMarks = quizData.total_marks;
             this.state.isTeacher = quizData.is_teacher || false;
+            this._applyQuestionOrder();
             if (typeof quizData.allow_resubmission === "boolean") {
                 this.state.allowResubmission = quizData.allow_resubmission;
             }
@@ -195,7 +206,9 @@ export class QuizGame extends Component {
             }
         } catch (error) {
             console.error("Error loading quiz:", error);
-            this.notification.add("Error loading quiz. Please try again.", { type: "danger" });
+            const errorMessage = error?.data?.message || error?.message || "Error loading quiz. Please try again.";
+            this.state.loadError = errorMessage;
+            this.notification.add(errorMessage, { type: "danger" });
         } finally {
             this.state.loading = false;
         }
@@ -262,6 +275,100 @@ export class QuizGame extends Component {
         this._savePreferences();
     }
 
+    toggleAnswerColumns() {
+        this.state.answerColumns = this.state.answerColumns >= 4 ? 1 : this.state.answerColumns + 1;
+        this._savePreferences();
+    }
+
+    async resetQuestionFilters() {
+        const launchParams = this._getCurrentLaunchParams({ quiz_token: null });
+        this.quizToken = null;
+        this.questionCount = 0;
+        this.optionCount = 0;
+        this.state.questionOrderMode = "random";
+        this.state.retakeMode = false;
+        this.state.submitted = false;
+        this.state.isCheckingAll = false;
+        this.state.hasCheckedAllAnswers = false;
+        this.state.score = 0;
+        this.state.results = [];
+        this.state.submission_submitted = false;
+        this.state.activeQuestionId = null;
+        this.state.loading = true;
+        this._persistLaunchParams(this._getLaunchStorageKey(), launchParams);
+        this._syncActionRouteState(launchParams);
+        await this.loadQuiz();
+        this.notification.add("Filters cleared. Showing all questions.", { type: "info" });
+    }
+
+    toggleQuestionOrder() {
+        const orderModes = ["random", "weighted", "attempts_weighted"];
+        const currentIndex = orderModes.indexOf(this.state.questionOrderMode);
+        this.state.questionOrderMode = orderModes[(currentIndex + 1) % orderModes.length];
+        this._applyQuestionOrder();
+    }
+
+    _applyQuestionOrder() {
+        if (!this.state.quiz?.questions?.length) {
+            return;
+        }
+        const originalIndex = (question) => question.randomOrderIndex ?? 0;
+        if (this.state.questionOrderMode === "weighted") {
+            this.state.quiz.questions.sort((left, right) => {
+                const diff = (left.student_weighted_score_pct ?? 0) - (right.student_weighted_score_pct ?? 0);
+                if (diff !== 0) {
+                    return diff;
+                }
+                return originalIndex(left) - originalIndex(right);
+            });
+            return;
+        }
+        if (this.state.questionOrderMode === "attempts_weighted") {
+            this.state.quiz.questions.sort((left, right) => {
+                const attemptDiff = (left.student_attempt_count ?? 0) - (right.student_attempt_count ?? 0);
+                if (attemptDiff !== 0) {
+                    return attemptDiff;
+                }
+                const weightedDiff = (left.student_weighted_score_pct ?? 0) - (right.student_weighted_score_pct ?? 0);
+                if (weightedDiff !== 0) {
+                    return weightedDiff;
+                }
+                return originalIndex(left) - originalIndex(right);
+            });
+            return;
+        }
+        this.state.quiz.questions.sort((left, right) => originalIndex(left) - originalIndex(right));
+    }
+
+    getQuestionOrderButtonLabel() {
+        if (this.state.questionOrderMode === "weighted") {
+            return "W%";
+        }
+        if (this.state.questionOrderMode === "attempts_weighted") {
+            return "A/W";
+        }
+        return "RND";
+    }
+
+    getQuestionOrderButtonTitle() {
+        if (this.state.questionOrderMode === "weighted") {
+            return "Order: weighted score ascending. Click for attempts then weighted.";
+        }
+        if (this.state.questionOrderMode === "attempts_weighted") {
+            return "Order: attempts then weighted score ascending. Click for random.";
+        }
+        return "Order: random. Click for weighted score ascending.";
+    }
+
+    getAnswerColumnButtonLabel() {
+        return `${this.state.answerColumns}C`;
+    }
+
+    getAnswerColumnButtonTitle() {
+        const nextColumns = this.state.answerColumns >= 4 ? 1 : this.state.answerColumns + 1;
+        return `Answer layout: ${this.state.answerColumns} column${this.state.answerColumns > 1 ? 's' : ''}. Click for ${nextColumns}.`;
+    }
+
     /** Increase the question/answer font size by one step (max 1.5em). */
     increaseFontSize() {
         const maxFontSize = 7;
@@ -285,6 +392,7 @@ export class QuizGame extends Component {
         this.orm.call("quiz.preference", "set_preferences", [], {
             use_cards: this.state.useCards,
             font_size_em: this.state.fontSizeEm,
+            answer_columns: this.state.answerColumns,
         }).catch(() => {});
     }
 
@@ -326,7 +434,9 @@ export class QuizGame extends Component {
         }
 
         try {
-            const result = await this.orm.call("quiz.quiz", "submit_quiz_answers", [this.quizId, answers]);
+            const result = await this.orm.call("quiz.quiz", "submit_quiz_answers", [this.quizId, answers], {
+                quiz_token: this.quizToken,
+            });
 
             // Merge server results back into quiz state for display
             result.results.forEach((r) => {
@@ -653,6 +763,24 @@ export class QuizGame extends Component {
         this.loadQuiz();
     }
 
+    _getCurrentLaunchParams(overrides = {}) {
+        return {
+            quiz_id: this.quizId,
+            quiz_token: this.quizToken,
+            active_id: this.resId,
+            active_model: this.resModel,
+            submission_state: this.submission_state,
+            ...overrides,
+        };
+    }
+
+    _shuffleArray(items) {
+        for (let index = items.length - 1; index > 0; index -= 1) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+        }
+    }
+
     _toInt(value) {
         const asInt = parseInt(value, 10);
         return Number.isFinite(asInt) ? asInt : null;
@@ -716,6 +844,10 @@ export class QuizGame extends Component {
             for (const key of keys) {
                 const value = payload[key];
                 if (value === undefined || value === null || value === "" || value === false) {
+                    if (url.searchParams.has(key)) {
+                        url.searchParams.delete(key);
+                        changed = true;
+                    }
                     continue;
                 }
                 const strValue = String(value);

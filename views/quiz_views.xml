@@ -13,6 +13,7 @@
                 <field name="subject_ids" widget="many2many_tags" optional="show"/>
                 <field name="question_count"/>
                 <field name="total_marks"/>
+                <field name="create_date" string="Created" optional="show"/>
             </list>
         </field>
     </record>
@@ -60,79 +61,50 @@
                             <field name="name" placeholder="e.g. Business English – Formal Letters"/>
                         </h1>
                     </div>
-                    <group>
-                        <group>
-                            <field name="question_count" readonly="1"/>
-                            <field name="total_marks" readonly="1"/>
-                            <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                            <field name="display_question_count"/>
-                            <field name="display_option_count"/>
-                            <field name="allow_resubmission"/>
-                            <field name="filter_tag_ids" widget="many2many_tags"
-                                   options="{'no_create': False}"
-                                   help="Limit the quiz to questions that have at least one of these tags. Leave empty to include all questions."/>
-                        </group>
-                        <group class="quiz-form-header-image">
-                            <field name="header_image" widget="image"
-                                   string="Header Image"
-                                   options="{'size': [400, 50]}"
-                                   nolabel="1"/>
-                        </group>
-                    </group>
-                    <group>
-                        <field name="quiz_url_params" readonly="1"
-                               string="APEX Game URL"
-                               widget="CopyClipboardChar"
-                               help="Paste this into the resource URL field in APEX to open this quiz. The format is action:&lt;id&gt;?quiz_id=&lt;id&gt;&amp;… matching the pattern used by other games."/>
-                    </group>
-                    <field name="description" widget="html"
-                           placeholder="Optional description shown to students…"/>
 
                     <notebook>
-                        <!-- ── Bulk import tab ── -->
-                        <page string="Bulk Import" name="bulk_import">
-                            <div class="alert alert-info" role="alert">
-                                <strong>Recommended workflow:</strong>
-                                <ol class="mb-1 mt-1">
-                                    <li>Paste your quiz text into the field below.</li>
-                                    <li>Click <strong>Clean Up Text</strong> to fix Unicode/formatting artefacts from ChatGPT or NotebookLM.</li>
-                                    <li>Click <strong>Preview Import</strong> to colour-code the text:
-                                        <span style="color:#1e1b4b; font-weight:bold;"> dark = question</span>,
-                                        <span style="color:#15803d; font-weight:bold;"> green = correct answer</span>,
-                                        <span style="color:#9a3412;"> red = answer option</span>,
-                                        <span style="color:#9ca3af;"> grey = unrecognised</span>.
-                                    </li>
-                                    <li>Edit the colour-coded text if needed, then click <strong>Import Questions from Text</strong>.</li>
-                                </ol>
-                                <strong>Supported paste formats:</strong>
-                                <ul class="mb-1">
-                                    <li><em>Italic</em> question line + plain answer lines + <strong>bold correct answer</strong> (Method 1).</li>
-                                    <li>Numbered questions (<code>1. text</code>) + lettered answers (<code>A) text</code>) with the correct answer in <strong>bold</strong> (Method 2 — ChatGPT default).</li>
-                                </ul>
-                                <small class="text-muted">
-                                    Prefixes like "Question 1:" and "A." are automatically removed on import.
-                                    The text is kept in this field after import so you can review or re-import.
-                                </small>
-                            </div>
-                            <field name="bulk_text" widget="html"
-                                   placeholder="Paste your formatted quiz text here…"/>
-                            <div class="mt-2 d-flex gap-2 flex-wrap">
-                                <button name="action_cleanup_bulk_text"
-                                        string="1. Clean Up Text"
-                                        type="object"
-                                        class="btn btn-secondary"
-                                        icon="fa-magic"/>
-                                <button name="action_preview_bulk_text"
-                                        string="2. Preview Import"
-                                        type="object"
-                                        class="btn btn-info"
-                                        icon="fa-eye"/>
-                                <button name="action_parse_bulk_text"
-                                        string="3. Import Questions from Text"
-                                        type="object"
-                                        class="btn btn-primary"
-                                        icon="fa-upload"/>
-                            </div>
+                        <page string="Settings" name="settings">
+                            <group>
+                                <group string="Display Settings">
+                                    <field name="question_count" readonly="1"/>
+                                    <field name="total_marks" readonly="1"/>
+                                    <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                    <field name="display_question_count"/>
+                                    <field name="display_option_count"/>
+                                    <field name="allow_resubmission"/>
+                                </group>
+                                <group class="quiz-form-header-image">
+                                    <field name="header_image" widget="image"
+                                           string="Header Image"
+                                           options="{'size': [400, 50]}"
+                                           nolabel="1"/>
+                                </group>
+                            </group>
+                            <group string="Question Filters">
+                                <group>
+                                    <field name="filter_tag_ids" widget="many2many_tags"
+                                           options="{'no_create': False}"
+                                           placeholder="Any matching tags..."/>
+                                    <field name="filter_subject_ids" widget="many2many_tags"
+                                           options="{'no_create': True}"
+                                           placeholder="Any matching subjects..."/>
+                                    <field name="filter_min_attempts" placeholder="Leave empty to ignore"/>
+                                    <field name="filter_max_attempts" placeholder="Leave empty to ignore"/>
+                                </group>
+                                <group>
+                                    <field name="filter_max_pct_correct" placeholder="Leave empty to ignore"/>
+                                    <field name="filter_student_attempts" placeholder="Leave empty to ignore"/>
+                                    <field name="filter_student_weighted_score_pct" placeholder="Leave empty to ignore"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="quiz_url_params" readonly="1"
+                                       string="APEX Game URL"
+                                       widget="CopyClipboardChar"
+                                       help="Paste this into the resource URL field in APEX to open this quiz. The format is action:&lt;id&gt;?quiz_id=&lt;id&gt;&amp;… matching the pattern used by other games."/>
+                            </group>
+                            <field name="description" widget="html"
+                                   placeholder="Optional description shown to students…"/>
                         </page>
                         <!-- ── Questions tab ── -->
                         <page string="Questions" name="questions">
@@ -146,14 +118,19 @@
                             </div>
                             <field name="question_ids" context="{'default_quiz_id': id}">
                                 <list string="Questions">
-                                    <field name="sequence" widget="handle"/>
-                                    <field name="question_text" widget="html" string="Question"/>
-                                    <field name="marks"/>
+                                    <field name="id" string="ID" optional="show"/>
+                                    <field name="sequence" widget="handle" optional="hide"/>
+                                    <field name="question_text" widget="html" string="Question" optional="hide"/>
+                                    <field name="correct_answer" widget="html" optional="hide"/>
+                                    <field name="marks" optional="hide"/>
+                                    <field name="import_group" optional="hide"/>
+                                    <field name="subject_ids" widget="many2many_tags" optional="show"/>
                                     <field name="tag_ids" widget="many2many_tags" optional="show"/>
-                                    <field name="correct_answer_count" string="Correct Options"/>
+                                    <field name="correct_answer_count" string="Correct Options" optional="hide"/>
                                     <field name="attempt_count" string="Attempts" optional="show"/>
                                     <field name="pct_correct_all" string="% Correct" optional="show"/>
                                     <field name="pct_correct_recent" string="% Correct (1h)" optional="hide"/>
+                                    <field name="create_date" string="Created" optional="show"/>
                                 </list>
                                 <!-- Inline popup form: question + all its answers on one page -->
                                 <form string="Question">
@@ -162,6 +139,8 @@
                                             <field name="sequence"/>
                                             <field name="marks"/>
                                             <field name="allow_multiple"/>
+                                            <field name="import_group"/>
+                                            <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
                                             <field name="tag_ids" widget="many2many_tags"/>
                                         </group>
                                         <field name="question_text" widget="html"
@@ -169,17 +148,51 @@
                                         <separator string="Answers"/>
                                         <field name="answer_ids">
                                             <list editable="bottom" string="Answers">
-                                                <field name="sequence" widget="handle"/>
+                                                <field name="sequence" widget="handle" optional="hide"/>
                                                 <field name="answer_text" widget="html"
-                                                       string="Answer Text"/>
-                                                <field name="is_correct" string="Correct?"/>
+                                                       string="Answer Text" optional="hide"/>
+                                                <field name="is_correct" string="Correct?" optional="hide"/>
                                                 <field name="select_count" string="Selected" optional="show"/>
                                                 <field name="select_pct_all" string="% (All)" optional="show"/>
                                                 <field name="select_pct_recent" string="% (1h)" optional="hide"/>
+                                                <field name="create_date" string="Created" optional="show"/>
                                             </list>
                                         </field>
                                     </sheet>
                                 </form>
+                            </field>
+                        </page>
+                        <page string="Bulk Add" name="bulk_add">
+                            <div class="alert alert-info" role="alert">
+                                <strong>Bulk Add by Question ID:</strong>
+                                <p class="mb-1 mt-1">Paste IDs separated by commas, spaces, or new lines. Click <strong>Check</strong> to stage questions, remove unwanted rows, then click <strong>Add Questions</strong>.</p>
+                            </div>
+                            <group>
+                                <field name="bulk_add_question_ids_text" placeholder="Example: 12, 15 21 34"/>
+                            </group>
+                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                <button name="action_bulk_check_question_ids"
+                                        string="Check"
+                                        type="object"
+                                        class="btn btn-secondary"
+                                        icon="fa-check"/>
+                                <button name="action_bulk_add_questions"
+                                        string="Add Questions"
+                                        type="object"
+                                        class="btn btn-primary"
+                                        icon="fa-plus"/>
+                            </div>
+                            <field name="bulk_add_question_ids">
+                                <list string="Staged Questions" create="0" delete="1" editable="bottom">
+                                    <field name="id"/>
+                                    <field name="question_text" widget="html" optional="show"/>
+                                    <field name="correct_answer" widget="html" optional="show"/>
+                                    <field name="subject_ids" widget="many2many_tags" optional="show"/>
+                                    <field name="tag_ids" widget="many2many_tags" optional="show"/>
+                                    <field name="import_group" optional="show"/>
+                                    <field name="marks" optional="show"/>
+                                    <field name="create_date" string="Created" optional="show"/>
+                                </list>
                             </field>
                         </page>
 
@@ -214,6 +227,7 @@
             <list string="Question Tags">
                 <field name="name"/>
                 <field name="description" optional="show"/>
+                <field name="create_date" string="Created" optional="show"/>
             </list>
         </field>
     </record>
@@ -242,14 +256,19 @@
         <field name="arch" type="xml">
             <list string="Questions" multi_edit="1">
                 <header>
-                    <button name="action_open_tag_wizard" string="Assign Tags" type="object" icon="fa-tags"/>
+                    <button name="action_open_tag_wizard" string="Bulk Modify" type="object" icon="fa-pencil"/>
                 </header>
-                <field name="quiz_id"/>
-                <field name="sequence" widget="handle"/>
-                <field name="question_text" widget="html"/>
-                <field name="marks"/>
+                <field name="id" string="ID" optional="show"/>
+                <field name="quiz_id" optional="hide"/>
+                <field name="sequence" widget="handle" optional="hide"/>
+                <field name="question_text" widget="html" optional="hide"/>
+                <field name="correct_answer" widget="html" optional="hide"/>
+                <field name="marks" optional="hide"/>
+                <field name="import_group" optional="show"/>
+                <field name="subject_ids" widget="many2many_tags" optional="show"/>
                 <field name="tag_ids" widget="many2many_tags" optional="show"/>
-                <field name="correct_answer_count" string="Correct Options"/>
+                <field name="create_date" string="Created" optional="show"/>
+                <field name="correct_answer_count" string="Correct Options" optional="hide"/>
                 <field name="attempt_count" string="Attempts" optional="show"/>
                 <field name="pct_correct_all" string="% Correct" optional="show"/>
                 <field name="pct_correct_recent" string="% Correct (1h)" optional="hide"/>
@@ -263,12 +282,17 @@
         <field name="arch" type="xml">
             <search string="Search Questions">
                 <field name="question_text" string="Question"/>
+                <field name="correct_answer" string="Correct Answer"/>
                 <field name="quiz_id"/>
                 <field name="all_quiz_ids" string="Quiz"/>
+                <field name="import_group"/>
+                <field name="subject_ids"/>
                 <field name="tag_ids"/>
                 <filter string="Multiple Answers" name="filter_multiple" domain="[('allow_multiple', '=', True)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Quiz" name="group_by_quiz" context="{'group_by': 'quiz_id'}"/>
+                    <filter string="Import Group" name="group_by_import_group" context="{'group_by': 'import_group'}"/>
+                    <filter string="Subject" name="group_by_subject" context="{'group_by': 'subject_ids'}"/>
                     <filter string="Tags" name="group_by_tags" context="{'group_by': 'tag_ids'}"/>
                 </group>
             </search>
@@ -290,10 +314,13 @@
                             <field name="sequence"/>
                             <field name="marks"/>
                             <field name="allow_multiple"/>
+                            <field name="import_group"/>
+                            <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
                             <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
                         </group>
                         <group>
                             <field name="correct_answer_count" readonly="1" string="Correct Options"/>
+                            <field name="correct_answer" readonly="1" widget="html"/>
                             <field name="attempt_count" readonly="1" string="Attempts"/>
                             <field name="pct_correct_all" readonly="1" string="% Correct (All)"/>
                             <field name="pct_correct_recent" readonly="1" string="% Correct (1h)"/>
@@ -310,6 +337,7 @@
                             <field name="sequence" widget="handle"/>
                             <field name="answer_text" widget="html" string="Answer Text"/>
                             <field name="is_correct" string="Correct?"/>
+                            <field name="create_date" string="Created" readonly="1" optional="show"/>
                             <field name="select_count" readonly="1" string="Selected" optional="show"/>
                             <field name="select_pct_all" readonly="1" string="% (All)" optional="show"/>
                             <field name="select_pct_recent" readonly="1" string="% (1h)" optional="hide"/>
@@ -320,24 +348,91 @@
         </field>
     </record>
 
+    <record id="view_quiz_question_import_wizard_form" model="ir.ui.view">
+        <field name="name">quiz.question.import.wizard.form</field>
+        <field name="model">quiz.question.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Quiz Questions Import">
+                <sheet>
+                <div class="d-flex flex-wrap gap-2 align-items-center sticky-top bg-white pt-2 pb-2 mb-3 border-bottom">
+                <button name="action_cleanup_bulk_text"
+                    string="1. Clean Up Text"
+                    type="object"
+                    class="btn btn-secondary"
+                    icon="fa-magic"/>
+                <button name="action_preview_bulk_text"
+                    string="2. Preview Import"
+                    type="object"
+                    class="btn btn-info"
+                    icon="fa-eye"/>
+                <button name="action_import_questions"
+                    string="3. Import Questions from Text"
+                    type="object"
+                    class="btn btn-primary"
+                    icon="fa-upload"/>
+                </div>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Import workflow:</strong>
+                        <ol class="mb-1 mt-1">
+                            <li>Set an Import Group and optional Subjects/Tags to apply to all imported questions.</li>
+                            <li>Paste your quiz text in the field below.</li>
+                            <li>Click <strong>Clean Up Text</strong> then <strong>Preview Import</strong>.</li>
+                            <li>Click <strong>Import Questions from Text</strong> to create unattached question records.</li>
+                        </ol>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="import_group"/>
+                            <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
+                        </group>
+                    </group>
+                    <field name="bulk_text" widget="html" placeholder="Paste your formatted quiz text here…"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
     <!-- ═══════════════════════════════════════════════════════
-         Wizard: Assign Tags to Multiple Questions
+         Wizard: Bulk Modify Questions
     ═══════════════════════════════════════════════════════ -->
     <record id="view_quiz_question_tag_wizard_form" model="ir.ui.view">
         <field name="name">quiz.question.tag.wizard.form</field>
         <field name="model">quiz.question.tag.wizard</field>
         <field name="arch" type="xml">
-            <form string="Assign Tags to Questions">
+            <form string="Bulk Modify Questions">
                 <sheet>
-                    <div class="alert alert-info" role="alert">
-                        <p>Select the tags to assign to the selected question(s):</p>
-                    </div>
-                    <group>
-                        <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
-                    </group>
+                    <notebook>
+                        <page string="Options">
+                            <group col="12">
+                                <group string="Update which fields" col="12" colspan="8">
+                                    <group colspan="4">
+                                        <field name="update_tags" nolabel="1" widget="boolean_toggle"/>
+                                        <label for="update_tags" class="mb-0">Tags</label>
+                                    </group>
+                                    <group colspan="8" invisible="not update_tags">
+                                        <field name="tags_add_ids" widget="many2many_tags" string="Add" placeholder="Tags to add..." options="{'no_create': False}"/>
+                                        <field name="tags_remove_ids" widget="many2many_tags" string="Remove" placeholder="Tags to remove..." options="{'no_create': False}"/>
+                                    </group>
+
+                                    <group colspan="4">
+                                        <field name="update_subjects" nolabel="1" widget="boolean_toggle"/>
+                                        <label for="update_subjects" class="mb-0">Subjects</label>
+                                    </group>
+                                    <group colspan="8" invisible="not update_subjects">
+                                        <field name="subjects_add_ids" widget="many2many_tags" string="Add" placeholder="Subjects to add..." options="{'no_create': True}"/>
+                                        <field name="subjects_remove_ids" widget="many2many_tags" string="Remove" placeholder="Subjects to remove..." options="{'no_create': True}"/>
+                                    </group>
+                                </group>
+                                <group string="Questions to Update" colspan="4">
+                                    <field name="question_ids" widget="many2many_tags" nolabel="1" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
                 <footer>
-                    <button name="apply_tags" string="Assign Tags" type="object" class="btn btn-primary"/>
+                    <button name="apply_changes" string="Apply" type="object" class="btn btn-primary"/>
                     <button string="Cancel" class="btn btn-secondary" special="cancel"/>
                 </footer>
             </form>

@@ -14,8 +14,17 @@
                 <p class="quiz-loading-text mt-3">Loading quiz…</p>
             </div>
 
-            <!-- ── No quiz assigned ── -->
-            <div t-elif="!state.quiz"
+              <!-- ── Load error ── -->
+              <div t-elif="state.loadError"
+                  class="d-flex flex-column align-items-center justify-content-center"
+                  style="min-height:300px;">
+                 <div style="font-size:3.5rem; margin-bottom:1rem;">⚠️</div>
+                 <h3 class="quiz-empty-title">Quiz link could not be opened.</h3>
+                 <p class="quiz-empty-sub"><t t-esc="state.loadError"/></p>
+              </div>
+
+              <!-- ── No quiz assigned ── -->
+              <div t-elif="!state.quiz"
                  class="d-flex flex-column align-items-center justify-content-center"
                  style="min-height:300px;">
                 <div style="font-size:3.5rem; margin-bottom:1rem;">📚</div>
@@ -69,6 +78,21 @@
                                 t-on-click="toggleCardMode">
                             <i t-attf-class="fa {{ state.useCards ? 'fa-list' : 'fa-th-large' }}"
                                style="font-size:0.85rem;"/>
+                        </button>
+                        <button class="quiz-font-btn quiz-layout-btn"
+                                t-att-title="getAnswerColumnButtonTitle()"
+                                t-on-click="toggleAnswerColumns">
+                            <span class="quiz-layout-label"><t t-esc="getAnswerColumnButtonLabel()"/></span>
+                        </button>
+                        <button class="quiz-font-btn quiz-layout-btn"
+                                title="Clear filters and show all questions"
+                                t-on-click="resetQuestionFilters">
+                            <span class="quiz-layout-label">ALL</span>
+                        </button>
+                        <button class="quiz-font-btn quiz-layout-btn"
+                                t-att-title="getQuestionOrderButtonTitle()"
+                                t-on-click="toggleQuestionOrder">
+                            <span class="quiz-layout-label"><t t-esc="getQuestionOrderButtonLabel()"/></span>
                         </button>
                     </div>
                 </div>
@@ -146,9 +170,15 @@
                                         <div class="d-flex flex-column gap-1 flex-shrink-0 mt-1">
                                             <span t-if="question.allow_multiple"
                                                   class="quiz-badge-multi">Multi</span>
-                                            <span class="quiz-badge-marks">
-                                                <t t-esc="question.marks"/> mark<t t-if="question.marks !== 1">s</t>
-                                            </span>
+                                            <div class="quiz-badge-row">
+                                                <span t-attf-class="quiz-badge-student-score {{ question.student_attempt_count > 0 ? (question.student_weighted_score_pct >= 80 ? 'score-band-blue' : question.student_weighted_score_pct >= 60 ? 'score-band-green' : question.student_weighted_score_pct >= 40 ? 'score-band-yellow' : question.student_weighted_score_pct >= 20 ? 'score-band-orange' : 'score-band-red') : '' }}"
+                                                      t-att-title="'Your weighted score / attempts'">
+                                                    <t t-esc="question.student_weighted_score_pct"/>% / <t t-esc="question.student_attempt_count"/>
+                                                </span>
+                                                <span class="quiz-badge-marks">
+                                                    <t t-esc="question.marks"/> mark<t t-if="question.marks !== 1">s</t>
+                                                </span>
+                                            </div>
                                             <!-- Check button: only for teachers, before the question is checked/submitted -->
                                             <button t-if="state.isTeacher and !question.checked and !state.submitted"
                                                     class="quiz-btn-check btn btn-sm"
@@ -159,91 +189,93 @@
                                     </div>
 
                                     <!-- Answer options -->
-                                    <t t-set="cardBackImg" t-value="question.cardBackUrl"/>
-                                    <t t-foreach="question.answers" t-as="answer" t-key="answer.id">
-                                        <t t-set="isSelected"  t-value="question.selected_answers.includes(answer.id)"/>
-                                        <t t-set="ansResult"   t-value="qResult and qResult.answers.find(a => a.id === answer.id)"/>
-                                        <t t-set="isCorrect"   t-value="ansResult and ansResult.is_correct"/>
-                                        <t t-set="wasSelected" t-value="ansResult and ansResult.was_selected"/>
-                                        <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
-                                        <!-- After reveal: wrong answers flip to back; correct stay front.
-                                             Before reveal: non-selected flip when any answer is chosen. -->
-                                        <t t-set="cardFlipped" t-value="showResult ? isCorrect : (isSelected and question.selected_answers.length > 0)"/>
+                                    <div t-attf-class="quiz-answer-grid quiz-answer-grid-{{ state.answerColumns }}">
+                                        <t t-set="cardBackImg" t-value="question.cardBackUrl"/>
+                                        <t t-foreach="question.answers" t-as="answer" t-key="answer.id">
+                                            <t t-set="isSelected"  t-value="question.selected_answers.includes(answer.id)"/>
+                                            <t t-set="ansResult"   t-value="qResult and qResult.answers.find(a => a.id === answer.id)"/>
+                                            <t t-set="isCorrect"   t-value="ansResult and ansResult.is_correct"/>
+                                            <t t-set="wasSelected" t-value="ansResult and ansResult.was_selected"/>
+                                            <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
+                                            <!-- After reveal: wrong answers flip to back; correct stay front.
+                                                 Before reveal: non-selected flip when any answer is chosen. -->
+                                            <t t-set="cardFlipped" t-value="showResult ? isCorrect : (isSelected and question.selected_answers.length > 0)"/>
 
-                                        <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
-                                             t-attf-class="quiz-answer-item
-                                                 {{ !showResult ? 'quiz-answer-option' : '' }}
-                                                 {{ !showResult and isSelected ? 'quiz-answer-selected' : '' }}
-                                                 {{ !showResult and !isSelected and question.selected_answers.length > 0 ? 'quiz-answer-unselected' : '' }}
-                                                 {{ showResult and isCorrect ? 'quiz-answer-correct' : '' }}
-                                                 {{ showResult and wasSelected and !isCorrect ? 'quiz-answer-wrong' : '' }}">
+                                            <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
+                                                 t-attf-class="quiz-answer-item
+                                                     {{ !showResult ? 'quiz-answer-option' : '' }}
+                                                     {{ !showResult and isSelected ? 'quiz-answer-selected' : '' }}
+                                                     {{ !showResult and !isSelected and question.selected_answers.length > 0 ? 'quiz-answer-unselected' : '' }}
+                                                     {{ showResult and isCorrect ? 'quiz-answer-correct' : '' }}
+                                                     {{ showResult and wasSelected and !isCorrect ? 'quiz-answer-wrong' : '' }}">
 
-                                            <!-- Card mode: playing-card indicator -->
-                                            <t t-if="state.useCards">
-                                                <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }}">
-                                                    <div class="quiz-card-inner">
-                                                        <div class="quiz-card-face quiz-card-front">
-                                                            <span class="quiz-card-letter"><t t-esc="getAnswerLetter(answer_index)"/></span>
-                                                        </div>
-                                                        <div class="quiz-card-face quiz-card-back">
-                                                            <div class="quiz-card-back-inner">
-                                                                <img t-att-src="cardBackImg"
-                                                                     class="quiz-card-back-img" alt=""/>
+                                                <!-- Card mode: playing-card indicator -->
+                                                <t t-if="state.useCards">
+                                                    <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }}">
+                                                        <div class="quiz-card-inner">
+                                                            <div class="quiz-card-face quiz-card-front">
+                                                                <span class="quiz-card-letter"><t t-esc="getAnswerLetter(answer_index)"/></span>
+                                                            </div>
+                                                            <div class="quiz-card-face quiz-card-back">
+                                                                <div class="quiz-card-back-inner">
+                                                                    <img t-att-src="cardBackImg"
+                                                                         class="quiz-card-back-img" alt=""/>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </t>
-                                            <!-- Classic mode: radio / checkbox -->
-                                            <t t-else="">
-                                                <input t-if="question.allow_multiple"
-                                                       type="checkbox"
-                                                       class="form-check-input me-2 flex-shrink-0"
-                                                       t-att-checked="isSelected"
-                                                       t-att-disabled="showResult"
-                                                       style="cursor:pointer; pointer-events:none;"/>
-                                                <input t-else=""
-                                                       type="radio"
-                                                       class="form-check-input me-2 flex-shrink-0"
-                                                       t-att-checked="isSelected"
-                                                       t-att-disabled="showResult"
-                                                       t-att-name="'q_' + question.id"
-                                                       style="cursor:pointer; pointer-events:none;"/>
-                                            </t>
+                                                </t>
+                                                <!-- Classic mode: radio / checkbox -->
+                                                <t t-else="">
+                                                    <input t-if="question.allow_multiple"
+                                                           type="checkbox"
+                                                           class="form-check-input me-2 flex-shrink-0"
+                                                           t-att-checked="isSelected"
+                                                           t-att-disabled="showResult"
+                                                           style="cursor:pointer; pointer-events:none;"/>
+                                                    <input t-else=""
+                                                           type="radio"
+                                                           class="form-check-input me-2 flex-shrink-0"
+                                                           t-att-checked="isSelected"
+                                                           t-att-disabled="showResult"
+                                                           t-att-name="'q_' + question.id"
+                                                           style="cursor:pointer; pointer-events:none;"/>
+                                                </t>
 
-                                            <div t-out="answer.answer_text" class="quiz-answer-text"
-                                                 t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
+                                                <div t-out="answer.answer_text" class="quiz-answer-text"
+                                                     t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
 
-                                            <!-- ── Percentage-pie stats (teacher Check view) ── -->
-                                            <div t-if="ansStats" class="quiz-ans-stats ms-auto d-flex align-items-center gap-1 flex-shrink-0">
-                                                <t t-set="displayPct" t-value="ansStats.recent_count > 0 ? ansStats.recent_pct : ansStats.total_pct"/>
-                                                <t t-set="ansIsCorrect" t-value="ansResult ? ansResult.is_correct : answer.is_correct"/>
-                                                <div class="quiz-pct-block quiz-pct-combined"
-                                                     t-att-title="'All: ' + ansStats.total_count + ' of ' + question.totalRespondents + ' respondents · Recent: ' + (ansStats.recent_count > 0 ? (ansStats.recent_count + ' of ' + question.recentRespondents) : 'no recent data')">
-                                                    <div class="quiz-pct-viz"
-                                                         t-att-style="'--recent-pct:' + displayPct + ';' + (ansIsCorrect ? '--quiz-pct-accent:#10b981;--quiz-pct-accent-soft:#d1fae5;' : '--quiz-pct-accent:#ef4444;--quiz-pct-accent-soft:#fee2e2;')">
-                                                        <svg class="quiz-pct-pie" width="44" height="44" viewBox="0 0 36 36" aria-hidden="true">
-                                                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#dee2e6" stroke-width="4.5"/>
-                                                            <circle cx="18" cy="18" r="15.9" fill="none" t-att-stroke="ansIsCorrect ? '#10b981' : '#ef4444'"
-                                                                    stroke-width="4.5"
-                                                                    t-att-stroke-dasharray="ansStats.total_pct + ' 100'"
-                                                                    stroke-linecap="round"
-                                                                    transform="rotate(-90 18 18)"/>
-                                                        </svg>
-                                                        <div t-if="ansStats.recent_count > 0" class="quiz-pct-recent-fill"/>
-                                                        <div t-if="ansStats.recent_count > 0" class="quiz-pct-value" t-esc="ansStats.recent_count"/>
-                                                    </div>
-                                                    <div class="quiz-pct-legend">
-                                                        <span class="legend-all">ALL</span>
-                                                        <span t-if="ansStats.recent_count > 0" class="legend-sep">/</span>
-                                                        <span t-if="ansStats.recent_count > 0" class="legend-recent">RECENT</span>
+                                                <!-- ── Percentage-pie stats (teacher Check view) ── -->
+                                                <div t-if="ansStats" class="quiz-ans-stats ms-auto d-flex align-items-center gap-1 flex-shrink-0">
+                                                    <t t-set="displayPct" t-value="ansStats.recent_count > 0 ? ansStats.recent_pct : ansStats.total_pct"/>
+                                                    <t t-set="ansIsCorrect" t-value="ansResult ? ansResult.is_correct : answer.is_correct"/>
+                                                    <div class="quiz-pct-block quiz-pct-combined"
+                                                         t-att-title="'All: ' + ansStats.total_count + ' of ' + question.totalRespondents + ' respondents · Recent: ' + (ansStats.recent_count > 0 ? (ansStats.recent_count + ' of ' + question.recentRespondents) : 'no recent data')">
+                                                        <div class="quiz-pct-viz"
+                                                             t-att-style="'--recent-pct:' + displayPct + ';' + (ansIsCorrect ? '--quiz-pct-accent:#10b981;--quiz-pct-accent-soft:#d1fae5;' : '--quiz-pct-accent:#ef4444;--quiz-pct-accent-soft:#fee2e2;')">
+                                                            <svg class="quiz-pct-pie" width="44" height="44" viewBox="0 0 36 36" aria-hidden="true">
+                                                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#dee2e6" stroke-width="4.5"/>
+                                                                <circle cx="18" cy="18" r="15.9" fill="none" t-att-stroke="ansIsCorrect ? '#10b981' : '#ef4444'"
+                                                                        stroke-width="4.5"
+                                                                        t-att-stroke-dasharray="ansStats.total_pct + ' 100'"
+                                                                        stroke-linecap="round"
+                                                                        transform="rotate(-90 18 18)"/>
+                                                            </svg>
+                                                            <div t-if="ansStats.recent_count > 0" class="quiz-pct-recent-fill"/>
+                                                            <div t-if="ansStats.recent_count > 0" class="quiz-pct-value" t-esc="ansStats.recent_count"/>
+                                                        </div>
+                                                        <div class="quiz-pct-legend">
+                                                            <span class="legend-all">ALL</span>
+                                                            <span t-if="ansStats.recent_count > 0" class="legend-sep">/</span>
+                                                            <span t-if="ansStats.recent_count > 0" class="legend-recent">RECENT</span>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                                <!-- ── / percentage-pie stats ── -->
+
                                             </div>
-                                            <!-- ── / percentage-pie stats ── -->
-
-                                        </div>
-                                    </t>
+                                        </t>
+                                    </div>
 
                                     <!-- Respondent count footer (teacher Check view) -->
                                     <div t-if="question.checked and question.totalRespondents > 0"
@@ -316,6 +348,10 @@
                                     Submit Quiz
                                 </button>
                             </div>
+                        </div>
+
+                        <div t-if="state.quiz.filter_summary" class="quiz-filter-summary">
+                            <t t-esc="state.quiz.filter_summary"/>
                         </div>
 
                     </main><!-- /quiz-questions-area -->

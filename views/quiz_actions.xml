@@ -15,6 +15,13 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <record id="action_quiz_question_import" model="ir.actions.act_window">
+        <field name="name">Import Quiz Questions</field>
+        <field name="res_model">quiz.question.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+
     <!-- Question Tags list action -->
     <record id="action_quiz_tag_list" model="ir.actions.act_window">
         <field name="name">Question Tags</field>
@@ -24,7 +31,7 @@
 
     <!-- Server action: bound to quiz.question → adds checkboxes + Action menu entry -->
     <record id="action_quiz_question_assign_tags_server" model="ir.actions.server">
-        <field name="name">Assign Tags</field>
+        <field name="name">Bulk Modify</field>
         <field name="model_id" ref="educational_games.model_quiz_question"/>
         <field name="binding_model_id" ref="educational_games.model_quiz_question"/>
         <field name="binding_type">action</field>
