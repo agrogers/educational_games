@@ -78,33 +78,43 @@
                                            string="Header Image"
                                            options="{'size': [400, 50]}"
                                            nolabel="1"/>
-                                </group>
-                            </group>
-                            <group string="Question Filters">
-                                <group>
-                                    <field name="filter_tag_ids" widget="many2many_tags"
-                                           options="{'no_create': False}"
-                                           placeholder="Any matching tags..."/>
-                                    <field name="filter_subject_ids" widget="many2many_tags"
-                                           options="{'no_create': True}"
-                                           placeholder="Any matching subjects..."/>
-                                    <field name="filter_min_attempts" placeholder="Leave empty to ignore"/>
-                                    <field name="filter_max_attempts" placeholder="Leave empty to ignore"/>
-                                </group>
-                                <group>
-                                    <field name="filter_max_pct_correct" placeholder="Leave empty to ignore"/>
-                                    <field name="filter_student_attempts" placeholder="Leave empty to ignore"/>
-                                    <field name="filter_student_weighted_score_pct" placeholder="Leave empty to ignore"/>
+                                    <field name="description" widget="html" nolabel="0"
+                                       placeholder="Optional description shown to students…"/>
+
                                 </group>
                             </group>
                             <group>
+                                <field name="filter_summary_preview" readonly="1" widget="text" colspan="2" placeholder="No active filters."/>
                                 <field name="quiz_url_params" readonly="1"
                                        string="APEX Game URL"
                                        widget="CopyClipboardChar"
                                        help="Paste this into the resource URL field in APEX to open this quiz. The format is action:&lt;id&gt;?quiz_id=&lt;id&gt;&amp;… matching the pattern used by other games."/>
                             </group>
-                            <field name="description" widget="html"
-                                   placeholder="Optional description shown to students…"/>
+                            <group string="Question Filters">
+                                <div class="alert alert-success m-2" colspan="2">These filters will include questions that have at least one tag AND one subject.</div>
+                                <group>
+                                    <field name="filter_tag_ids" widget="many2many_tags"
+                                        options="{'no_create': False}"
+                                        placeholder="Any matching tags..."/>
+                                </group>
+                                <group>                                
+                                    <field name="filter_subject_ids" widget="many2many_tags"
+                                        options="{'no_create': True}"
+                                        placeholder="Any matching subjects..."/>
+                                </group>
+                                <group string="Student's Own Answer History">
+                                    <div class="alert alert-warning">These filters will exclude questions that satisfy ALL the critiera below.</div>
+                                    <field name="filter_student_attempts" placeholder="Leave empty to ignore"/>
+                                    <field name="filter_student_weighted_score_pct" placeholder="Leave empty to ignore"/>
+                                    <field name="filter_exclude_answered_days" placeholder="Leave empty to ignore"/>
+                                </group>
+                                <group string="All Students' History">
+                                    <div class="alert alert-success">These filters will include questions that satisfy ALL critiera.</div>
+                                    <field name="filter_min_attempts" placeholder="Leave empty to ignore"/>
+                                    <field name="filter_max_attempts" placeholder="Leave empty to ignore"/>
+                                    <field name="filter_max_pct_correct" placeholder="Leave empty to ignore"/>
+                                </group>
+                            </group>
                         </page>
                         <!-- ── Questions tab ── -->
                         <page string="Questions" name="questions">
@@ -120,8 +130,8 @@
                                 <list string="Questions">
                                     <field name="id" string="ID" optional="show"/>
                                     <field name="sequence" widget="handle" optional="hide"/>
-                                    <field name="question_text" widget="html" string="Question" optional="hide"/>
-                                    <field name="correct_answer" widget="html" optional="hide"/>
+                                    <field name="question_text" widget="html" string="Question" optional="hide" class="quiz-question-text"/>
+                                    <field name="correct_answer" widget="html" optional="hide" class="quiz-answer-text"/>
                                     <field name="marks" optional="hide"/>
                                     <field name="import_group" optional="hide"/>
                                     <field name="subject_ids" widget="many2many_tags" optional="show"/>
@@ -147,10 +157,10 @@
                                                placeholder="Enter the question…"/>
                                         <separator string="Answers"/>
                                         <field name="answer_ids">
-                                            <list editable="bottom" string="Answers">
+                                            <list editable="bottom" string="Answers" decoration-success="is_correct">
                                                 <field name="sequence" widget="handle" optional="hide"/>
-                                                <field name="answer_text" widget="html"
-                                                       string="Answer Text" optional="hide"/>
+                                                      <field name="answer_text" widget="html"
+                                                          string="Answer Text" optional="hide" class="quiz-answer-text"/>
                                                 <field name="is_correct" string="Correct?" optional="hide"/>
                                                 <field name="select_count" string="Selected" optional="show"/>
                                                 <field name="select_pct_all" string="% (All)" optional="show"/>
@@ -185,8 +195,8 @@
                             <field name="bulk_add_question_ids">
                                 <list string="Staged Questions" create="0" delete="1" editable="bottom">
                                     <field name="id"/>
-                                    <field name="question_text" widget="html" optional="show"/>
-                                    <field name="correct_answer" widget="html" optional="show"/>
+                                    <field name="question_text" widget="html" optional="show" class="quiz-question-text"/>
+                                    <field name="correct_answer" widget="html" optional="show" class="quiz-answer-text"/>
                                     <field name="subject_ids" widget="many2many_tags" optional="show"/>
                                     <field name="tag_ids" widget="many2many_tags" optional="show"/>
                                     <field name="import_group" optional="show"/>
@@ -261,8 +271,8 @@
                 <field name="id" string="ID" optional="show"/>
                 <field name="quiz_id" optional="hide"/>
                 <field name="sequence" widget="handle" optional="hide"/>
-                <field name="question_text" widget="html" optional="hide"/>
-                <field name="correct_answer" widget="html" optional="hide"/>
+                <field name="question_text" widget="html" optional="hide" class="quiz-question-text"/>
+                <field name="correct_answer" widget="html" optional="hide" class="quiz-answer-text"/>
                 <field name="marks" optional="hide"/>
                 <field name="import_group" optional="show"/>
                 <field name="subject_ids" widget="many2many_tags" optional="show"/>

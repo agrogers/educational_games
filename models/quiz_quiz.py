@@ -102,10 +102,10 @@ class Quiz(models.Model):
     )
     filter_max_pct_correct = fields.Char(
         string='Max % Correct',
-        help='Only include questions whose overall % correct is at or below this value.',
+        help='Only include questions whose overall % correct is at or below this value. Use this to focuse on questions the whole class is having difficulties with.',
     )
     filter_student_weighted_score_pct = fields.Char(
-        string="Student's Own Weighted Score %",
+        string="Student's Weighted Score %",
         help=(
             'Exclude a question when the student has reached at least this weighted score percentage. '
             'Most recent attempt has weight 1, next 1/2, next 1/3, and so on.'
@@ -114,6 +114,15 @@ class Quiz(models.Model):
     filter_student_attempts = fields.Char(
         string="Student's Attempts",
         help='Only consider excluding a question when the student has attempted it at least this many times.',
+    )
+    filter_exclude_answered_days = fields.Char(
+        string='Exclude Answered In Previous Days',
+        help='Exclude questions the current student answered within the previous X days.',
+    )
+    filter_summary_preview = fields.Text(
+        string='Filter',
+        compute='_compute_filter_summary_preview',
+        readonly=True,
     )
     bulk_add_question_ids_text = fields.Text(
         string='Question IDs',
@@ -161,6 +170,7 @@ class Quiz(models.Model):
             'filter_max_pct_correct': self._sanitize_nonnegative_int(self.filter_max_pct_correct),
             'filter_student_weighted_score_pct': self._sanitize_nonnegative_int(self.filter_student_weighted_score_pct),
             'filter_student_attempts': self._sanitize_nonnegative_int(self.filter_student_attempts),
+            'filter_exclude_answered_days': self._sanitize_nonnegative_int(self.filter_exclude_answered_days),
         }
 
     @classmethod
@@ -174,6 +184,7 @@ class Quiz(models.Model):
             'filter_max_pct_correct': cls._sanitize_nonnegative_int(payload.get('filter_max_pct_correct')),
             'filter_student_weighted_score_pct': cls._sanitize_nonnegative_int(payload.get('filter_student_weighted_score_pct')),
             'filter_student_attempts': cls._sanitize_nonnegative_int(payload.get('filter_student_attempts')),
+            'filter_exclude_answered_days': cls._sanitize_nonnegative_int(payload.get('filter_exclude_answered_days')),
         }
 
     def _build_filter_summary(self, filter_payload):
@@ -201,16 +212,33 @@ class Quiz(models.Model):
 
         student_attempts = filter_payload['filter_student_attempts']
         student_weighted = filter_payload['filter_student_weighted_score_pct']
-        if student_attempts and student_weighted:
-            parts.append(
-                f"Exclude if your attempts are at least {student_attempts} and your weighted score is at least {student_weighted}%"
-            )
-        elif student_attempts:
-            parts.append(f"Exclude if your attempts are at least {student_attempts}")
-        elif student_weighted:
-            parts.append(f"Exclude if your weighted score is at least {student_weighted}%")
+        exclude_answered_days = filter_payload['filter_exclude_answered_days']
+        student_exclusion_parts = []
+        if student_attempts:
+            student_exclusion_parts.append(f"your attempts are at least {student_attempts}")
+        if student_weighted:
+            student_exclusion_parts.append(f"your weighted score is at least {student_weighted}%")
+        if exclude_answered_days:
+            student_exclusion_parts.append(f"you answered it in the previous {exclude_answered_days} days")
+
+        if student_exclusion_parts:
+            parts.append(f"Exclude if all of these are true: {' and '.join(student_exclusion_parts)}")
 
         return 'Active filters: ' + ' | '.join(parts) if parts else ''
+
+    @api.depends(
+        'filter_tag_ids',
+        'filter_subject_ids',
+        'filter_min_attempts',
+        'filter_max_attempts',
+        'filter_max_pct_correct',
+        'filter_student_weighted_score_pct',
+        'filter_student_attempts',
+        'filter_exclude_answered_days',
+    )
+    def _compute_filter_summary_preview(self):
+        for record in self:
+            record.filter_summary_preview = record._build_filter_summary(record._get_quiz_filter_payload())
 
     @staticmethod
     def _response_attempt_group_key(response):
@@ -234,8 +262,12 @@ class Quiz(models.Model):
         for response in responses:
             question_groups = grouped.setdefault(response.question_id.id, {})
             group_key = self._response_attempt_group_key(response)
-            group = question_groups.setdefault(group_key, {'selected_ids': set()})
+            group = question_groups.setdefault(group_key, {'selected_ids': set(), 'answered_at': response.create_date})
             group['selected_ids'].add(response.answer_id.id)
+            if response.create_date and (
+                not group['answered_at'] or response.create_date > group['answered_at']
+            ):
+                group['answered_at'] = response.create_date
 
         stats = {}
         for question in questions:
@@ -253,6 +285,7 @@ class Quiz(models.Model):
             stats[question.id] = {
                 'attempt_count': len(attempts),
                 'weighted_score_pct': round(weighted_total / weight_sum, 1) if weight_sum else None,
+                'last_answered_at': attempts[0]['answered_at'] if attempts else None,
             }
 
         return stats
@@ -283,8 +316,12 @@ class Quiz(models.Model):
 
         student_attempt_threshold = filter_payload['filter_student_attempts']
         student_weighted_threshold = filter_payload['filter_student_weighted_score_pct']
-        if student_attempt_threshold or student_weighted_threshold:
-            question_stats = student_stats.get(question.id, {'attempt_count': 0, 'weighted_score_pct': None})
+        exclude_answered_days = filter_payload['filter_exclude_answered_days']
+        if student_attempt_threshold or student_weighted_threshold or exclude_answered_days:
+            question_stats = student_stats.get(
+                question.id,
+                {'attempt_count': 0, 'weighted_score_pct': None, 'last_answered_at': None},
+            )
             meets_attempt_threshold = (
                 question_stats['attempt_count'] >= student_attempt_threshold
                 if student_attempt_threshold else True
@@ -294,7 +331,15 @@ class Quiz(models.Model):
                 weighted_score is not None and weighted_score >= student_weighted_threshold
                 if student_weighted_threshold else True
             )
-            if meets_attempt_threshold and meets_weighted_threshold:
+            last_answered_at = question_stats['last_answered_at']
+            meets_recent_answer_threshold = True
+            if exclude_answered_days:
+                meets_recent_answer_threshold = False
+                if last_answered_at:
+                    cutoff = fields.Datetime.now() - timedelta(days=exclude_answered_days)
+                    meets_recent_answer_threshold = last_answered_at >= cutoff
+
+            if meets_attempt_threshold and meets_weighted_threshold and meets_recent_answer_threshold:
                 return False
 
         return True
@@ -357,6 +402,7 @@ class Quiz(models.Model):
         'filter_max_pct_correct',
         'filter_student_weighted_score_pct',
         'filter_student_attempts',
+        'filter_exclude_answered_days',
     )
     def _compute_quiz_url_params(self):
         # Resolve the client action ID once for all records in this batch.

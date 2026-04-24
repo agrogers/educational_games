@@ -1,5 +1,7 @@
 import uuid
+from datetime import timedelta
 
+from odoo import fields
 from odoo.tests.common import TransactionCase
 
 
@@ -134,7 +136,128 @@ class TestQuizTokenFilters(TransactionCase):
         self.assertEqual([question['id'] for question in payload['questions']], [question_keep.id])
         self.assertEqual(payload['questions'][0]['student_attempt_count'], 3)
         self.assertEqual(payload['questions'][0]['student_weighted_score_pct'], 55)
-        self.assertIn('Exclude if your attempts are at least 2 and your weighted score is at least 60%', payload['filter_summary'])
+        self.assertIn(
+            'Exclude if all of these are true: your attempts are at least 2 and your weighted score is at least 60%',
+            payload['filter_summary'],
+        )
+
+    def test_exclude_answered_days_is_anded_with_other_student_filters(self):
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Combined Student Filter Quiz',
+            'filter_student_attempts': '2',
+            'filter_student_weighted_score_pct': '75',
+            'filter_exclude_answered_days': '4',
+        })
+
+        question_not_recent = self.env['quiz.question'].create({'question_text': 'Keep not recent'})
+        answer_not_recent_correct = self.env['quiz.answer'].create({
+            'question_id': question_not_recent.id,
+            'answer_text': 'Correct not recent',
+            'is_correct': True,
+        })
+        answer_not_recent_wrong = self.env['quiz.answer'].create({
+            'question_id': question_not_recent.id,
+            'answer_text': 'Wrong not recent',
+            'is_correct': False,
+        })
+
+        question_low_weighted = self.env['quiz.question'].create({'question_text': 'Keep low weighted'})
+        answer_low_weighted_correct = self.env['quiz.answer'].create({
+            'question_id': question_low_weighted.id,
+            'answer_text': 'Correct low weighted',
+            'is_correct': True,
+        })
+        answer_low_weighted_wrong = self.env['quiz.answer'].create({
+            'question_id': question_low_weighted.id,
+            'answer_text': 'Wrong low weighted',
+            'is_correct': False,
+        })
+
+        question_exclude = self.env['quiz.question'].create({'question_text': 'Exclude only when all match'})
+        answer_exclude_correct = self.env['quiz.answer'].create({
+            'question_id': question_exclude.id,
+            'answer_text': 'Correct exclude',
+            'is_correct': True,
+        })
+        answer_exclude_wrong = self.env['quiz.answer'].create({
+            'question_id': question_exclude.id,
+            'answer_text': 'Wrong exclude',
+            'is_correct': False,
+        })
+
+        quiz.question_ids = [(6, 0, [question_not_recent.id, question_low_weighted.id, question_exclude.id])]
+
+        response_model = self.env['quiz.response']
+        old_response = response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_not_recent.id,
+            'answer_id': answer_not_recent_wrong.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': False,
+        })
+        old_response_2 = response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_not_recent.id,
+            'answer_id': answer_not_recent_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+        low_weighted_response_1 = response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_low_weighted.id,
+            'answer_id': answer_low_weighted_wrong.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': False,
+        })
+        low_weighted_response_2 = response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_low_weighted.id,
+            'answer_id': answer_low_weighted_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+        recent_response_1 = response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_exclude.id,
+            'answer_id': answer_exclude_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+        recent_response_2 = response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_exclude.id,
+            'answer_id': answer_exclude_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+
+        old_response.write({'create_date': fields.Datetime.now() - timedelta(days=10)})
+        old_response_2.write({'create_date': fields.Datetime.now() - timedelta(days=9)})
+        low_weighted_response_1.write({'create_date': fields.Datetime.now() - timedelta(days=2)})
+        low_weighted_response_2.write({'create_date': fields.Datetime.now() - timedelta(days=1)})
+        recent_response_1.write({'create_date': fields.Datetime.now() - timedelta(days=2)})
+        recent_response_2.write({'create_date': fields.Datetime.now() - timedelta(days=1)})
+
+        token = quiz._build_quiz_token(
+            quiz.id,
+            filter_payload=quiz._get_quiz_filter_payload(),
+        )
+        payload = quiz.get_quiz_for_student(quiz.id, quiz_token=token)
+
+        self.assertEqual(
+            [question['id'] for question in payload['questions']],
+            [question_not_recent.id, question_low_weighted.id],
+        )
+        self.assertIn(
+            'Exclude if all of these are true: your attempts are at least 2 and your weighted score is at least 75% and you answered it in the previous 4 days',
+            payload['filter_summary'],
+        )
 
 
 class TestQuizSubmissionScoring(TransactionCase):
