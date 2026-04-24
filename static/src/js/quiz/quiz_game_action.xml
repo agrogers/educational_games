@@ -179,6 +179,9 @@
                                     <!-- Question text + marks badge + teacher Check button -->
                                     <div class="d-flex align-items-start gap-2 mb-3">
                                         <div t-out="question.question_text" class="quiz-question-text flex-grow-1"
+                                            t-att-data-image-viewer-model="'quiz.question'"
+                                            t-att-data-image-viewer-id="question.id"
+                                            t-att-data-image-viewer-field="'question_text'"
                                              t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
                                         <div class="d-flex flex-column gap-1 flex-shrink-0 mt-1">
                                             <span t-if="question.allow_multiple"
@@ -255,7 +258,10 @@
                                                            style="cursor:pointer; pointer-events:none;"/>
                                                 </t>
 
-                                                <div t-out="answer.answer_text" class="quiz-answer-text"
+                                                   <div t-out="answer.answer_text" class="quiz-answer-text"
+                                                       t-att-data-image-viewer-model="'quiz.answer'"
+                                                       t-att-data-image-viewer-id="answer.id"
+                                                       t-att-data-image-viewer-field="'answer_text'"
                                                      t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
 
                                                 <!-- ── Percentage-pie stats (teacher Check view) ── -->

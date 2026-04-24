@@ -294,7 +294,7 @@
 }
 .o_quiz_page .quiz-badge-student-score {
     display: inline-block;
-    background: #ede9fe;
+    border: 1px solid #a8a8a873;
     color: #5b21b6;
     font-size: 0.7rem;
     font-weight: 700;

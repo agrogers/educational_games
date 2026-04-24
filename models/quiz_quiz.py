@@ -916,7 +916,7 @@ class Quiz(models.Model):
             raise UserError("Quiz not found.")
 
         question = self.env['quiz.question'].browse(int(question_id))
-        if not question.exists() or question.quiz_id.id != quiz.id:
+        if not question.exists() or question.id not in quiz.question_ids.ids:
             raise UserError("Question not found in this quiz.")
 
         correct_ids = set(question.answer_ids.filtered('is_correct').ids)
