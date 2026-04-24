@@ -157,6 +157,8 @@
 
                             <div class="quiz-question-wrap"
                                  t-att-data-question-id="question.id"
+                                   t-att-data-image-viewer-model="'quiz.question'"
+                                   t-att-data-image-viewer-id="question.id"
                                  t-on-click="() => this.setActiveQuestion(question.id)">
 
                                 <!-- Question number badge (top-left) -->
