@@ -100,6 +100,67 @@
 .o_quiz_page .quiz-title    { color: white; font-weight: 800; font-size: 1.6rem; margin: 0 0 0.3rem; }
 .o_quiz_page .quiz-subtitle { color: rgba(255,255,255,.8); font-size: 0.95rem; margin: 0; }
 
+.o_quiz_page .quiz-progress-summary {
+    max-width: 42rem;
+    padding: 0.65rem 0.8rem 0.7rem;
+    border-radius: 0.8rem;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(4px);
+}
+
+.o_quiz_page .quiz-progress-text {
+    color: rgba(255,255,255,.95);
+    font-size: 0.9rem;
+    line-height: 1.35;
+    margin: 0;
+}
+
+.o_quiz_page .quiz-progress-bar {
+    display: flex;
+    overflow: hidden;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.o_quiz_page .quiz-progress-segment {
+    min-width: 0.35rem;
+}
+
+.o_quiz_page .quiz-progress-known {
+    background: #22c55e;
+}
+
+.o_quiz_page .quiz-progress-not-known {
+    background: #f59e0b;
+}
+
+.o_quiz_page .quiz-progress-not-tried {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.o_quiz_page .quiz-progress-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    color: rgba(255,255,255,.78);
+    font-size: 0.78rem;
+}
+
+.o_quiz_page .quiz-progress-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.o_quiz_page .quiz-progress-key {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    display: inline-block;
+    flex: 0 0 auto;
+}
+
 .o_quiz_page .quiz-score-banner {
     display: inline-block;
     margin-top: 0.75rem;
@@ -632,6 +693,29 @@
 /* Flip state: rotate card to show back face */
 .o_quiz_page .quiz-answer-card.card-flipped .quiz-card-inner {
     transform: rotateY(180deg);
+}
+
+.o_quiz_page .quiz-answer-card.quiz-answer-card-wrong .quiz-card-front,
+.o_quiz_page .quiz-answer-card.quiz-answer-card-wrong .quiz-card-back {
+    border-color: #ef4444;
+}
+
+.o_quiz_page .quiz-answer-card.quiz-answer-card-wrong .quiz-card-front {
+    background: #ef4444;
+    color: #991b1b;
+}
+
+.o_quiz_page .quiz-answer-card.quiz-answer-card-wrong .quiz-card-back {
+    background: #fee2e2;
+}
+
+.o_quiz_page .quiz-answer-card.quiz-answer-card-wrong .quiz-card-back-inner {
+    border-color: #ef4444;
+}
+
+.o_quiz_page .quiz-answer-card.quiz-answer-card-wrong .quiz-card-back-img {
+    opacity: 0.55;
+    filter: saturate(0.75) brightness(0.95);
 }
 
 /* Shared face styles: dark border, rounded corners, hidden when facing away */

@@ -43,11 +43,27 @@
                     <!-- Content (z-index above overlay) -->
                     <div class="quiz-header-content">
                         <h2 class="quiz-title"><t t-esc="state.quiz.name"/></h2>
-                        <p class="quiz-subtitle">
-                            <t t-esc="state.quiz.questions.length"/> question(s)
-                            ·
-                            <t t-esc="state.totalMarks"/> mark(s)
-                        </p>
+                        <div t-if="state.quiz.student_progress_summary and state.quiz.student_progress_summary.progress_text" class="quiz-progress-summary mt-2">
+                            <p class="mb-2 quiz-progress-text">
+                                <t t-esc="state.quiz.student_progress_summary.progress_text"/>
+                            </p>
+                            <div class="quiz-progress-bar" aria-hidden="true">
+                                <div t-if="state.quiz.student_progress_summary.known_questions"
+                                     class="quiz-progress-segment quiz-progress-known"
+                                      t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('known_questions') + '%'"/>
+                                <div t-if="state.quiz.student_progress_summary.not_known_questions"
+                                     class="quiz-progress-segment quiz-progress-not-known"
+                                      t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('not_known_questions') + '%'"/>
+                                <div t-if="state.quiz.student_progress_summary.not_tried_enough_questions"
+                                     class="quiz-progress-segment quiz-progress-not-tried"
+                                      t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('not_tried_enough_questions') + '%'"/>
+                            </div>
+                            <div class="quiz-progress-legend mt-1">
+                                  <span><span class="quiz-progress-key quiz-progress-known"></span>Known (<t t-esc="state.quiz.student_progress_summary.known_questions"/>)</span>
+                                  <span><span class="quiz-progress-key quiz-progress-not-known"></span>Still learning (<t t-esc="state.quiz.student_progress_summary.not_known_questions"/>)</span>
+                                  <span><span class="quiz-progress-key quiz-progress-not-tried"></span>Insufficient Data (<t t-esc="state.quiz.student_progress_summary.not_tried_enough_questions"/>)</span>
+                            </div>
+                        </div>
                         <div t-if="state.submitted" class="quiz-score-banner">
                             <strong>Score: <t t-esc="state.score"/> / <t t-esc="state.totalMarks"/></strong>
                             <span t-if="state.submission_submitted" class="ms-2 quiz-saved-badge">✓ Saved</span>
@@ -227,7 +243,7 @@
 
                                                 <!-- Card mode: playing-card indicator -->
                                                 <t t-if="state.useCards">
-                                                    <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }}">
+                                                    <div t-attf-class="quiz-answer-card {{ cardFlipped ? 'card-flipped' : '' }} {{ showResult and wasSelected and !isCorrect ? 'quiz-answer-card-wrong' : '' }}">
                                                         <div class="quiz-card-inner">
                                                             <div class="quiz-card-face quiz-card-front">
                                                                 <span class="quiz-card-letter"><t t-esc="getAnswerLetter(answer_index)"/></span>

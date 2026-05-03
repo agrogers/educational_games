@@ -141,6 +141,209 @@ class TestQuizTokenFilters(TransactionCase):
             payload['filter_summary'],
         )
 
+    def test_quiz_progress_summary_uses_static_scope_and_student_thresholds(self):
+        subject_science = self.env['aps.subject'].create({'name': 'Science'})
+        subject_history = self.env['aps.subject'].create({'name': 'History'})
+        tag_focus = self.env['quiz.tag'].create({'name': 'Focus'})
+        tag_other = self.env['quiz.tag'].create({'name': 'Other'})
+
+        question_known = self.env['quiz.question'].create({
+            'question_text': 'Known question',
+            'subject_ids': [(6, 0, [subject_science.id])],
+            'tag_ids': [(6, 0, [tag_focus.id])],
+        })
+        question_unknown = self.env['quiz.question'].create({
+            'question_text': 'Unknown question',
+            'subject_ids': [(6, 0, [subject_science.id])],
+            'tag_ids': [(6, 0, [tag_focus.id])],
+        })
+        question_not_tried_enough = self.env['quiz.question'].create({
+            'question_text': 'Not tried enough question',
+            'subject_ids': [(6, 0, [subject_science.id])],
+            'tag_ids': [(6, 0, [tag_focus.id])],
+        })
+        question_filtered_out = self.env['quiz.question'].create({
+            'question_text': 'Filtered out question',
+            'subject_ids': [(6, 0, [subject_history.id])],
+            'tag_ids': [(6, 0, [tag_other.id])],
+        })
+
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Progress Summary Quiz',
+            'question_ids': [
+                (6, 0, [
+                    question_known.id,
+                    question_unknown.id,
+                    question_not_tried_enough.id,
+                    question_filtered_out.id,
+                ])
+            ],
+            'filter_tag_ids': [(6, 0, [tag_focus.id])],
+            'filter_subject_ids': [(6, 0, [subject_science.id])],
+            'filter_student_attempts': '2',
+            'filter_student_weighted_score_pct': '75',
+        })
+
+        response_model = self.env['quiz.response']
+        known_correct = self.env['quiz.answer'].create({
+            'question_id': question_known.id,
+            'answer_text': 'Known correct',
+            'is_correct': True,
+        })
+        self.env['quiz.answer'].create({
+            'question_id': question_known.id,
+            'answer_text': 'Known wrong',
+            'is_correct': False,
+        })
+        unknown_wrong = self.env['quiz.answer'].create({
+            'question_id': question_unknown.id,
+            'answer_text': 'Unknown wrong',
+            'is_correct': False,
+        })
+        unknown_correct = self.env['quiz.answer'].create({
+            'question_id': question_unknown.id,
+            'answer_text': 'Unknown correct',
+            'is_correct': True,
+        })
+        tried_enough_correct = self.env['quiz.answer'].create({
+            'question_id': question_not_tried_enough.id,
+            'answer_text': 'Not tried enough correct',
+            'is_correct': True,
+        })
+        self.env['quiz.answer'].create({
+            'question_id': question_not_tried_enough.id,
+            'answer_text': 'Not tried enough wrong',
+            'is_correct': False,
+        })
+
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_known.id,
+            'answer_id': known_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_known.id,
+            'answer_id': known_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_unknown.id,
+            'answer_id': unknown_wrong.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': False,
+        })
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_unknown.id,
+            'answer_id': unknown_wrong.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': False,
+        })
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_not_tried_enough.id,
+            'answer_id': tried_enough_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+
+        token = quiz._build_quiz_token(
+            quiz.id,
+            filter_payload=quiz._get_quiz_filter_payload(),
+        )
+        payload = quiz.get_quiz_for_student(quiz.id, quiz_token=token)
+
+        summary = payload['student_progress_summary']
+        self.assertEqual(summary['total_possible_questions'], 3)
+        self.assertEqual(summary['questions_with_results_data'], 2)
+        self.assertEqual(summary['known_questions'], 1)
+        self.assertEqual(summary['not_known_questions'], 1)
+        self.assertEqual(summary['not_tried_enough_questions'], 1)
+        self.assertIn('There are 3 questions in this quiz.', summary['progress_text'])
+        self.assertIn('You have scored 75% or more in 1 out of the 2 we have results data for', summary['progress_text'])
+
+    def test_quiz_progress_summary_defaults_to_eighty_percent(self):
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Default Threshold Quiz',
+        })
+
+        question_known = self.env['quiz.question'].create({'question_text': 'Known by default threshold'})
+        question_not_known = self.env['quiz.question'].create({'question_text': 'Not known by default threshold'})
+        quiz.question_ids = [(6, 0, [question_known.id, question_not_known.id])]
+
+        known_correct = self.env['quiz.answer'].create({
+            'question_id': question_known.id,
+            'answer_text': 'Known correct',
+            'is_correct': True,
+        })
+        known_wrong = self.env['quiz.answer'].create({
+            'question_id': question_known.id,
+            'answer_text': 'Known wrong',
+            'is_correct': False,
+        })
+        not_known_correct = self.env['quiz.answer'].create({
+            'question_id': question_not_known.id,
+            'answer_text': 'Not known correct',
+            'is_correct': True,
+        })
+        not_known_wrong = self.env['quiz.answer'].create({
+            'question_id': question_not_known.id,
+            'answer_text': 'Not known wrong',
+            'is_correct': False,
+        })
+
+        response_model = self.env['quiz.response']
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_known.id,
+            'answer_id': known_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_known.id,
+            'answer_id': known_wrong.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': False,
+        })
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_known.id,
+            'answer_id': known_correct.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_not_known.id,
+            'answer_id': not_known_wrong.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': False,
+        })
+
+        payload = quiz.get_quiz_for_student(quiz.id)
+
+        summary = payload['student_progress_summary']
+        self.assertEqual(summary['student_weighted_threshold'], 80)
+        self.assertEqual(summary['questions_with_results_data'], 2)
+        self.assertEqual(summary['known_questions'], 1)
+        self.assertIn('You have scored 80% or more in 1 out of the 2 we have results data for.', summary['progress_text'])
+
     def test_exclude_answered_days_is_anded_with_other_student_filters(self):
         quiz = self.env['quiz.quiz'].create({
             'name': 'Combined Student Filter Quiz',
@@ -279,7 +482,7 @@ class TestQuizSubmissionScoring(TransactionCase):
         })
         return question, correct
 
-    def test_unfiltered_partial_submission_uses_minimum_out_of_ten(self):
+    def test_unfiltered_partial_submission_excludes_unanswered_questions(self):
         quiz = self.env['quiz.quiz'].create({'name': 'No Filter Quiz'})
         question_1, correct_1 = self._make_question(quiz, 'Question 1')
         question_2, _correct_2 = self._make_question(quiz, 'Question 2')
@@ -293,9 +496,10 @@ class TestQuizSubmissionScoring(TransactionCase):
         })
 
         self.assertEqual(result['score'], 1)
-        self.assertEqual(result['total_marks'], 10)
+        self.assertEqual(result['total_marks'], 1)
+        self.assertEqual([entry['question_id'] for entry in result['results']], [question_1.id])
 
-    def test_filtered_partial_submission_keeps_displayed_total(self):
+    def test_filtered_partial_submission_excludes_unanswered_questions(self):
         quiz = self.env['quiz.quiz'].create({'name': 'Filtered Quiz'})
         question_1, correct_1 = self._make_question(quiz, 'Question 1')
         question_2, _correct_2 = self._make_question(quiz, 'Question 2')
@@ -313,4 +517,38 @@ class TestQuizSubmissionScoring(TransactionCase):
         )
 
         self.assertEqual(result['score'], 1)
-        self.assertEqual(result['total_marks'], 2)
+        self.assertEqual(result['total_marks'], 1)
+        self.assertEqual([entry['question_id'] for entry in result['results']], [question_1.id])
+
+    def test_submit_returns_refreshed_student_progress_stats(self):
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Progress Refresh Quiz',
+            'filter_student_attempts': '1',
+            'filter_student_weighted_score_pct': '50',
+        })
+        question_1, correct_1 = self._make_question(quiz, 'Question 1')
+        question_2, _correct_2 = self._make_question(quiz, 'Question 2')
+        quiz.question_ids = [(6, 0, [question_1.id, question_2.id])]
+
+        response_model = self.env['quiz.response']
+        response_model.create({
+            'quiz_id': quiz.id,
+            'question_id': question_1.id,
+            'answer_id': correct_1.id,
+            'user_id': self.env.user.id,
+            'attempt_token': uuid.uuid4().hex,
+            'is_correct': True,
+        })
+
+        result = quiz.submit_quiz_answers(
+            quiz.id,
+            {
+                str(question_1.id): [correct_1.id],
+                str(question_2.id): [],
+            },
+        )
+
+        self.assertIn('student_question_stats', result)
+        self.assertIn('student_progress_summary', result)
+        self.assertEqual(result['student_question_stats'][str(question_1.id)]['attempt_count'], 2)
+        self.assertEqual(result['student_progress_summary']['total_possible_questions'], 2)

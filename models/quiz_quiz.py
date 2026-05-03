@@ -344,6 +344,71 @@ class Quiz(models.Model):
 
         return True
 
+    def _question_matches_static_scope(self, question, filter_payload):
+        filter_payload = self._normalize_quiz_filter_payload(filter_payload)
+
+        if filter_payload['filter_tag_ids']:
+            if not set(filter_payload['filter_tag_ids']).intersection(question.tag_ids.ids):
+                return False
+
+        if filter_payload['filter_subject_ids']:
+            if not set(filter_payload['filter_subject_ids']).intersection(question.subject_ids.ids):
+                return False
+
+        return True
+
+    def _build_student_progress_summary(self, quiz, filter_payload, student_stats):
+        filter_payload = self._normalize_quiz_filter_payload(filter_payload)
+        student_attempt_threshold = filter_payload['filter_student_attempts']
+        student_weighted_threshold = filter_payload['filter_student_weighted_score_pct'] or 80
+
+        scoped_questions = quiz.question_ids.filtered(lambda question: self._question_matches_static_scope(question, filter_payload))
+        total_possible_questions = len(scoped_questions)
+
+        questions_with_results_data = 0
+        known_questions = 0
+        for question in scoped_questions:
+            question_stats = student_stats.get(
+                question.id,
+                {'attempt_count': 0, 'weighted_score_pct': None, 'last_answered_at': None},
+            )
+            attempt_count = question_stats['attempt_count'] or 0
+            weighted_score = question_stats['weighted_score_pct']
+
+            has_results_data = attempt_count >= student_attempt_threshold if student_attempt_threshold else attempt_count > 0
+            if has_results_data:
+                questions_with_results_data += 1
+
+            meets_weighted_threshold = (
+                weighted_score is not None and weighted_score >= student_weighted_threshold
+            )
+            if has_results_data and meets_weighted_threshold:
+                known_questions += 1
+
+        questions_not_known = max(0, questions_with_results_data - known_questions)
+        questions_not_tried_enough = max(0, total_possible_questions - questions_with_results_data)
+
+        progress_text = ''
+        if total_possible_questions:
+            progress_text = (
+                f'This quiz has {total_possible_questions} questions.  '
+                f'You have scored {student_weighted_threshold}% or more in {known_questions} out of '
+                f'the {questions_with_results_data} we have results data for.'
+            )
+            if student_attempt_threshold:
+                progress_text = f'{progress_text} (ie questions  you have attempted at least {student_attempt_threshold} times).'
+
+        return {
+            'total_possible_questions': total_possible_questions,
+            'questions_with_results_data': questions_with_results_data,
+            'known_questions': known_questions,
+            'not_known_questions': questions_not_known,
+            'not_tried_enough_questions': questions_not_tried_enough,
+            'student_attempt_threshold': student_attempt_threshold,
+            'student_weighted_threshold': student_weighted_threshold,
+            'progress_text': progress_text,
+        }
+
     @staticmethod
     def _b64url_encode(data):
         return base64.urlsafe_b64encode(data).decode().rstrip('=')
@@ -646,6 +711,7 @@ class Quiz(models.Model):
         all_questions = list(quiz.question_ids)
 
         student_stats = self._get_student_question_attempt_stats(quiz.question_ids, self.env.user)
+        progress_summary = self._build_student_progress_summary(quiz, filter_payload, student_stats)
 
         all_questions = [
             question for question in all_questions
@@ -733,6 +799,7 @@ class Quiz(models.Model):
             'total_marks': displayed_marks,
             'allow_resubmission': allow_resubmission,
             'filter_summary': quiz._build_filter_summary(filter_payload),
+            'student_progress_summary': progress_summary,
             # quiz.id is always a positive integer from the ORM; safe for URL use
             'header_image_url': (
                 f'/web/image/quiz.quiz/{quiz.id}/header_image'
@@ -776,13 +843,18 @@ class Quiz(models.Model):
         total_marks = 0
         attempted_question_count = 0
 
-        # Only score the questions that the student actually received (keys in answers)
-        submitted_ids = {int(k) for k in answers}
-        questions_to_score = quiz.question_ids.filtered(lambda q: q.id in submitted_ids) if submitted_ids else quiz.question_ids
+        # Only score questions that have at least one selected answer.
+        submitted_answers = {
+            str(question_id): [int(answer_id) for answer_id in (selected_ids or []) if answer_id]
+            for question_id, selected_ids in (answers or {}).items()
+            if selected_ids
+        }
+        submitted_ids = {int(question_id) for question_id in submitted_answers}
+        questions_to_score = quiz.question_ids.filtered(lambda q: q.id in submitted_ids) if submitted_ids else quiz.question_ids.browse([])
 
         for question in questions_to_score:
             q_id = str(question.id)
-            selected_ids = set(int(i) for i in (answers.get(q_id) or []))
+            selected_ids = set(submitted_answers.get(q_id) or [])
             correct_ids = set(question.answer_ids.filtered('is_correct').ids)
 
             if selected_ids:
@@ -812,7 +884,7 @@ class Quiz(models.Model):
                 'answers': answer_details,
             })
 
-        if not has_active_filters and attempted_question_count < len(questions_to_score):
+        if questions_to_score and not has_active_filters and attempted_question_count < len(questions_to_score):
             total_marks = max(10, attempted_question_count)
 
         # Persist one quiz.response record for every answer the student selected
@@ -837,6 +909,17 @@ class Quiz(models.Model):
         # or quiz.answer (the stats fields are teacher-facing read-only counters).
         affected_q_ids = [r['question_id'] for r in results]
         self.env['quiz.question'].sudo()._recompute_stats(affected_q_ids)
+
+        student_stats = self._get_student_question_attempt_stats(quiz.question_ids, self.env.user)
+        student_question_stats = {
+            str(question.id): {
+                'attempt_count': stats['attempt_count'],
+                'weighted_score_pct': round(stats['weighted_score_pct'] or 0),
+                'last_answered_at': stats['last_answered_at'],
+            }
+            for question, stats in ((question, student_stats.get(question.id, {'attempt_count': 0, 'weighted_score_pct': None, 'last_answered_at': None})) for question in quiz.question_ids)
+        }
+        student_progress_summary = self._build_student_progress_summary(quiz, filter_payload, student_stats)
 
         # ── Per-question response stats for teacher users ────────────────
         is_teacher = (
@@ -890,6 +973,8 @@ class Quiz(models.Model):
             'total_marks': total_marks,
             'results': results,
             'is_teacher': is_teacher,
+            'student_question_stats': student_question_stats,
+            'student_progress_summary': student_progress_summary,
         }
 
     @api.model

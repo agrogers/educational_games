@@ -6,6 +6,7 @@ from odoo import models, fields, api
 class QuizQuestion(models.Model):
     _name = 'quiz.question'
     _description = 'Quiz Question'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'quiz_id, sequence, id'
 
     quiz_id = fields.Many2one('quiz.quiz', string='Primary Quiz', ondelete='set null')

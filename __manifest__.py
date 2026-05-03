@@ -1,13 +1,13 @@
 {
     'name': 'Educational Games',
-    'version': '18.0.1.1.0',
+    'version': '18.0.1.1.1',
     'category': 'Education',
     'summary': 'Educational games for learning English grammar',
     'description': 'A collection of educational games to help students learn English grammar concepts.',
     'author': 'Your Name',
     'website': '',
     'license': 'LGPL-3',
-    'depends': ['base', 'web', 'aps_sis'],
+    'depends': ['base', 'web', 'mail', 'aps_sis'],
     'data': [
         'security/ir.model.access.csv',
         'views/quiz_actions.xml',

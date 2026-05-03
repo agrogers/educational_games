@@ -360,6 +360,15 @@ export class QuizGame extends Component {
         return "Order: random. Click for weighted score ascending.";
     }
 
+    getQuizProgressSegmentWidth(segmentKey) {
+        const summary = this.state.quiz?.student_progress_summary;
+        if (!summary || !summary.total_possible_questions) {
+            return 0;
+        }
+        const value = summary[segmentKey] || 0;
+        return (value / summary.total_possible_questions) * 100;
+    }
+
     getAnswerColumnButtonLabel() {
         return `${this.state.answerColumns}C`;
     }
@@ -430,7 +439,14 @@ export class QuizGame extends Component {
         // Build payload: { "questionId": [answerId, ...] }
         const answers = {};
         for (const question of this.state.quiz.questions) {
-            answers[String(question.id)] = question.selected_answers;
+            if (question.selected_answers.length > 0) {
+                answers[String(question.id)] = question.selected_answers;
+            }
+        }
+
+        if (!Object.keys(answers).length) {
+            this.notification.add("Select at least one answer before submitting.", { type: "warning" });
+            return;
         }
 
         try {
@@ -454,11 +470,27 @@ export class QuizGame extends Component {
                 }
             });
 
+            if (result.student_question_stats) {
+                this.state.quiz.questions.forEach((question) => {
+                    const stats = result.student_question_stats[String(question.id)];
+                    if (!stats) {
+                        return;
+                    }
+                    question.student_attempt_count = stats.attempt_count || 0;
+                    question.student_weighted_score_pct = stats.weighted_score_pct || 0;
+                });
+            }
+
+            if (result.student_progress_summary) {
+                this.state.quiz.student_progress_summary = result.student_progress_summary;
+            }
+
             this.state.score = result.score;
             this.state.totalMarks = result.total_marks;
             this.state.results = result.results;
             this.state.submitted = true;
             this.state.activeQuestionId = null;
+            this._applyQuestionOrder();
 
             await this.onGameFinished(result.score, result.results);
         } catch (error) {
