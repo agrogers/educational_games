@@ -83,6 +83,16 @@
 
                                 </group>
                             </group>
+                            <group string="Inherited Quizzes">
+                                <div class="alert alert-info m-2" colspan="2">
+                                    Questions from the quizzes below are automatically included when this quiz is played.
+                                    Circular references are not allowed.
+                                </div>
+                                <field name="include_other_quizzes" widget="many2many_tags"
+                                       options="{'no_create': True, 'no_open': False}"
+                                       colspan="2"
+                                       placeholder="Select quizzes to inherit questions from…"/>
+                            </group>
                             <group>
                                 <field name="filter_summary_preview" readonly="1" widget="text" colspan="2" placeholder="No active filters."/>
                                 <field name="quiz_url_params" readonly="1"
