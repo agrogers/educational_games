@@ -84,7 +84,7 @@
                                 </group>
                             </group>
                             <group string="Inherited Quizzes">
-                                <div class="alert alert-info m-2" colspan="2">
+                                <div class="alert alert-info m-2">
                                     Questions from the quizzes below are automatically included when this quiz is played.
                                     Circular references are not allowed.
                                 </div>

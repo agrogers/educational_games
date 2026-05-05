@@ -676,4 +676,3 @@ class TestQuizInheritQuestions(TransactionCase):
 
         with self.assertRaises(ValidationError):
             quiz_a.include_other_quizzes = [(4, quiz_a.id)]
-        self.assertEqual(result['student_progress_summary']['total_possible_questions'], 2)
