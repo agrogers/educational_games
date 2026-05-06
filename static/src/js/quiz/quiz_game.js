@@ -85,6 +85,9 @@ export class QuizGame extends Component {
             // when false all questions share the same card-back image.
             randomCardBacks: true,
             questionOrderMode: "random",
+            // null | 'not_known' | 'not_tried' — filters displayed questions
+            // to a specific progress category from the header legend.
+            progressFilter: null,
         });
 
         this.resId = this._toInt(getParam("active_id")) || routeResId;
@@ -286,6 +289,7 @@ export class QuizGame extends Component {
         this.questionCount = 0;
         this.optionCount = 0;
         this.state.questionOrderMode = "random";
+        this.state.progressFilter = null;
         this.state.retakeMode = false;
         this.state.submitted = false;
         this.state.isCheckingAll = false;
@@ -367,6 +371,61 @@ export class QuizGame extends Component {
         }
         const value = summary[segmentKey] || 0;
         return (value / summary.total_possible_questions) * 100;
+    }
+
+    /**
+     * Returns the subset of loaded questions to display, based on the active
+     * progress-category filter ('not_known', 'not_tried', or null for all).
+     *
+     * 'not_known'  – reviewed (attempts ≥ threshold) but below the score threshold
+     * 'not_tried'  – not yet reviewed enough times
+     */
+    get displayedQuestions() {
+        const questions = this.state.quiz?.questions || [];
+        const filter = this.state.progressFilter;
+        if (!filter) {
+            return questions;
+        }
+        const summary = this.state.quiz?.student_progress_summary;
+        if (!summary) {
+            return questions;
+        }
+        const attemptThreshold = summary.student_attempt_threshold || 0;
+        const weightedThreshold = summary.student_weighted_threshold || 80;
+        return questions.filter((q) => {
+            const hasResultsData = this._questionHasResultsData(q, attemptThreshold);
+            if (filter === "not_known") {
+                return hasResultsData && q.student_weighted_score_pct < weightedThreshold;
+            }
+            if (filter === "not_tried") {
+                return !hasResultsData;
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Returns true if the question has been attempted enough times to count
+     * as "reviewed" according to the attempt threshold from the progress summary.
+     */
+    _questionHasResultsData(question, attemptThreshold) {
+        return attemptThreshold > 0
+            ? question.student_attempt_count >= attemptThreshold
+            : question.student_attempt_count > 0;
+    }
+
+    /**
+     * Toggle the progress-category filter.  Clicking the same category again
+     * clears the filter and shows all questions.  Keeps the currently active
+     * question selected if it is still visible after the filter change.
+     */
+    filterByProgressCategory(category) {
+        this.state.progressFilter = this.state.progressFilter === category ? null : category;
+        const displayed = this.displayedQuestions;
+        const stillVisible = displayed.some((q) => q.id === this.state.activeQuestionId);
+        if (!stillVisible) {
+            this.state.activeQuestionId = displayed[0]?.id || null;
+        }
     }
 
     getAnswerColumnButtonLabel() {
@@ -791,6 +850,7 @@ export class QuizGame extends Component {
         this.state.results = [];
         this.state.submission_submitted = false;
         this.state.activeQuestionId = null;
+        this.state.progressFilter = null;
         this.state.loading = true;
         this.loadQuiz();
     }

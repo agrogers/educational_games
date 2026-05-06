@@ -153,6 +153,22 @@
     gap: 0.35rem;
 }
 
+.o_quiz_page .quiz-progress-legend-btn {
+    cursor: pointer;
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem 0.1rem 0.25rem;
+    transition: background 0.15s, color 0.15s;
+}
+.o_quiz_page .quiz-progress-legend-btn:hover {
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+}
+.o_quiz_page .quiz-progress-legend-active {
+    background: rgba(255,255,255,0.28);
+    color: #fff;
+    font-weight: 600;
+}
+
 .o_quiz_page .quiz-progress-key {
     width: 0.65rem;
     height: 0.65rem;

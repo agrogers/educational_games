@@ -60,8 +60,16 @@
                             </div>
                             <div class="quiz-progress-legend mt-1">
                                   <span><span class="quiz-progress-key quiz-progress-known"></span>Known (<t t-esc="state.quiz.student_progress_summary.known_questions"/>)</span>
-                                  <span><span class="quiz-progress-key quiz-progress-not-known"></span>Still learning (<t t-esc="state.quiz.student_progress_summary.not_known_questions"/>)</span>
-                                  <span><span class="quiz-progress-key quiz-progress-not-tried"></span>Insufficient Data (<t t-esc="state.quiz.student_progress_summary.not_tried_enough_questions"/>)</span>
+                                  <span t-attf-class="quiz-progress-legend-btn {{ state.progressFilter === 'not_known' ? 'quiz-progress-legend-active' : '' }}"
+                                        title="Click to show only these questions"
+                                        t-on-click="() => this.filterByProgressCategory('not_known')">
+                                      <span class="quiz-progress-key quiz-progress-not-known"></span>Still learning (<t t-esc="state.quiz.student_progress_summary.not_known_questions"/>)
+                                  </span>
+                                  <span t-attf-class="quiz-progress-legend-btn {{ state.progressFilter === 'not_tried' ? 'quiz-progress-legend-active' : '' }}"
+                                        title="Click to show only these questions"
+                                        t-on-click="() => this.filterByProgressCategory('not_tried')">
+                                      <span class="quiz-progress-key quiz-progress-not-tried"></span>Insufficient Data (<t t-esc="state.quiz.student_progress_summary.not_tried_enough_questions"/>)
+                                  </span>
                             </div>
                         </div>
                         <div t-if="state.submitted" class="quiz-score-banner">
@@ -120,7 +128,7 @@
                     <aside class="quiz-toc">
                         <div class="quiz-toc-label"></div>
 
-                        <t t-foreach="state.quiz.questions" t-as="tocQ" t-key="tocQ.id">
+                        <t t-foreach="this.displayedQuestions" t-as="tocQ" t-key="tocQ.id">
                             <t t-set="tocStatus" t-value="getQuestionStatus(tocQ)"/>
                             <div t-attf-class="quiz-toc-item {{ tocQ.id === state.activeQuestionId ? 'toc-active' : '' }}"
                                  t-on-click="() => this.scrollToQuestion(tocQ.id)"
@@ -154,10 +162,14 @@
 
                     <!-- Questions area -->
                     <main class="quiz-questions-area">
-                        <t t-if="state.quiz.questions.length === 0">
+                        <t t-if="this.displayedQuestions.length === 0">
                             <div class="alert alert-info">
                                 <div>No questions are currently being displayed.</div>
-                                <div t-if="state.quiz.filter_summary" class="mt-1">
+                                <div t-if="state.progressFilter" class="mt-1">
+                                    No questions match the selected category filter.
+                                    <a href="#" class="ms-1" t-on-click.prevent="() => this.filterByProgressCategory(state.progressFilter)">Clear filter</a>
+                                </div>
+                                <div t-elif="state.quiz.filter_summary" class="mt-1">
                                     The active filters may have excluded every question because the selected criteria have already been satisfied.
                                 </div>
                                 <div t-else="" class="mt-1">
@@ -165,7 +177,7 @@
                                 </div>
                             </div>
                         </t>
-                        <t t-else="" t-foreach="state.quiz.questions" t-as="question" t-key="question.id">
+                        <t t-else="" t-foreach="this.displayedQuestions" t-as="question" t-key="question.id">
                             <t t-set="qResult" t-value="question.result"/>
                             <t t-set="isActive" t-value="question.id === state.activeQuestionId"/>
                             <t t-set="showResult" t-value="(state.submitted or question.checked) and qResult !== null"/>
@@ -363,7 +375,7 @@
                                 </button>
                             </div>
 
-                            <div t-elif="state.quiz.questions.length > 0" class="d-flex align-items-center gap-2">
+                            <div t-elif="this.displayedQuestions.length > 0" class="d-flex align-items-center gap-2">
                                 <button t-if="state.isTeacher"
                                         class="btn btn-outline-secondary"
                                         t-att-disabled="state.isCheckingAll"
