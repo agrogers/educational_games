@@ -1,5 +1,5 @@
 from odoo import models, fields, api
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import config
 import base64
 from collections import Counter
@@ -33,15 +33,26 @@ class Quiz(models.Model):
         'question_id',
         string='Questions',
     )
+    include_other_quizzes = fields.Many2many(
+        'quiz.quiz',
+        'quiz_quiz_include_rel',
+        'quiz_id',
+        'included_quiz_id',
+        string='Include Questions From',
+        help=(
+            'Questions from these quizzes are automatically included when playing this quiz. '
+            'Use this to build composite quizzes that inherit questions from other quizzes.'
+        ),
+    )
     question_count = fields.Integer(
         string='Number of Questions',
         compute='_compute_question_count',
-        store=True,
+        store=False,
     )
     total_marks = fields.Integer(
         string='Total Marks',
         compute='_compute_total_marks',
-        store=True,
+        store=False,
     )
     header_image = fields.Image(
         string='Header Image',
@@ -145,15 +156,58 @@ class Quiz(models.Model):
             'Paste it into the resource URL field in the APEX module.'
         ),
     )
-    @api.depends('question_ids')
+    @api.depends('question_ids', 'include_other_quizzes', 'include_other_quizzes.question_ids')
     def _compute_question_count(self):
         for record in self:
-            record.question_count = len(record.question_ids)
+            record.question_count = len(record._get_effective_question_ids())
 
-    @api.depends('question_ids.marks')
+    @api.depends('question_ids.marks', 'include_other_quizzes', 'include_other_quizzes.question_ids',
+                 'include_other_quizzes.question_ids.marks')
     def _compute_total_marks(self):
         for record in self:
-            record.total_marks = sum(q.marks for q in record.question_ids)
+            record.total_marks = sum(q.marks for q in record._get_effective_question_ids())
+
+    def _get_effective_question_ids(self):
+        """Return all questions for this quiz, including those inherited from
+        included quizzes. Circular references are handled by tracking visited
+        quiz IDs so that each quiz is only visited once."""
+        self.ensure_one()
+        visited_quiz_ids = set()
+        question_ids = set()
+
+        def _collect(quiz):
+            if quiz.id in visited_quiz_ids:
+                return
+            visited_quiz_ids.add(quiz.id)
+            question_ids.update(quiz.question_ids.ids)
+            for included in quiz.include_other_quizzes:
+                _collect(included)
+
+        _collect(self)
+        return self.env['quiz.question'].browse(list(question_ids))
+
+    @api.constrains('include_other_quizzes')
+    def _check_no_circular_include(self):
+        """Raise a ValidationError if including another quiz would create a
+        circular dependency (A includes B includes ... includes A)."""
+        for record in self:
+            visited = set()
+
+            def _is_reachable(quiz):
+                if quiz.id in visited:
+                    return False
+                if quiz.id == record.id:
+                    return True
+                visited.add(quiz.id)
+                return any(_is_reachable(inc) for inc in quiz.include_other_quizzes)
+
+            for included in record.include_other_quizzes:
+                visited.clear()
+                if _is_reachable(included):
+                    raise ValidationError(
+                        f"Circular reference detected: including '{included.name}' "
+                        f"would create a cycle."
+                    )
 
     @staticmethod
     def _sanitize_nonnegative_int(value):
@@ -362,7 +416,7 @@ class Quiz(models.Model):
         student_attempt_threshold = filter_payload['filter_student_attempts']
         student_weighted_threshold = filter_payload['filter_student_weighted_score_pct'] or 80
 
-        scoped_questions = quiz.question_ids.filtered(lambda question: self._question_matches_static_scope(question, filter_payload))
+        scoped_questions = quiz._get_effective_question_ids().filtered(lambda question: self._question_matches_static_scope(question, filter_payload))
         total_possible_questions = len(scoped_questions)
 
         questions_with_results_data = 0
@@ -708,9 +762,10 @@ class Quiz(models.Model):
 
         rng = random.SystemRandom()
 
-        all_questions = list(quiz.question_ids)
+        effective_questions = quiz._get_effective_question_ids()
+        all_questions = list(effective_questions)
 
-        student_stats = self._get_student_question_attempt_stats(quiz.question_ids, self.env.user)
+        student_stats = self._get_student_question_attempt_stats(effective_questions, self.env.user)
         progress_summary = self._build_student_progress_summary(quiz, filter_payload, student_stats)
 
         all_questions = [
@@ -850,7 +905,8 @@ class Quiz(models.Model):
             if selected_ids
         }
         submitted_ids = {int(question_id) for question_id in submitted_answers}
-        questions_to_score = quiz.question_ids.filtered(lambda q: q.id in submitted_ids) if submitted_ids else quiz.question_ids.browse([])
+        effective_questions = quiz._get_effective_question_ids()
+        questions_to_score = effective_questions.filtered(lambda q: q.id in submitted_ids) if submitted_ids else effective_questions.browse([])
 
         for question in questions_to_score:
             q_id = str(question.id)
@@ -910,14 +966,14 @@ class Quiz(models.Model):
         affected_q_ids = [r['question_id'] for r in results]
         self.env['quiz.question'].sudo()._recompute_stats(affected_q_ids)
 
-        student_stats = self._get_student_question_attempt_stats(quiz.question_ids, self.env.user)
+        student_stats = self._get_student_question_attempt_stats(effective_questions, self.env.user)
         student_question_stats = {
             str(question.id): {
                 'attempt_count': stats['attempt_count'],
                 'weighted_score_pct': round(stats['weighted_score_pct'] or 0),
                 'last_answered_at': stats['last_answered_at'],
             }
-            for question, stats in ((question, student_stats.get(question.id, {'attempt_count': 0, 'weighted_score_pct': None, 'last_answered_at': None})) for question in quiz.question_ids)
+            for question, stats in ((question, student_stats.get(question.id, {'attempt_count': 0, 'weighted_score_pct': None, 'last_answered_at': None})) for question in effective_questions)
         }
         student_progress_summary = self._build_student_progress_summary(quiz, filter_payload, student_stats)
 
@@ -1001,7 +1057,7 @@ class Quiz(models.Model):
             raise UserError("Quiz not found.")
 
         question = self.env['quiz.question'].browse(int(question_id))
-        if not question.exists() or question.id not in quiz.question_ids.ids:
+        if not question.exists() or question.id not in quiz._get_effective_question_ids().ids:
             raise UserError("Question not found in this quiz.")
 
         correct_ids = set(question.answer_ids.filtered('is_correct').ids)

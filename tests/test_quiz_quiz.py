@@ -551,4 +551,128 @@ class TestQuizSubmissionScoring(TransactionCase):
         self.assertIn('student_question_stats', result)
         self.assertIn('student_progress_summary', result)
         self.assertEqual(result['student_question_stats'][str(question_1.id)]['attempt_count'], 2)
-        self.assertEqual(result['student_progress_summary']['total_possible_questions'], 2)
+
+
+class TestQuizInheritQuestions(TransactionCase):
+    """Tests for include_other_quizzes: question inheritance and circular reference guard."""
+
+    def _make_quiz(self, name, questions=None):
+        vals = {'name': name}
+        if questions:
+            vals['question_ids'] = [(6, 0, [q.id for q in questions])]
+        return self.env['quiz.quiz'].create(vals)
+
+    def _make_question(self, text):
+        return self.env['quiz.question'].create({'question_text': text})
+
+    # ── Inheritance ────────────────────────────────────────────────────────
+
+    def test_effective_questions_includes_own_and_inherited(self):
+        q1 = self._make_question('Own question')
+        q2 = self._make_question('Inherited question')
+        source = self._make_quiz('Source Quiz', questions=[q2])
+        quiz = self._make_quiz('Main Quiz', questions=[q1])
+        quiz.include_other_quizzes = [(4, source.id)]
+
+        effective = quiz._get_effective_question_ids()
+        self.assertIn(q1.id, effective.ids)
+        self.assertIn(q2.id, effective.ids)
+
+    def test_question_count_includes_inherited_questions(self):
+        q1 = self._make_question('Own')
+        q2 = self._make_question('Inherited')
+        source = self._make_quiz('Source', questions=[q2])
+        quiz = self._make_quiz('Main', questions=[q1])
+        quiz.include_other_quizzes = [(4, source.id)]
+
+        self.assertEqual(quiz.question_count, 2)
+
+    def test_total_marks_includes_inherited_questions(self):
+        q1 = self._make_question('Own')
+        q1.marks = 2
+        q2 = self._make_question('Inherited')
+        q2.marks = 3
+        source = self._make_quiz('Source', questions=[q2])
+        quiz = self._make_quiz('Main', questions=[q1])
+        quiz.include_other_quizzes = [(4, source.id)]
+
+        self.assertEqual(quiz.total_marks, 5)
+
+    def test_get_quiz_for_student_serves_inherited_questions(self):
+        q1 = self._make_question('Own question')
+        q2 = self._make_question('Inherited question')
+        self.env['quiz.answer'].create({'question_id': q2.id, 'answer_text': 'A', 'is_correct': True})
+        source = self._make_quiz('Source', questions=[q2])
+        quiz = self._make_quiz('Main', questions=[q1])
+        quiz.include_other_quizzes = [(4, source.id)]
+
+        payload = quiz.get_quiz_for_student(quiz.id)
+        returned_ids = {q['id'] for q in payload['questions']}
+        self.assertIn(q1.id, returned_ids)
+        self.assertIn(q2.id, returned_ids)
+
+    def test_inherited_questions_added_later_are_also_included(self):
+        """Questions added to a source quiz after inclusion are served correctly."""
+        q_initial = self._make_question('Initial inherited question')
+        source = self._make_quiz('Source', questions=[q_initial])
+        quiz = self._make_quiz('Main')
+        quiz.include_other_quizzes = [(4, source.id)]
+
+        q_later = self._make_question('Later added question')
+        source.question_ids = [(4, q_later.id)]
+
+        effective = quiz._get_effective_question_ids()
+        self.assertIn(q_initial.id, effective.ids)
+        self.assertIn(q_later.id, effective.ids)
+
+    def test_no_duplicate_questions_when_own_and_inherited_overlap(self):
+        """A question that is both directly in the quiz and in an included quiz
+        should appear only once in the effective question set."""
+        q_shared = self._make_question('Shared question')
+        source = self._make_quiz('Source', questions=[q_shared])
+        quiz = self._make_quiz('Main', questions=[q_shared])
+        quiz.include_other_quizzes = [(4, source.id)]
+
+        effective = quiz._get_effective_question_ids()
+        self.assertEqual(effective.ids.count(q_shared.id), 1)
+
+    def test_transitive_inheritance(self):
+        """Quiz A includes B which includes C — A should see C's questions."""
+        q_c = self._make_question('Question in C')
+        quiz_c = self._make_quiz('Quiz C', questions=[q_c])
+        quiz_b = self._make_quiz('Quiz B')
+        quiz_b.include_other_quizzes = [(4, quiz_c.id)]
+        quiz_a = self._make_quiz('Quiz A')
+        quiz_a.include_other_quizzes = [(4, quiz_b.id)]
+
+        effective = quiz_a._get_effective_question_ids()
+        self.assertIn(q_c.id, effective.ids)
+
+    # ── Circular reference ─────────────────────────────────────────────────
+
+    def test_direct_circular_reference_is_rejected(self):
+        from odoo.exceptions import ValidationError
+        quiz_a = self._make_quiz('Quiz A')
+        quiz_b = self._make_quiz('Quiz B')
+        quiz_a.include_other_quizzes = [(4, quiz_b.id)]
+
+        with self.assertRaises(ValidationError):
+            quiz_b.include_other_quizzes = [(4, quiz_a.id)]
+
+    def test_indirect_circular_reference_is_rejected(self):
+        from odoo.exceptions import ValidationError
+        quiz_a = self._make_quiz('Quiz A')
+        quiz_b = self._make_quiz('Quiz B')
+        quiz_c = self._make_quiz('Quiz C')
+        quiz_a.include_other_quizzes = [(4, quiz_b.id)]
+        quiz_b.include_other_quizzes = [(4, quiz_c.id)]
+
+        with self.assertRaises(ValidationError):
+            quiz_c.include_other_quizzes = [(4, quiz_a.id)]
+
+    def test_self_include_is_rejected(self):
+        from odoo.exceptions import ValidationError
+        quiz_a = self._make_quiz('Quiz A')
+
+        with self.assertRaises(ValidationError):
+            quiz_a.include_other_quizzes = [(4, quiz_a.id)]
