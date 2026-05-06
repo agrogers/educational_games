@@ -454,7 +454,7 @@ class Quiz(models.Model):
         student_attempt_threshold = filter_payload['filter_student_attempts']
         student_weighted_threshold = filter_payload['filter_student_weighted_score_pct'] or 80
 
-        scoped_questions = quiz._get_effective_question_ids().filtered(lambda question: self._question_matches_static_scope(question, filter_payload))
+        scoped_questions = quiz.question_ids.filtered(lambda question: self._question_matches_static_scope(question, filter_payload))
         total_possible_questions = len(scoped_questions)
 
         questions_with_results_data = 0
@@ -800,7 +800,7 @@ class Quiz(models.Model):
 
         rng = random.SystemRandom()
 
-        effective_questions = quiz._get_effective_question_ids()
+        effective_questions = quiz.question_ids
         all_questions = list(effective_questions)
 
         student_stats = self._get_student_question_attempt_stats(effective_questions, self.env.user)
@@ -943,7 +943,7 @@ class Quiz(models.Model):
             if selected_ids
         }
         submitted_ids = {int(question_id) for question_id in submitted_answers}
-        effective_questions = quiz._get_effective_question_ids()
+        effective_questions = quiz.question_ids
         questions_to_score = effective_questions.filtered(lambda q: q.id in submitted_ids) if submitted_ids else effective_questions.browse([])
 
         for question in questions_to_score:
@@ -1095,7 +1095,7 @@ class Quiz(models.Model):
             raise UserError("Quiz not found.")
 
         question = self.env['quiz.question'].browse(int(question_id))
-        if not question.exists() or question.id not in quiz._get_effective_question_ids().ids:
+        if not question.exists() or question.id not in quiz.question_ids.ids:
             raise UserError("Question not found in this quiz.")
 
         correct_ids = set(question.answer_ids.filtered('is_correct').ids)
