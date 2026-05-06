@@ -44,6 +44,14 @@ class Quiz(models.Model):
             'Use this to build composite quizzes that inherit questions from other quizzes.'
         ),
     )
+    inherited_question_ids = fields.Many2many(
+        'quiz.question',
+        'quiz_inherited_question_rel',
+        'quiz_id',
+        'question_id',
+        string='Inherited Questions',
+        help='Questions automatically pulled in from included quizzes. Managed automatically — do not edit manually.',
+    )
     question_count = fields.Integer(
         string='Number of Questions',
         compute='_compute_question_count',
@@ -156,35 +164,52 @@ class Quiz(models.Model):
             'Paste it into the resource URL field in the APEX module.'
         ),
     )
-    @api.depends('question_ids', 'include_other_quizzes', 'include_other_quizzes.question_ids')
+    @api.depends('question_ids')
     def _compute_question_count(self):
         for record in self:
-            record.question_count = len(record._get_effective_question_ids())
+            record.question_count = len(record.question_ids)
 
-    @api.depends('question_ids.marks', 'include_other_quizzes', 'include_other_quizzes.question_ids',
-                 'include_other_quizzes.question_ids.marks')
+    @api.depends('question_ids.marks')
     def _compute_total_marks(self):
         for record in self:
-            record.total_marks = sum(q.marks for q in record._get_effective_question_ids())
+            record.total_marks = sum(q.marks for q in record.question_ids)
 
-    def _get_effective_question_ids(self):
-        """Return all questions for this quiz, including those inherited from
-        included quizzes. Circular references are handled by tracking visited
-        quiz IDs so that each quiz is only visited once."""
-        self.ensure_one()
-        visited_quiz_ids = set()
-        question_ids = set()
+    def _sync_inherited_questions(self):
+        """Sync question_ids to include questions from include_other_quizzes.
 
-        def _collect(quiz):
-            if quiz.id in visited_quiz_ids:
-                return
-            visited_quiz_ids.add(quiz.id)
-            question_ids.update(quiz.question_ids.ids)
+        inherited_question_ids tracks which questions were auto-added so we
+        know which ones to remove safely when an included quiz is removed.
+        Only questions that are no longer inherited AND were not also manually
+        added are removed from question_ids.
+        """
+        for quiz in self:
+            visited_quiz_ids = set()
+            new_inherited_ids = set()
+
+            def _collect(q):
+                if q.id in visited_quiz_ids:
+                    return
+                visited_quiz_ids.add(q.id)
+                new_inherited_ids.update(q.question_ids.ids)
+                for included in q.include_other_quizzes:
+                    _collect(included)
+
             for included in quiz.include_other_quizzes:
                 _collect(included)
 
-        _collect(self)
-        return self.env['quiz.question'].browse(list(question_ids))
+            old_inherited_ids = set(quiz.inherited_question_ids.ids)
+            manually_added_ids = set(quiz.question_ids.ids) - old_inherited_ids
+
+            to_add = new_inherited_ids - set(quiz.question_ids.ids)
+            to_remove = old_inherited_ids - new_inherited_ids - manually_added_ids
+
+            # Update the hidden tracking set
+            quiz.inherited_question_ids = self.env['quiz.question'].browse(list(new_inherited_ids))
+            # Propagate changes into question_ids
+            if to_add:
+                quiz.question_ids = [(4, qid) for qid in to_add]
+            if to_remove:
+                quiz.question_ids = [(3, qid) for qid in to_remove]
 
     @api.constrains('include_other_quizzes')
     def _check_no_circular_include(self):
@@ -208,6 +233,19 @@ class Quiz(models.Model):
                         f"Circular reference detected: including '{included.name}' "
                         f"would create a cycle."
                     )
+
+    def write(self, vals):
+        result = super().write(vals)
+        if 'include_other_quizzes' in vals:
+            self._sync_inherited_questions()
+        if 'question_ids' in vals:
+            # Re-sync any quizzes that include self so their inherited set stays current.
+            including_quizzes = self.env['quiz.quiz'].search(
+                [('include_other_quizzes', 'in', self.ids)]
+            )
+            if including_quizzes:
+                including_quizzes._sync_inherited_questions()
+        return result
 
     @staticmethod
     def _sanitize_nonnegative_int(value):
