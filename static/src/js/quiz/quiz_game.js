@@ -373,12 +373,26 @@ export class QuizGame extends Component {
         return (value / summary.total_possible_questions) * 100;
     }
 
+    /** Label shown in the filter chip when a progress filter is active. */
+    getProgressFilterLabel() {
+        const labels = {
+            not_known: "Still learning",
+            new_above_threshold: "✓ New",
+            new_below_threshold: "✗ New",
+            not_tried: "Not tried",
+        };
+        return labels[this.state.progressFilter] || "";
+    }
+
     /**
      * Returns the subset of loaded questions to display, based on the active
-     * progress-category filter ('not_known', 'not_tried', or null for all).
+     * progress-category filter.
      *
-     * 'not_known'  – reviewed (attempts ≥ threshold) but below the score threshold
-     * 'not_tried'  – not yet reviewed enough times
+     * Filters:
+     *   'not_known'          – reviewed (attempts ≥ threshold) but score below threshold
+     *   'new_above_threshold'– tried (0 < attempts < threshold) and score ≥ threshold
+     *   'new_below_threshold'– tried (0 < attempts < threshold) and score < threshold
+     *   'not_tried'          – never attempted
      */
     get displayedQuestions() {
         const questions = this.state.quiz?.questions || [];
@@ -392,13 +406,27 @@ export class QuizGame extends Component {
         }
         const attemptThreshold = summary.student_attempt_threshold || 0;
         const weightedThreshold = summary.student_weighted_threshold || 80;
+        // Mirror the Python effective_threshold logic: when no explicit threshold
+        // is set, require at least 2 attempts to count as "reviewed enough".
+        const effectiveThreshold = attemptThreshold > 0 ? attemptThreshold : 2;
         return questions.filter((q) => {
-            const hasResultsData = this._questionHasResultsData(q, attemptThreshold);
+            const attempts = q.student_attempt_count || 0;
+            const score = q.student_weighted_score_pct;
+            const meetsScore = score !== null && score !== undefined && score >= weightedThreshold;
+            const reviewedEnough = attempts >= effectiveThreshold;
+            const triedButInsufficient = attempts > 0 && !reviewedEnough;
+
             if (filter === "not_known") {
-                return hasResultsData && q.student_weighted_score_pct < weightedThreshold;
+                return reviewedEnough && !meetsScore;
+            }
+            if (filter === "new_above_threshold") {
+                return triedButInsufficient && meetsScore;
+            }
+            if (filter === "new_below_threshold") {
+                return triedButInsufficient && !meetsScore;
             }
             if (filter === "not_tried") {
-                return !hasResultsData;
+                return attempts === 0;
             }
             return true;
         });

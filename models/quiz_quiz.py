@@ -457,8 +457,17 @@ class Quiz(models.Model):
         scoped_questions = quiz.question_ids.filtered(lambda question: self._question_matches_static_scope(question, filter_payload))
         total_possible_questions = len(scoped_questions)
 
-        questions_with_results_data = 0
-        known_questions = 0
+        known_questions = 0           # attempts ≥ threshold AND score ≥ threshold
+        not_known_questions = 0        # attempts ≥ threshold AND score < threshold
+        new_above_threshold = 0        # 0 < attempts < threshold AND score ≥ threshold
+        new_below_threshold = 0        # 0 < attempts < threshold AND score < threshold
+        not_tried_questions = 0        # attempts == 0
+
+        # When no explicit attempt threshold is configured we still want to
+        # distinguish "tried once" (new) from "reviewed multiple times" (known).
+        # Use a default minimum of 2 attempts to count as properly reviewed.
+        effective_threshold = student_attempt_threshold if student_attempt_threshold else 2
+
         for question in scoped_questions:
             question_stats = student_stats.get(
                 question.id,
@@ -467,18 +476,26 @@ class Quiz(models.Model):
             attempt_count = question_stats['attempt_count'] or 0
             weighted_score = question_stats['weighted_score_pct']
 
-            has_results_data = attempt_count >= student_attempt_threshold if student_attempt_threshold else attempt_count > 0
-            if has_results_data:
-                questions_with_results_data += 1
-
             meets_weighted_threshold = (
                 weighted_score is not None and weighted_score >= student_weighted_threshold
             )
-            if has_results_data and meets_weighted_threshold:
-                known_questions += 1
 
-        questions_not_known = max(0, questions_with_results_data - known_questions)
-        questions_not_tried_enough = max(0, total_possible_questions - questions_with_results_data)
+            if attempt_count == 0:
+                not_tried_questions += 1
+            elif attempt_count < effective_threshold:
+                # Tried but not yet reviewed enough times
+                if meets_weighted_threshold:
+                    new_above_threshold += 1
+                else:
+                    new_below_threshold += 1
+            else:
+                # Reviewed enough (attempts ≥ threshold)
+                if meets_weighted_threshold:
+                    known_questions += 1
+                else:
+                    not_known_questions += 1
+
+        questions_with_results_data = known_questions + not_known_questions + new_above_threshold + new_below_threshold
 
         progress_text = ''
         if total_possible_questions:
@@ -488,14 +505,16 @@ class Quiz(models.Model):
                 f'the {questions_with_results_data} we have results data for.'
             )
             if student_attempt_threshold:
-                progress_text = f'{progress_text} (ie questions  you have attempted at least {student_attempt_threshold} times).'
+                progress_text = f'{progress_text} (ie questions you have attempted at least {student_attempt_threshold} times).'
 
         return {
             'total_possible_questions': total_possible_questions,
             'questions_with_results_data': questions_with_results_data,
             'known_questions': known_questions,
-            'not_known_questions': questions_not_known,
-            'not_tried_enough_questions': questions_not_tried_enough,
+            'not_known_questions': not_known_questions,
+            'new_above_threshold': new_above_threshold,
+            'new_below_threshold': new_below_threshold,
+            'not_tried_questions': not_tried_questions,
             'student_attempt_threshold': student_attempt_threshold,
             'student_weighted_threshold': student_weighted_threshold,
             'progress_text': progress_text,
