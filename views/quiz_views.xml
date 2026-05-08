@@ -56,12 +56,6 @@
                             type="object"
                             class="btn btn-secondary"
                             icon="fa-eye"/>
-                    <button name="action_delete_all_questions"
-                            string="Delete All Questions"
-                            type="object"
-                            class="btn btn-danger"
-                            icon="fa-trash"
-                            confirm="This will permanently delete ALL questions and answers for this quiz. This cannot be undone. Continue?"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
