@@ -135,8 +135,18 @@
     background: #f59e0b;
 }
 
+/* Tried but < threshold: score ≥ threshold (dark blue) */
+.o_quiz_page .quiz-progress-new-above {
+    background: #3b82f6;
+}
+
+/* Tried but < threshold: score < threshold (light blue) */
+.o_quiz_page .quiz-progress-new-below {
+    background: #93c5fd;
+}
+
 .o_quiz_page .quiz-progress-not-tried {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(180, 180, 180, 0.45);
 }
 
 .o_quiz_page .quiz-progress-legend {
@@ -151,6 +161,22 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
+}
+
+.o_quiz_page .quiz-progress-legend-btn {
+    cursor: pointer;
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem 0.1rem 0.25rem;
+    transition: background 0.15s, color 0.15s;
+}
+.o_quiz_page .quiz-progress-legend-btn:hover {
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+}
+.o_quiz_page .quiz-progress-legend-active {
+    background: rgba(255,255,255,0.28);
+    color: #fff;
+    font-weight: 600;
 }
 
 .o_quiz_page .quiz-progress-key {

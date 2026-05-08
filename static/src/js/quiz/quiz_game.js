@@ -85,6 +85,9 @@ export class QuizGame extends Component {
             // when false all questions share the same card-back image.
             randomCardBacks: true,
             questionOrderMode: "random",
+            // null | 'not_known' | 'not_tried' — filters displayed questions
+            // to a specific progress category from the header legend.
+            progressFilter: null,
         });
 
         this.resId = this._toInt(getParam("active_id")) || routeResId;
@@ -286,6 +289,7 @@ export class QuizGame extends Component {
         this.questionCount = 0;
         this.optionCount = 0;
         this.state.questionOrderMode = "random";
+        this.state.progressFilter = null;
         this.state.retakeMode = false;
         this.state.submitted = false;
         this.state.isCheckingAll = false;
@@ -379,6 +383,89 @@ export class QuizGame extends Component {
         }
         const value = summary[segmentKey] || 0;
         return (value / summary.total_possible_questions) * 100;
+    }
+
+    /** Label shown in the filter chip when a progress filter is active. */
+    getProgressFilterLabel() {
+        const labels = {
+            not_known: "Still learning",
+            new_above_threshold: "✓ New",
+            new_below_threshold: "✗ New",
+            not_tried: "Not tried",
+        };
+        return labels[this.state.progressFilter] || "";
+    }
+
+    /**
+     * Returns the subset of loaded questions to display, based on the active
+     * progress-category filter.
+     *
+     * Filters:
+     *   'not_known'          – reviewed (attempts ≥ threshold) but score below threshold
+     *   'new_above_threshold'– tried (0 < attempts < threshold) and score ≥ threshold
+     *   'new_below_threshold'– tried (0 < attempts < threshold) and score < threshold
+     *   'not_tried'          – never attempted
+     */
+    get displayedQuestions() {
+        const questions = this.state.quiz?.questions || [];
+        const filter = this.state.progressFilter;
+        if (!filter) {
+            return questions;
+        }
+        const summary = this.state.quiz?.student_progress_summary;
+        if (!summary) {
+            return questions;
+        }
+        const attemptThreshold = summary.student_attempt_threshold || 0;
+        const weightedThreshold = summary.student_weighted_threshold || 80;
+        // Mirror the Python effective_threshold logic: when no explicit threshold
+        // is set, require at least 2 attempts to count as "reviewed enough".
+        const effectiveThreshold = attemptThreshold > 0 ? attemptThreshold : 2;
+        return questions.filter((q) => {
+            const attempts = q.student_attempt_count || 0;
+            const score = q.student_weighted_score_pct;
+            const meetsScore = score !== null && score !== undefined && score >= weightedThreshold;
+            const reviewedEnough = attempts >= effectiveThreshold;
+            const triedButInsufficient = attempts > 0 && !reviewedEnough;
+
+            if (filter === "not_known") {
+                return reviewedEnough && !meetsScore;
+            }
+            if (filter === "new_above_threshold") {
+                return triedButInsufficient && meetsScore;
+            }
+            if (filter === "new_below_threshold") {
+                return triedButInsufficient && !meetsScore;
+            }
+            if (filter === "not_tried") {
+                return attempts === 0;
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Returns true if the question has been attempted enough times to count
+     * as "reviewed" according to the attempt threshold from the progress summary.
+     */
+    _questionHasResultsData(question, attemptThreshold) {
+        return attemptThreshold > 0
+            ? question.student_attempt_count >= attemptThreshold
+            : question.student_attempt_count > 0;
+    }
+
+    /**
+     * Toggle the progress-category filter.  Clicking the same category again
+     * clears the filter and shows all questions.  Keeps the currently active
+     * question selected if it is still visible after the filter change.
+     */
+    filterByProgressCategory(category) {
+        this.state.progressFilter = this.state.progressFilter === category ? null : category;
+        const displayed = this.displayedQuestions;
+        const stillVisible = displayed.some((q) => q.id === this.state.activeQuestionId);
+        if (!stillVisible) {
+            this.state.activeQuestionId = displayed[0]?.id || null;
+        }
     }
 
     getAnswerColumnButtonLabel() {
@@ -803,6 +890,7 @@ export class QuizGame extends Component {
         this.state.results = [];
         this.state.submission_submitted = false;
         this.state.activeQuestionId = null;
+        this.state.progressFilter = null;
         this.state.loading = true;
         this.loadQuiz();
     }
