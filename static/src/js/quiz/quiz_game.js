@@ -308,24 +308,32 @@ export class QuizGame extends Component {
         this._applyQuestionOrder();
     }
 
+    _assignRandomOrderIndices() {
+        this.state.quiz.questions.forEach((question, index) => {
+            question.randomOrderIndex = index;
+        });
+    }
+
     _applyQuestionOrder() {
         if (!this.state.quiz?.questions?.length) {
             return;
         }
+        const questions = [...this.state.quiz.questions];
         const originalIndex = (question) => question.randomOrderIndex ?? 0;
         if (this.state.questionOrderMode === "weighted") {
-            this.state.quiz.questions.sort((left, right) => {
+            questions.sort((left, right) => {
                 const diff = (left.student_weighted_score_pct ?? 0) - (right.student_weighted_score_pct ?? 0);
                 if (diff !== 0) {
                     return diff;
                 }
                 return originalIndex(left) - originalIndex(right);
             });
+            this.state.quiz.questions = questions;
             return;
         }
         if (this.state.questionOrderMode === "attempts_weighted") {
-            this.state.quiz.questions.sort((left, right) => {
-                const attemptDiff = (left.student_attempt_count ?? 0) - (right.student_attempt_count ?? 0);
+            questions.sort((left, right) => {
+                const attemptDiff = (right.student_attempt_count ?? 0) - (left.student_attempt_count ?? 0);
                 if (attemptDiff !== 0) {
                     return attemptDiff;
                 }
@@ -335,9 +343,13 @@ export class QuizGame extends Component {
                 }
                 return originalIndex(left) - originalIndex(right);
             });
+            this.state.quiz.questions = questions;
             return;
         }
-        this.state.quiz.questions.sort((left, right) => originalIndex(left) - originalIndex(right));
+
+        this._shuffleArray(questions);
+        this.state.quiz.questions = questions;
+        this._assignRandomOrderIndices();
     }
 
     getQuestionOrderButtonLabel() {
