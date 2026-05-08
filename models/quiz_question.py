@@ -175,3 +175,14 @@ class QuizQuestion(models.Model):
                 'default_question_ids': [(6, 0, self.ids)],
             },
         }
+
+    @api.model
+    def action_open_import_wizard(self):
+        """Open the question import wizard."""
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Import Quiz Questions',
+            'res_model': 'quiz.question.import.wizard',
+            'view_mode': 'form',
+            'target': 'current',
+        }

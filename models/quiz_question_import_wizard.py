@@ -55,6 +55,18 @@ class QuizQuestionImportWizard(models.TransientModel):
         string='Tags',
         help='These tags are assigned to every imported question.',
     )
+    quiz_id = fields.Many2one(
+        'quiz.quiz',
+        string='Quiz',
+        ondelete='set null',
+        help='Imported questions will be automatically added to this quiz.',
+    )
+
+    @api.onchange('quiz_id')
+    def _onchange_quiz_id(self):
+        if self.quiz_id:
+            self.subject_ids = self.quiz_id.subject_ids
+            self.tag_ids = self.quiz_id.filter_tag_ids
 
     @api.model
     def _default_import_group(self):
@@ -157,6 +169,10 @@ class QuizQuestionImportWizard(models.TransientModel):
         if not self.bulk_text or not self.bulk_text.strip():
             raise UserError("No text to parse. Please paste quiz text first.")
 
+        existing_ids = self.env['quiz.question'].search(
+            [('import_group', '=', self.import_group)],
+        ).ids
+
         question_count, answer_count = self._parse_and_create_questions()
         if question_count == 0:
             return {
@@ -171,6 +187,21 @@ class QuizQuestionImportWizard(models.TransientModel):
                     'type': 'warning',
                     'sticky': True,
                 },
+            }
+
+        if self.quiz_id:
+            new_questions = self.env['quiz.question'].search(
+                [('import_group', '=', self.import_group),
+                 ('id', 'not in', existing_ids)],
+            )
+            self.quiz_id.question_ids |= new_questions
+            return {
+                'type': 'ir.actions.act_window',
+                'name': self.quiz_id.name,
+                'res_model': 'quiz.quiz',
+                'res_id': self.quiz_id.id,
+                'view_mode': 'form',
+                'target': 'current',
             }
 
         return {
