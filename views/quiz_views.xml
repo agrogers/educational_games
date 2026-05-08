@@ -129,6 +129,12 @@
                         <!-- ── Questions tab ── -->
                         <page string="Questions" name="questions">
                             <div class="mb-2">
+                                <button name="%(educational_games.action_quiz_question_import)d"
+                                        string="Import Questions"
+                                        type="action"
+                                        class="btn btn-secondary"
+                                        icon="fa-upload"
+                                        context="{'default_quiz_id': id}"/>
                                 <button name="%(educational_games.action_quiz_question_list)d"
                                         string="Open Questions List"
                                         type="action"
@@ -276,6 +282,7 @@
         <field name="arch" type="xml">
             <list string="Questions" multi_edit="1">
                 <header>
+                    <button name="action_open_import_wizard" string="Import Questions" type="object" icon="fa-upload"/>
                     <button name="action_open_tag_wizard" string="Bulk Modify" type="object" icon="fa-pencil"/>
                 </header>
                 <field name="id" string="ID" optional="show"/>
@@ -394,14 +401,16 @@
                     <div class="alert alert-info" role="alert">
                         <strong>Import workflow:</strong>
                         <ol class="mb-1 mt-1">
+                            <li>Optionally select a <strong>Quiz</strong> to automatically assign imported questions to it (subjects and tags will be pre-filled from the quiz).</li>
                             <li>Set an Import Group and optional Subjects/Tags to apply to all imported questions.</li>
                             <li>Paste your quiz text in the field below.</li>
                             <li>Click <strong>Clean Up Text</strong> then <strong>Preview Import</strong>.</li>
-                            <li>Click <strong>Import Questions from Text</strong> to create unattached question records.</li>
+                            <li>Click <strong>Import Questions from Text</strong> to create the questions.</li>
                         </ol>
                     </div>
                     <group>
                         <group>
+                            <field name="quiz_id"/>
                             <field name="import_group"/>
                             <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
                             <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
