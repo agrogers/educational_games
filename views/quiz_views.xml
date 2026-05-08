@@ -25,10 +25,19 @@
             <search string="Search Quizzes">
                 <field name="name"/>
                 <field name="subject_ids"/>
-                <field name="filter_tag_ids"/>
+                <field name="filter_tag_ids" string="Tag"/>
+                <separator/>
+                <filter string="Allow Resubmission" name="filter_allow_resubmission" domain="[('allow_resubmission', '=', True)]"/>
+                <filter string="Has Questions" name="filter_has_questions" domain="[('question_ids', '!=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Subject" name="group_by_subject" context="{'group_by': 'subject_ids'}"/>
+                    <filter string="Tag" name="group_by_tag" context="{'group_by': 'filter_tag_ids'}"/>
+                    <filter string="Allow Resubmission" name="group_by_resubmission" context="{'group_by': 'allow_resubmission'}"/>
                 </group>
+                <searchpanel>
+                    <field name="subject_ids" string="Subject" select="multi" icon="fa-book" enable_counters="1"/>
+                    <field name="filter_tag_ids" string="Tag" select="multi" icon="fa-tag" enable_counters="1"/>
+                </searchpanel>
             </search>
         </field>
     </record>
@@ -308,13 +317,22 @@
                 <field name="import_group"/>
                 <field name="subject_ids"/>
                 <field name="tag_ids"/>
+                <separator/>
                 <filter string="Multiple Answers" name="filter_multiple" domain="[('allow_multiple', '=', True)]"/>
+                <filter string="Has Subject" name="filter_has_subject" domain="[('subject_ids', '!=', False)]"/>
+                <filter string="Has Tag" name="filter_has_tag" domain="[('tag_ids', '!=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Quiz" name="group_by_quiz" context="{'group_by': 'quiz_id'}"/>
                     <filter string="Import Group" name="group_by_import_group" context="{'group_by': 'import_group'}"/>
                     <filter string="Subject" name="group_by_subject" context="{'group_by': 'subject_ids'}"/>
                     <filter string="Tags" name="group_by_tags" context="{'group_by': 'tag_ids'}"/>
+                    <filter string="Allow Multiple Answers" name="group_by_allow_multiple" context="{'group_by': 'allow_multiple'}"/>
                 </group>
+                <searchpanel>
+                    <field name="all_quiz_ids" string="Quiz" select="multi" icon="fa-list-alt" enable_counters="1"/>
+                    <field name="subject_ids" string="Subject" select="multi" icon="fa-book" enable_counters="1"/>
+                    <field name="tag_ids" string="Tag" select="multi" icon="fa-tag" enable_counters="1"/>
+                </searchpanel>
             </search>
         </field>
     </record>
