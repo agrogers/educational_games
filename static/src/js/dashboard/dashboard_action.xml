@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="educational_games_dashboard.DashboardTemplate" owl="1">
+        <div class="o_action_manager o_content h-100 overflow-auto eg-dashboard">
+
+            <!-- Header -->
+            <div class="eg-dashboard-header d-flex align-items-center justify-content-between px-4 py-3">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="eg-dashboard-icon">🎓</span>
+                    <div>
+                        <h1 class="eg-dashboard-title mb-0">Educational Games</h1>
+                        <span class="eg-dashboard-subtitle">Teacher Dashboard</span>
+                    </div>
+                </div>
+                <button class="btn eg-refresh-btn" t-on-click="loadDashboardData" title="Refresh data">
+                    <span t-if="state.loading" class="spinner-border spinner-border-sm me-1" role="status"/>
+                    <t t-else="">↻</t>
+                    Refresh
+                </button>
+            </div>
+
+            <!-- Loading state -->
+            <div t-if="state.loading and !state.stats.total_quizzes"
+                 class="d-flex flex-column align-items-center justify-content-center"
+                 style="min-height: 300px;">
+                <div class="spinner-border text-primary mb-3" role="status"/>
+                <p class="text-muted">Loading dashboard…</p>
+            </div>
+
+            <!-- Error state -->
+            <div t-elif="state.error" class="alert alert-danger mx-4 mt-3">
+                <t t-esc="state.error"/>
+            </div>
+
+            <!-- Dashboard content -->
+            <div t-else="" class="eg-dashboard-body px-4 pb-5">
+
+                <!-- ── Stat cards ─────────────────────────────────────────── -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="eg-stat-card eg-stat-quizzes" t-on-click="openQuizList" role="button" title="View all quizzes">
+                            <div class="eg-stat-icon">📝</div>
+                            <div class="eg-stat-value"><t t-esc="state.stats.total_quizzes"/></div>
+                            <div class="eg-stat-label">Quizzes</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="eg-stat-card eg-stat-questions" t-on-click="openQuestionList" role="button" title="View all questions">
+                            <div class="eg-stat-icon">❓</div>
+                            <div class="eg-stat-value"><t t-esc="state.stats.total_questions"/></div>
+                            <div class="eg-stat-label">Questions</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="eg-stat-card eg-stat-responses" t-on-click="openResponseList" role="button" title="View all responses">
+                            <div class="eg-stat-icon">✅</div>
+                            <div class="eg-stat-value"><t t-esc="state.stats.total_responses"/></div>
+                            <div class="eg-stat-label">Responses</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="eg-stat-card eg-stat-students">
+                            <div class="eg-stat-icon">👩‍🎓</div>
+                            <div class="eg-stat-value"><t t-esc="state.stats.active_students"/></div>
+                            <div class="eg-stat-label">Active Students</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Two-column section ─────────────────────────────────── -->
+                <div class="row g-4 mb-4">
+
+                    <!-- Recently created quizzes -->
+                    <div class="col-lg-6">
+                        <div class="eg-card h-100">
+                            <div class="eg-card-header d-flex align-items-center justify-content-between">
+                                <span>🆕 Recently Created Quizzes</span>
+                                <button class="btn btn-sm eg-see-all-btn" t-on-click="openQuizList">See all</button>
+                            </div>
+                            <div class="eg-card-body">
+                                <div t-if="!state.recentQuizzes.length" class="eg-empty-state">
+                                    No quizzes created yet.
+                                </div>
+                                <table t-else="" class="eg-table w-100">
+                                    <thead>
+                                        <tr>
+                                            <th>Quiz</th>
+                                            <th class="text-center">Questions</th>
+                                            <th class="text-end">Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="state.recentQuizzes" t-as="quiz" t-key="quiz.id"
+                                            class="eg-clickable-row"
+                                            t-on-click="() => this.openQuiz(quiz.id)"
+                                            title="Open quiz">
+                                            <td class="eg-name-cell"><t t-esc="quiz.name"/></td>
+                                            <td class="text-center">
+                                                <span class="badge bg-secondary"><t t-esc="quiz.question_count"/></span>
+                                            </td>
+                                            <td class="text-end text-muted eg-date-cell">
+                                                <t t-esc="this.formatDate(quiz.create_date)"/>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recently active quizzes -->
+                    <div class="col-lg-6">
+                        <div class="eg-card h-100">
+                            <div class="eg-card-header d-flex align-items-center justify-content-between">
+                                <span>🔥 Recently Active Quizzes</span>
+                            </div>
+                            <div class="eg-card-body">
+                                <div t-if="!state.recentActivity.length" class="eg-empty-state">
+                                    No quiz activity yet. Students haven't taken any quizzes.
+                                </div>
+                                <table t-else="" class="eg-table w-100">
+                                    <thead>
+                                        <tr>
+                                            <th>Quiz</th>
+                                            <th class="text-center">Students</th>
+                                            <th class="text-end">Last Activity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="state.recentActivity" t-as="quiz" t-key="quiz.id"
+                                            class="eg-clickable-row"
+                                            t-on-click="() => this.openQuizWithActivity(quiz.id)"
+                                            title="Open quiz">
+                                            <td class="eg-name-cell"><t t-esc="quiz.name"/></td>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary"><t t-esc="quiz.student_count"/></span>
+                                            </td>
+                                            <td class="text-end text-muted eg-date-cell">
+                                                <t t-esc="this.formatDate(quiz.last_activity)"/>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Struggling questions ───────────────────────────────── -->
+                <div class="eg-card mb-4">
+                    <div class="eg-card-header d-flex align-items-center justify-content-between">
+                        <span>⚠️ Questions Students Are Struggling With</span>
+                        <button class="btn btn-sm eg-see-all-btn" t-on-click="openStrugglingQuestions">See all</button>
+                    </div>
+                    <div class="eg-card-body">
+                        <div t-if="!state.strugglingQuestions.length" class="eg-empty-state">
+                            No question response data yet. Students need to take quizzes first.
+                        </div>
+                        <table t-else="" class="eg-table w-100">
+                            <thead>
+                                <tr>
+                                    <th>Question</th>
+                                    <th class="text-center">Attempts</th>
+                                    <th class="text-center">% Correct</th>
+                                    <th class="text-center">Difficulty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="state.strugglingQuestions" t-as="q" t-key="q.id"
+                                    class="eg-clickable-row"
+                                    t-on-click="() => this.openQuestion(q.id)"
+                                    title="Open question">
+                                    <td class="eg-question-cell">
+                                        <t t-esc="this.truncate(q.question_text, 90)"/>
+                                    </td>
+                                    <td class="text-center text-muted"><t t-esc="q.attempt_count"/></td>
+                                    <td class="text-center">
+                                        <span t-attf-class="badge {{ this.pctBadgeClass(q.pct_correct_all) }}">
+                                            <t t-esc="q.pct_correct_all"/>%
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="eg-progress-bar-wrap">
+                                            <div class="eg-progress-bar-fill"
+                                                 t-attf-style="width: {{ Math.min(100 - q.pct_correct_all, 100) }}%; background: {{ q.pct_correct_all <= 30 ? '#dc3545' : q.pct_correct_all <= 60 ? '#ffc107' : '#198754' }}"/>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ── Leaderboard ────────────────────────────────────────── -->
+                <div class="eg-card">
+                    <div class="eg-card-header">
+                        🏆 Student Leaderboard — Most Quizzes Taken
+                    </div>
+                    <div class="eg-card-body">
+                        <div t-if="!state.leaderboard.length" class="eg-empty-state">
+                            No student data yet. Students need to take quizzes first.
+                        </div>
+                        <table t-else="" class="eg-table w-100">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 60px;">Rank</th>
+                                    <th>Student</th>
+                                    <th class="text-center">Quizzes Taken</th>
+                                    <th class="text-center">Total Responses</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="state.leaderboard" t-as="student" t-key="student.id"
+                                    t-attf-class="eg-clickable-row {{ student_index === 0 ? 'eg-leaderboard-gold' : student_index === 1 ? 'eg-leaderboard-silver' : student_index === 2 ? 'eg-leaderboard-bronze' : '' }}"
+                                    t-on-click="() => this.openStudentResponses(student.id)"
+                                    title="View student responses">
+                                    <td class="text-center eg-rank-cell">
+                                        <t t-esc="this.rankMedal(student_index)"/>
+                                    </td>
+                                    <td class="eg-name-cell fw-semibold">
+                                        <t t-esc="student.name"/>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge eg-quiz-count-badge"><t t-esc="student.quiz_count"/></span>
+                                    </td>
+                                    <td class="text-center text-muted">
+                                        <t t-esc="student.response_count"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+</templates>

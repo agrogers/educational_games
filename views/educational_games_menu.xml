@@ -4,10 +4,13 @@
     <menuitem id="educational_games_menu" name="Educational Games" parent="aps_sis.menu_apex_root" sequence="1020" groups="aps_sis.group_aps_teacher"/>
 
     <record id="educational_games_dashboard_action" model="ir.actions.act_url" forcecreate="1">
-        <field name="name">Games Dashboard</field>
+        <field name="name">Games Dashboard (legacy URL)</field>
         <field name="url">/educational_games/dashboard</field>
         <field name="target">self</field>
     </record>
+
+    <!-- Dashboard menu item using the new OWL client action -->
+    <menuitem id="menu_educational_games_dashboard" name="Dashboard" parent="educational_games_menu" action="educational_games.action_educational_games_dashboard" sequence="1" groups="aps_sis.group_aps_teacher"/>
 
     <record id="action_student_game" model="ir.actions.client" forcecreate="1">
         <field name="name">Classroom Challenge</field>

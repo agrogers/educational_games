@@ -39,6 +39,12 @@
         <field name="code">action = records.action_open_tag_wizard()</field>
     </record>
 
+    <!-- Client action: teacher dashboard (OWL component) -->
+    <record id="action_educational_games_dashboard" model="ir.actions.client">
+        <field name="name">Games Dashboard</field>
+        <field name="tag">action_educational_games_dashboard_js</field>
+    </record>
+
     <!-- Client action: student quiz game (OWL component) -->
     <record id="action_quiz_game" model="ir.actions.client">
         <field name="name">Quiz</field>

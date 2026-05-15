@@ -20,6 +20,8 @@
     'assets': {
         'web.assets_backend': [
             'educational_games/static/src/css/educational_games.css',
+            'educational_games/static/src/js/dashboard/dashboard.js',
+            'educational_games/static/src/js/dashboard/dashboard_action.xml',
             'educational_games/static/src/js/binary_conversions/binary_conversions.js',
             'educational_games/static/src/js/binary_conversions/binary_conversions_action.xml',
             # Shared utility: ORM write + notifications for aps.resource.submission.

@@ -810,3 +810,235 @@
     color: #4c1d95;
     transition: color 1s ease;
 }
+/* ═══════════════════════════════════════════════════════
+   Educational Games Dashboard
+   ═══════════════════════════════════════════════════════ */
+
+.eg-dashboard {
+    background: #f4f6fb;
+    font-family: inherit;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.eg-dashboard-header {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: #fff;
+    border-bottom: 3px solid #3730a3;
+}
+
+.eg-dashboard-icon {
+    font-size: 2.2rem;
+    line-height: 1;
+}
+
+.eg-dashboard-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.eg-dashboard-subtitle {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.eg-refresh-btn {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.35);
+    font-size: 0.85rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.eg-refresh-btn:hover {
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+}
+
+/* ── Dashboard body ─────────────────────────────────── */
+.eg-dashboard-body {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding-top: 1.5rem;
+}
+
+/* ── Stat cards ─────────────────────────────────────── */
+.eg-stat-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    transition: transform 0.15s, box-shadow 0.15s;
+    border-top: 4px solid transparent;
+}
+
+.eg-stat-card[role="button"] {
+    cursor: pointer;
+}
+.eg-stat-card[role="button"]:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+
+.eg-stat-quizzes  { border-top-color: #4f46e5; }
+.eg-stat-questions { border-top-color: #0ea5e9; }
+.eg-stat-responses { border-top-color: #10b981; }
+.eg-stat-students  { border-top-color: #f59e0b; }
+
+.eg-stat-icon {
+    font-size: 1.8rem;
+    margin-bottom: 0.4rem;
+}
+
+.eg-stat-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #1e1b4b;
+}
+
+.eg-stat-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+    margin-top: 0.3rem;
+}
+
+/* ── Content cards ──────────────────────────────────── */
+.eg-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    overflow: hidden;
+}
+
+.eg-card-header {
+    background: #f8faff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.85rem 1.2rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #374151;
+}
+
+.eg-card-body {
+    padding: 0;
+}
+
+.eg-see-all-btn {
+    font-size: 0.78rem;
+    color: #4f46e5;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    background: transparent;
+    transition: background 0.15s;
+}
+.eg-see-all-btn:hover {
+    background: #ede9fe;
+    color: #3730a3;
+}
+
+/* ── Tables ─────────────────────────────────────────── */
+.eg-table {
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.eg-table thead th {
+    padding: 0.6rem 1rem;
+    background: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.eg-table tbody td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: middle;
+    color: #374151;
+}
+
+.eg-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.eg-clickable-row {
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.eg-clickable-row:hover {
+    background: #f5f3ff;
+}
+
+.eg-name-cell {
+    font-weight: 500;
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.eg-question-cell {
+    max-width: 460px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.eg-date-cell {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+/* ── Progress bar ───────────────────────────────────── */
+.eg-progress-bar-wrap {
+    background: #e5e7eb;
+    border-radius: 4px;
+    height: 10px;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.eg-progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+/* ── Leaderboard ────────────────────────────────────── */
+.eg-rank-cell {
+    font-size: 1.1rem;
+}
+
+.eg-leaderboard-gold   { background: #fffbeb; }
+.eg-leaderboard-silver { background: #f8fafc; }
+.eg-leaderboard-bronze { background: #fff7ed; }
+.eg-leaderboard-gold:hover   { background: #fef9c3; }
+.eg-leaderboard-silver:hover { background: #f1f5f9; }
+.eg-leaderboard-bronze:hover { background: #ffedd5; }
+
+.eg-quiz-count-badge {
+    background: #4f46e5;
+    color: #fff;
+    font-size: 0.85rem;
+    padding: 0.3em 0.7em;
+    border-radius: 20px;
+}
+
+/* ── Empty state ────────────────────────────────────── */
+.eg-empty-state {
+    padding: 2rem;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}

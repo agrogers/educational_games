@@ -1091,6 +1091,136 @@ class Quiz(models.Model):
         }
 
     @api.model
+    def get_dashboard_data(self):
+        """Return aggregated data for the educational games dashboard."""
+
+        def _strip_html(html_str):
+            if not html_str:
+                return ''
+            return re.sub(r'<[^>]+>', '', str(html_str)).strip()
+
+        QuizQuestion = self.env['quiz.question'].sudo()
+        QuizResponse = self.env['quiz.response'].sudo()
+
+        # === Overview stats ===
+        total_quizzes = self.sudo().search_count([])
+        total_questions = QuizQuestion.search_count([])
+        total_responses = QuizResponse.search_count([])
+
+        student_groups = QuizResponse.read_group(
+            domain=[('user_id', '!=', False)],
+            fields=['user_id'],
+            groupby=['user_id'],
+        )
+        active_students = len(student_groups)
+
+        # === Recently created quizzes (last 10) ===
+        recent_quizzes_records = self.sudo().search(
+            [], order='create_date desc', limit=10
+        )
+        recent_quizzes = [
+            {
+                'id': q.id,
+                'name': q.name,
+                'question_count': len(q.question_ids),
+                'create_date': (
+                    fields.Datetime.to_string(q.create_date) if q.create_date else ''
+                ),
+            }
+            for q in recent_quizzes_records
+        ]
+
+        # === Recently active quizzes (10 quizzes with most recent responses) ===
+        recent_resp = QuizResponse.search([], order='create_date desc', limit=500)
+        seen_quiz_ids = []
+        seen_set = set()
+        quiz_resp_data = {}
+        for r in recent_resp:
+            qid = r.quiz_id.id
+            if not qid:
+                continue
+            if qid not in seen_set:
+                seen_set.add(qid)
+                seen_quiz_ids.append(qid)
+                quiz_resp_data[qid] = {
+                    'last_activity': (
+                        fields.Datetime.to_string(r.create_date) if r.create_date else ''
+                    ),
+                    'student_ids': set(),
+                    'response_count': 0,
+                }
+            quiz_resp_data[qid]['student_ids'].add(r.user_id.id)
+            quiz_resp_data[qid]['response_count'] += 1
+
+        recent_activity_quiz_ids = seen_quiz_ids[:10]
+        recent_activity_quizzes = self.sudo().browse(recent_activity_quiz_ids)
+        recent_activity = []
+        for q in recent_activity_quizzes:
+            data = quiz_resp_data.get(q.id, {})
+            recent_activity.append({
+                'id': q.id,
+                'name': q.name,
+                'last_activity': data.get('last_activity', ''),
+                'student_count': len(data.get('student_ids', set())),
+                'response_count': data.get('response_count', 0),
+            })
+
+        # === Struggling questions: most-attempted questions with lowest % correct ===
+        struggling_records = QuizQuestion.search(
+            [('attempt_count', '>', 0)],
+            order='pct_correct_all asc, attempt_count desc',
+            limit=10,
+        )
+        struggling_questions = [
+            {
+                'id': q.id,
+                'question_text': _strip_html(q.question_text),
+                'attempt_count': q.attempt_count,
+                'pct_correct_all': q.pct_correct_all,
+            }
+            for q in struggling_records
+        ]
+
+        # === Student leaderboard: rank by distinct quizzes taken ===
+        user_quiz_rows = QuizResponse.read_group(
+            domain=[('user_id', '!=', False)],
+            fields=['user_id', 'quiz_id'],
+            groupby=['user_id', 'quiz_id'],
+            lazy=False,
+        )
+        user_stats = {}
+        for row in user_quiz_rows:
+            if not row.get('user_id') or not row.get('quiz_id'):
+                continue
+            uid = row['user_id'][0]
+            uname = row['user_id'][1]
+            if uid not in user_stats:
+                user_stats[uid] = {
+                    'id': uid,
+                    'name': uname,
+                    'quiz_count': 0,
+                    'response_count': 0,
+                }
+            user_stats[uid]['quiz_count'] += 1
+            user_stats[uid]['response_count'] += row.get('__count', 0)
+        leaderboard = sorted(
+            user_stats.values(), key=lambda x: x['quiz_count'], reverse=True
+        )[:10]
+
+        return {
+            'stats': {
+                'total_quizzes': total_quizzes,
+                'total_questions': total_questions,
+                'total_responses': total_responses,
+                'active_students': active_students,
+            },
+            'recent_quizzes': recent_quizzes,
+            'recent_activity': recent_activity,
+            'struggling_questions': struggling_questions,
+            'leaderboard': leaderboard,
+        }
+
+    @api.model
     def check_single_question(self, quiz_id, question_id):
         """
         For teachers: reveal the correct answer(s) for a single question without
