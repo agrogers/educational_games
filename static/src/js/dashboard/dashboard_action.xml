@@ -182,7 +182,7 @@
                                     <td class="text-center">
                                         <div class="eg-progress-bar-wrap">
                                             <div class="eg-progress-bar-fill"
-                                                 t-attf-style="width: {{ Math.min(100 - q.pct_correct_all, 100) }}%; background: {{ q.pct_correct_all <= 30 ? '#dc3545' : q.pct_correct_all <= 60 ? '#ffc107' : '#198754' }}"/>
+                                                 t-attf-style="width: {{ Math.min(100 - q.pct_correct_all, 100) }}%; background: {{ this.getDifficultyColor(q.pct_correct_all) }}"/>
                                         </div>
                                     </td>
                                 </tr>

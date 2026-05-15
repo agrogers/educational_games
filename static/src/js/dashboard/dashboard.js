@@ -75,6 +75,12 @@ export class EducationalGamesDashboard extends Component {
         return "bg-success";
     }
 
+    getDifficultyColor(pct) {
+        if (pct <= 30) return "#dc3545";
+        if (pct <= 60) return "#ffc107";
+        return "#198754";
+    }
+
     rankMedal(index) {
         if (index === 0) return "🥇";
         if (index === 1) return "🥈";

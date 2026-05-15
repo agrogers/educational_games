@@ -1149,7 +1149,8 @@ class Quiz(models.Model):
                     'student_ids': set(),
                     'response_count': 0,
                 }
-            quiz_resp_data[qid]['student_ids'].add(r.user_id.id)
+            if r.user_id:
+                quiz_resp_data[qid]['student_ids'].add(r.user_id.id)
             quiz_resp_data[qid]['response_count'] += 1
 
         recent_activity_quiz_ids = seen_quiz_ids[:10]
