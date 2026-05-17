@@ -19,6 +19,7 @@ export class EducationalGamesDashboard extends Component {
         this.state = useState({
             loading: true,
             error: "",
+            selectedRange: "30d",
             stats: { total_quizzes: 0, total_questions: 0, total_responses: 0, active_students: 0 },
             recentQuizzes: [],
             recentActivity: [],
@@ -35,7 +36,8 @@ export class EducationalGamesDashboard extends Component {
         this.state.loading = true;
         this.state.error = "";
         try {
-            const data = await this.orm.call("quiz.quiz", "get_dashboard_data", []);
+            const data = await this.orm.call("quiz.quiz", "get_dashboard_data", [this.state.selectedRange]);
+            this.state.selectedRange = data.date_range || this.state.selectedRange;
             this.state.stats = data.stats;
             this.state.recentQuizzes = data.recent_quizzes;
             this.state.recentActivity = data.recent_activity;
@@ -47,6 +49,27 @@ export class EducationalGamesDashboard extends Component {
         } finally {
             this.state.loading = false;
         }
+    }
+
+    get rangeOptions() {
+        return [
+            { value: "today", label: "Today" },
+            { value: "7d", label: "Last 7 Days" },
+            { value: "14d", label: "Last 14 Days" },
+            { value: "30d", label: "Last 30 Days" },
+            { value: "90d", label: "Last 90 Days" },
+            { value: "365d", label: "Last 365 Days" },
+            { value: "all", label: "All Time" },
+        ];
+    }
+
+    async onRangeChange(ev) {
+        const nextValue = ev.target.value || "30d";
+        if (nextValue === this.state.selectedRange) {
+            return;
+        }
+        this.state.selectedRange = nextValue;
+        await this.loadDashboardData();
     }
 
     formatDate(dateStr) {
@@ -129,13 +152,7 @@ export class EducationalGamesDashboard extends Component {
     }
 
     openResponseList() {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            name: "All Responses",
-            res_model: "quiz.response",
-            views: [[false, "list"]],
-            target: "current",
-        });
+        this.actionService.doAction("educational_games.action_quiz_response_list");
     }
 
     openStrugglingQuestions() {

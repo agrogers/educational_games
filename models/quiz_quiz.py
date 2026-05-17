@@ -1091,8 +1091,11 @@ class Quiz(models.Model):
         }
 
     @api.model
-    def get_dashboard_data(self):
-        """Return aggregated data for the educational games dashboard."""
+    def get_dashboard_data(self, date_range='30d'):
+        """Return aggregated data for the educational games dashboard.
+
+        :param date_range: one of ``today``, ``7d``, ``14d``, ``30d``, ``90d``, ``365d``, ``all``
+        """
 
         def _strip_html(html_str):
             if not html_str:
@@ -1102,13 +1105,37 @@ class Quiz(models.Model):
         QuizQuestion = self.env['quiz.question'].sudo()
         QuizResponse = self.env['quiz.response'].sudo()
 
+        now = fields.Datetime.now()
+        range_days_map = {
+            'today': 0,
+            '7d': 7,
+            '14d': 14,
+            '30d': 30,
+            '90d': 90,
+            '365d': 365,
+            'all': None,
+        }
+        range_key = date_range if date_range in range_days_map else '30d'
+        days = range_days_map.get(range_key)
+
+        date_from = None
+        if days is not None:
+            if days == 0:
+                date_from = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            else:
+                date_from = now - timedelta(days=days)
+
+        quizzes_domain = [('create_date', '>=', date_from)] if date_from else []
+        questions_domain = [('create_date', '>=', date_from)] if date_from else []
+        responses_domain = [('create_date', '>=', date_from)] if date_from else []
+
         # === Overview stats ===
-        total_quizzes = self.sudo().search_count([])
-        total_questions = QuizQuestion.search_count([])
-        total_responses = QuizResponse.search_count([])
+        total_quizzes = self.sudo().search_count(quizzes_domain)
+        total_questions = QuizQuestion.search_count(questions_domain)
+        total_responses = QuizResponse.search_count(responses_domain)
 
         student_groups = QuizResponse.read_group(
-            domain=[('user_id', '!=', False)],
+            domain=responses_domain + [('user_id', '!=', False)],
             fields=['user_id'],
             groupby=['user_id'],
         )
@@ -1116,7 +1143,7 @@ class Quiz(models.Model):
 
         # === Recently created quizzes (last 10) ===
         recent_quizzes_records = self.sudo().search(
-            [], order='create_date desc', limit=10
+            quizzes_domain, order='create_date desc', limit=10
         )
         recent_quizzes = [
             {
@@ -1131,7 +1158,7 @@ class Quiz(models.Model):
         ]
 
         # === Recently active quizzes (10 quizzes with most recent responses) ===
-        recent_resp = QuizResponse.search([], order='create_date desc', limit=500)
+        recent_resp = QuizResponse.search(responses_domain, order='create_date desc', limit=500)
         seen_quiz_ids = []
         seen_set = set()
         quiz_resp_data = {}
@@ -1167,24 +1194,70 @@ class Quiz(models.Model):
             })
 
         # === Struggling questions: most-attempted questions with lowest % correct ===
-        struggling_records = QuizQuestion.search(
-            [('attempt_count', '>', 0)],
-            order='pct_correct_all asc, attempt_count desc',
-            limit=10,
-        )
-        struggling_questions = [
-            {
-                'id': q.id,
-                'question_text': _strip_html(q.question_text),
-                'attempt_count': q.attempt_count,
-                'pct_correct_all': q.pct_correct_all,
+        if date_from:
+            grouped_by_question = QuizResponse.read_group(
+                domain=responses_domain + [('question_id', '!=', False)],
+                fields=['question_id', 'is_correct'],
+                groupby=['question_id', 'is_correct'],
+                lazy=False,
+            )
+            question_stats = {}
+            for row in grouped_by_question:
+                q_ref = row.get('question_id')
+                if not q_ref:
+                    continue
+                qid = q_ref[0]
+                stat = question_stats.setdefault(qid, {'attempt_count': 0, 'correct_count': 0})
+                count = row.get('__count', 0)
+                stat['attempt_count'] += count
+                if row.get('is_correct'):
+                    stat['correct_count'] += count
+
+            sorted_qids = sorted(
+                question_stats.keys(),
+                key=lambda qid: (
+                    round((question_stats[qid]['correct_count'] / question_stats[qid]['attempt_count']) * 100)
+                    if question_stats[qid]['attempt_count'] else 100,
+                    -question_stats[qid]['attempt_count'],
+                ),
+            )[:10]
+
+            question_map = {
+                q.id: q for q in QuizQuestion.browse(sorted_qids).exists()
             }
-            for q in struggling_records
-        ]
+            struggling_questions = []
+            for qid in sorted_qids:
+                question = question_map.get(qid)
+                if not question:
+                    continue
+                attempts = question_stats[qid]['attempt_count']
+                correct = question_stats[qid]['correct_count']
+                pct_correct = round((correct / attempts) * 100) if attempts else 0
+                struggling_questions.append({
+                    'id': question.id,
+                    'question_text': _strip_html(question.question_text),
+                    'attempt_count': attempts,
+                    'pct_correct_all': pct_correct,
+                })
+        else:
+            struggling_records = QuizQuestion.search(
+                [('attempt_count', '>', 0)],
+                order='pct_correct_all asc, attempt_count desc',
+                limit=10,
+            )
+            struggling_questions = [
+                {
+                    'id': q.id,
+                    'question_text': _strip_html(q.question_text),
+                    'attempt_count': q.attempt_count,
+                    'pct_correct_all': q.pct_correct_all,
+                }
+                for q in struggling_records
+            ]
 
         # === Student leaderboard: rank by distinct quizzes taken ===
         user_quiz_rows = QuizResponse.read_group(
-            domain=[('user_id', '!=', False)],
+            domain=responses_domain + [('user_id', '!=', False)],
             fields=['user_id', 'quiz_id'],
             groupby=['user_id', 'quiz_id'],
             lazy=False,
@@ -1201,14 +1274,39 @@ class Quiz(models.Model):
                     'name': uname,
                     'quiz_count': 0,
                     'response_count': 0,
+                    'correct_count': 0,
+                    'average_score': 0,
                 }
             user_stats[uid]['quiz_count'] += 1
             user_stats[uid]['response_count'] += row.get('__count', 0)
+
+        user_correct_rows = QuizResponse.read_group(
+            domain=responses_domain + [('user_id', '!=', False), ('is_correct', '=', True)],
+            fields=['user_id'],
+            groupby=['user_id'],
+            lazy=False,
+        )
+        for row in user_correct_rows:
+            if not row.get('user_id'):
+                continue
+            uid = row['user_id'][0]
+            if uid in user_stats:
+                user_stats[uid]['correct_count'] = row.get('__count', 0)
+
+        for stat in user_stats.values():
+            total_responses_for_user = stat.get('response_count', 0)
+            if total_responses_for_user:
+                stat['average_score'] = round((stat.get('correct_count', 0) / total_responses_for_user) * 100, 1)
+            else:
+                stat['average_score'] = 0
         leaderboard = sorted(
-            user_stats.values(), key=lambda x: x['quiz_count'], reverse=True
+            user_stats.values(),
+            key=lambda x: (x['quiz_count'], x['average_score'], x['response_count']),
+            reverse=True,
         )[:10]
 
         return {
+            'date_range': range_key,
             'stats': {
                 'total_quizzes': total_quizzes,
                 'total_questions': total_questions,

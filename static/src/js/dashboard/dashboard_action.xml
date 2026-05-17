@@ -12,11 +12,22 @@
                         <span class="eg-dashboard-subtitle">Teacher Dashboard</span>
                     </div>
                 </div>
-                <button class="btn eg-refresh-btn" t-on-click="loadDashboardData" title="Refresh data">
-                    <span t-if="state.loading" class="spinner-border spinner-border-sm me-1" role="status"/>
-                    <t t-else="">↻</t>
-                    Refresh
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" style="width: 170px;"
+                            t-att-value="state.selectedRange"
+                            t-on-change="onRangeChange"
+                            t-att-disabled="state.loading ? true : undefined"
+                            title="Filter dashboard period">
+                        <option t-foreach="rangeOptions" t-as="opt" t-key="opt.value" t-att-value="opt.value">
+                            <t t-esc="opt.label"/>
+                        </option>
+                    </select>
+                    <button class="btn eg-refresh-btn" t-on-click="loadDashboardData" title="Refresh data">
+                        <span t-if="state.loading" class="spinner-border spinner-border-sm me-1" role="status"/>
+                        <t t-else="">↻</t>
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             <!-- Loading state -->
@@ -206,6 +217,7 @@
                                     <th class="text-center" style="width: 60px;">Rank</th>
                                     <th>Student</th>
                                     <th class="text-center">Quizzes Taken</th>
+                                    <th class="text-center">Average Score</th>
                                     <th class="text-center">Total Responses</th>
                                 </tr>
                             </thead>
@@ -222,6 +234,9 @@
                                     </td>
                                     <td class="text-center">
                                         <span class="badge eg-quiz-count-badge"><t t-esc="student.quiz_count"/></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-info text-dark"><t t-esc="student.average_score"/>%</span>
                                     </td>
                                     <td class="text-center text-muted">
                                         <t t-esc="student.response_count"/>

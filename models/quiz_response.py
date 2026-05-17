@@ -37,3 +37,26 @@ class QuizResponse(models.Model):
         string='Correct Answer',
         help='Whether the selected answer option is a correct answer.',
     )
+    result_label = fields.Selection(
+        [
+            ('correct', 'Correct'),
+            ('incorrect', 'Incorrect'),
+        ],
+        string='Result',
+        compute='_compute_result_label',
+        store=False,
+    )
+    question_pct_correct_all = fields.Float(
+        string='% Correct (All)',
+        related='question_id.pct_correct_all',
+        readonly=True,
+    )
+    question_pct_correct_recent = fields.Float(
+        string='% Correct (1h)',
+        related='question_id.pct_correct_recent',
+        readonly=True,
+    )
+
+    def _compute_result_label(self):
+        for record in self:
+            record.result_label = 'correct' if record.is_correct else 'incorrect'

@@ -291,8 +291,8 @@
                 <field name="id" string="ID" optional="show"/>
                 <field name="quiz_id" optional="hide"/>
                 <field name="sequence" widget="handle" optional="hide"/>
-                <field name="question_text" widget="html" optional="hide" class="quiz-question-text"/>
-                <field name="correct_answer" widget="html" optional="hide" class="quiz-answer-text"/>
+                <field name="question_text" widget="html" optional="hide" class="text-wrap quiz-question-text"/>
+                <field name="correct_answer" widget="html" optional="hide" class="text-wrap quiz-answer-text"/>
                 <field name="marks" optional="hide"/>
                 <field name="import_group" optional="show"/>
                 <field name="subject_ids" widget="many2many_tags" optional="show"/>
@@ -435,6 +435,79 @@
     </record>
 
     <!-- ═══════════════════════════════════════════════════════
+         quiz.response  –  Views
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_quiz_response_list" model="ir.ui.view">
+        <field name="name">quiz.response.list</field>
+        <field name="model">quiz.response</field>
+        <field name="arch" type="xml">
+            <list string="Quiz Responses" decoration-success="is_correct" decoration-danger="not is_correct">
+                <field name="create_date" string="Date Attempted" optional="show"/>
+                <field name="quiz_id" optional="show"/>
+                <field name="question_id" optional="show"/>
+                <field name="answer_id" optional="hide"/>
+                <field name="user_id" string="Student" optional="show"/>
+                <field name="result_label" string="Result" widget="badge"
+                       decoration-success="result_label == 'correct'"
+                       decoration-danger="result_label == 'incorrect'"
+                       optional="show"/>
+                <field name="question_pct_correct_all" string="% Correct (All)" optional="show"/>
+                <field name="question_pct_correct_recent" string="% Correct (1h)" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_quiz_response_search" model="ir.ui.view">
+        <field name="name">quiz.response.search</field>
+        <field name="model">quiz.response</field>
+        <field name="arch" type="xml">
+            <search string="Search Quiz Responses">
+                <field name="quiz_id"/>
+                <field name="question_id"/>
+                <field name="user_id"/>
+                <field name="create_date"/>
+                <separator/>
+                <filter string="Correct" name="filter_correct" domain="[('is_correct', '=', True)]"/>
+                <filter string="Incorrect" name="filter_incorrect" domain="[('is_correct', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Date" name="group_by_date" context="{'group_by': 'create_date:day'}"/>
+                    <filter string="Quiz" name="group_by_quiz" context="{'group_by': 'quiz_id'}"/>
+                    <filter string="Question" name="group_by_question" context="{'group_by': 'question_id'}"/>
+                    <filter string="Student" name="group_by_student" context="{'group_by': 'user_id'}"/>
+                    <filter string="Result" name="group_by_result" context="{'group_by': 'is_correct'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_quiz_response_form" model="ir.ui.view">
+        <field name="name">quiz.response.form</field>
+        <field name="model">quiz.response</field>
+        <field name="arch" type="xml">
+            <form string="Quiz Response">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="create_date" string="Date Attempted" readonly="1"/>
+                            <field name="quiz_id" readonly="1"/>
+                            <field name="question_id" readonly="1"/>
+                            <field name="answer_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="user_id" readonly="1"/>
+                            <field name="result_label" widget="badge" readonly="1"
+                                   decoration-success="result_label == 'correct'"
+                                   decoration-danger="result_label == 'incorrect'"/>
+                            <field name="question_pct_correct_all" readonly="1"/>
+                            <field name="question_pct_correct_recent" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
          Wizard: Bulk Modify Questions
     ═══════════════════════════════════════════════════════ -->
     <record id="view_quiz_question_tag_wizard_form" model="ir.ui.view">
@@ -478,6 +551,27 @@
                 </footer>
             </form>
         </field>
+    </record>
+
+    <record id="action_quiz_response_list" model="ir.actions.act_window">
+        <field name="name">Quiz Responses</field>
+        <field name="res_model">quiz.response</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="educational_games.view_quiz_response_search"/>
+    </record>
+
+    <record id="action_quiz_response_list_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="educational_games.view_quiz_response_list"/>
+        <field name="act_window_id" ref="educational_games.action_quiz_response_list"/>
+    </record>
+
+    <record id="action_quiz_response_list_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="educational_games.view_quiz_response_form"/>
+        <field name="act_window_id" ref="educational_games.action_quiz_response_list"/>
     </record>
 
 </odoo>
