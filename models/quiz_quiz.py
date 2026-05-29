@@ -1400,3 +1400,36 @@ class Quiz(models.Model):
             'total_respondents': total_n,
             'recent_respondents': recent_n,
         }
+
+    @api.model
+    def get_quiz_student_statistics(self, quiz_id):
+        """Return per-student progress summary data for all students who have
+        answered at least one question in this quiz.
+
+        Returns a list sorted by student name, where each entry contains:
+        - user_id, user_name
+        - progress_summary: same structure as _build_student_progress_summary
+        """
+        quiz = self.browse(int(quiz_id))
+        if not quiz.exists():
+            raise UserError("Quiz not found.")
+
+        responses = self.env['quiz.response'].sudo().search(
+            [('quiz_id', '=', quiz.id)],
+        )
+        users = responses.mapped('user_id')
+
+        filter_payload = quiz._get_quiz_filter_payload()
+
+        result = []
+        for user in users:
+            student_stats = quiz._get_student_question_attempt_stats(quiz.question_ids, user)
+            progress = quiz._build_student_progress_summary(quiz, filter_payload, student_stats)
+            result.append({
+                'user_id': user.id,
+                'user_name': user.name or '',
+                'progress_summary': progress,
+            })
+
+        result.sort(key=lambda x: (x['user_name'] or '').lower())
+        return result

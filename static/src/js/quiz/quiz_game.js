@@ -8,8 +8,80 @@ import {
     createSubmissionCopy,
 } from "@educational_games/js/utils/aps_submission";
 
+// ── Reusable progress bar component ─────────────────────────────────────────
+
+export class QuizProgressBar extends Component {
+    static template = "quiz_game.QuizProgressBar";
+    static props = {
+        summary: { type: Object, optional: true },
+        progressFilter: { optional: true },
+        onFilter: { type: Function, optional: true },
+    };
+
+    /** Returns the flex-basis percentage for a given segment key. */
+    getWidth(key) {
+        const s = this.props.summary;
+        if (!s || !s.total_possible_questions) {
+            return 0;
+        }
+        return ((s[key] || 0) / s.total_possible_questions) * 100;
+    }
+}
+
+// ── Statistics widget (shown in the Statistics tab of the quiz form) ─────────
+
+export class QuizStatisticsWidget extends Component {
+    static template = "quiz_game.QuizStatisticsTemplate";
+    static components = { QuizProgressBar };
+    static props = {
+        record: Object,
+        readonly: { type: Boolean, optional: true },
+    };
+
+    setup() {
+        this.orm = useService("orm");
+        this.state = useState({
+            loading: true,
+            error: "",
+            students: [],
+        });
+
+        onWillStart(async () => {
+            await this.loadStatistics();
+        });
+    }
+
+    async loadStatistics() {
+        this.state.loading = true;
+        this.state.error = "";
+        try {
+            const quizId = this.props.record.resId;
+            if (!quizId) {
+                this.state.students = [];
+                return;
+            }
+            const data = await this.orm.call(
+                "quiz.quiz",
+                "get_quiz_student_statistics",
+                [quizId],
+            );
+            this.state.students = data;
+        } catch (err) {
+            this.state.error = "Failed to load statistics. Please refresh the page.";
+            console.error("Quiz statistics load error:", err);
+        } finally {
+            this.state.loading = false;
+        }
+    }
+}
+
+registry.category("view_widgets").add("quiz_statistics", { component: QuizStatisticsWidget });
+
+// ── Quiz game ────────────────────────────────────────────────────────────────
+
 export class QuizGame extends Component {
     static template = "quiz_game.QuizTemplate";
+    static components = { QuizProgressBar };
     static props = {
         action: Object,
         actionId: { type: Number, optional: true },

@@ -191,7 +191,7 @@
                                 </form>
                             </field>
                         </page>
-                        <page string="Bulk Add" name="bulk_add">
+                        <page string="Bulk Add by ID" name="bulk_add">
                             <div class="alert alert-info" role="alert">
                                 <strong>Bulk Add by Question ID:</strong>
                                 <p class="mb-1 mt-1">Paste IDs separated by commas, spaces, or new lines. Click <strong>Check</strong> to stage questions, remove unwanted rows, then click <strong>Add Questions</strong>.</p>
@@ -223,6 +223,9 @@
                                     <field name="create_date" string="Created" optional="show"/>
                                 </list>
                             </field>
+                        </page>
+                        <page string="Statistics" name="statistics">
+                            <widget name="quiz_statistics"/>
                         </page>
 
                     </notebook>

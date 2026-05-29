@@ -43,55 +43,10 @@
                     <!-- Content (z-index above overlay) -->
                     <div class="quiz-header-content">
                         <h2 class="quiz-title"><t t-esc="state.quiz.name"/></h2>
-                        <div t-if="state.quiz.student_progress_summary and state.quiz.student_progress_summary.progress_text" class="quiz-progress-summary mt-2">
-                            <p class="mb-2 quiz-progress-text">
-                                <t t-esc="state.quiz.student_progress_summary.progress_text"/>
-                            </p>
-                            <div class="quiz-progress-bar" aria-hidden="true">
-                                <div t-if="state.quiz.student_progress_summary.known_questions"
-                                     class="quiz-progress-segment quiz-progress-known"
-                                      t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('known_questions') + '%'"/>
-                                <div t-if="state.quiz.student_progress_summary.not_known_questions"
-                                     class="quiz-progress-segment quiz-progress-not-known"
-                                      t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('not_known_questions') + '%'"/>
-                                <t t-if="state.quiz.student_progress_summary.student_attempt_threshold !== 1">
-                                    <div t-if="state.quiz.student_progress_summary.new_above_threshold"
-                                         class="quiz-progress-segment quiz-progress-new-above"
-                                          t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('new_above_threshold') + '%'"/>
-                                    <div t-if="state.quiz.student_progress_summary.new_below_threshold"
-                                         class="quiz-progress-segment quiz-progress-new-below"
-                                          t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('new_below_threshold') + '%'"/>
-                                </t>
-                                <div t-if="state.quiz.student_progress_summary.not_tried_questions"
-                                     class="quiz-progress-segment quiz-progress-not-tried"
-                                      t-att-style="'flex-basis:' + this.getQuizProgressSegmentWidth('not_tried_questions') + '%'"/>
-                            </div>
-                            <div class="quiz-progress-legend mt-1">
-                                  <span><span class="quiz-progress-key quiz-progress-known"></span>Known (<t t-esc="state.quiz.student_progress_summary.known_questions"/>)</span>
-                                  <span t-attf-class="quiz-progress-legend-btn {{ state.progressFilter === 'not_known' ? 'quiz-progress-legend-active' : '' }}"
-                                        title="Click to show only these questions"
-                                        t-on-click="() => this.filterByProgressCategory('not_known')">
-                                      <span class="quiz-progress-key quiz-progress-not-known"></span>Learning (<t t-esc="state.quiz.student_progress_summary.not_known_questions"/>)
-                                  </span>
-                                  <t t-if="state.quiz.student_progress_summary.student_attempt_threshold !== 1">
-                                      <span t-attf-class="quiz-progress-legend-btn {{ state.progressFilter === 'new_above_threshold' ? 'quiz-progress-legend-active' : '' }}"
-                                            title="Click to show only these questions"
-                                            t-on-click="() => this.filterByProgressCategory('new_above_threshold')">
-                                          <span class="quiz-progress-key quiz-progress-new-above"></span>✓ New (<t t-esc="state.quiz.student_progress_summary.new_above_threshold"/>)
-                                      </span>
-                                      <span t-attf-class="quiz-progress-legend-btn {{ state.progressFilter === 'new_below_threshold' ? 'quiz-progress-legend-active' : '' }}"
-                                            title="Click to show only these questions"
-                                            t-on-click="() => this.filterByProgressCategory('new_below_threshold')">
-                                          <span class="quiz-progress-key quiz-progress-new-below"></span>✗ New (<t t-esc="state.quiz.student_progress_summary.new_below_threshold"/>)
-                                      </span>
-                                  </t>
-                                  <span t-attf-class="quiz-progress-legend-btn {{ state.progressFilter === 'not_tried' ? 'quiz-progress-legend-active' : '' }}"
-                                        title="Click to show only these questions"
-                                        t-on-click="() => this.filterByProgressCategory('not_tried')">
-                                      <span class="quiz-progress-key quiz-progress-not-tried"></span>Not tried (<t t-esc="state.quiz.student_progress_summary.not_tried_questions"/>)
-                                  </span>
-                            </div>
-                        </div>
+                        <QuizProgressBar
+                            summary="state.quiz.student_progress_summary"
+                            progressFilter="state.progressFilter"
+                            onFilter.bind="filterByProgressCategory"/>
                         <div t-if="state.submitted" class="quiz-score-banner">
                             <strong>Score: <t t-esc="state.score"/> / <t t-esc="state.totalMarks"/></strong>
                             <span t-if="state.submission_submitted" class="ms-2 quiz-saved-badge">✓ Saved</span>
@@ -424,6 +379,126 @@
                     </main><!-- /quiz-questions-area -->
                 </div><!-- /quiz-body -->
             </div><!-- /quiz content -->
+        </div>
+    </t>
+
+    <!-- ── Reusable progress bar component ── -->
+    <!-- Props: summary (Object), progressFilter (String, optional), onFilter (Function, optional) -->
+    <t t-name="quiz_game.QuizProgressBar" owl="1">
+        <div t-if="props.summary and props.summary.progress_text"
+             class="quiz-progress-summary">
+            <p class="mb-2 quiz-progress-text">
+                <t t-esc="props.summary.progress_text"/>
+            </p>
+            <div class="quiz-progress-bar" aria-hidden="true">
+                <div t-if="props.summary.known_questions"
+                     class="quiz-progress-segment quiz-progress-known"
+                     t-att-style="'flex-basis:' + this.getWidth('known_questions') + '%'"/>
+                <div t-if="props.summary.not_known_questions"
+                     class="quiz-progress-segment quiz-progress-not-known"
+                     t-att-style="'flex-basis:' + this.getWidth('not_known_questions') + '%'"/>
+                <t t-if="props.summary.student_attempt_threshold !== 1">
+                    <div t-if="props.summary.new_above_threshold"
+                         class="quiz-progress-segment quiz-progress-new-above"
+                         t-att-style="'flex-basis:' + this.getWidth('new_above_threshold') + '%'"/>
+                    <div t-if="props.summary.new_below_threshold"
+                         class="quiz-progress-segment quiz-progress-new-below"
+                         t-att-style="'flex-basis:' + this.getWidth('new_below_threshold') + '%'"/>
+                </t>
+                <div t-if="props.summary.not_tried_questions"
+                     class="quiz-progress-segment quiz-progress-not-tried"
+                     t-att-style="'flex-basis:' + this.getWidth('not_tried_questions') + '%'"/>
+            </div>
+            <div class="quiz-progress-legend mt-1">
+                <span>
+                    <span class="quiz-progress-key quiz-progress-known"></span>
+                    Known (<t t-esc="props.summary.known_questions"/>)
+                </span>
+                <t t-if="props.onFilter">
+                    <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'not_known' ? 'quiz-progress-legend-active' : '' }}"
+                          title="Click to show only these questions"
+                          t-on-click="() => props.onFilter('not_known')">
+                        <span class="quiz-progress-key quiz-progress-not-known"></span>Learning (<t t-esc="props.summary.not_known_questions"/>)
+                    </span>
+                    <t t-if="props.summary.student_attempt_threshold !== 1">
+                        <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'new_above_threshold' ? 'quiz-progress-legend-active' : '' }}"
+                              title="Click to show only these questions"
+                              t-on-click="() => props.onFilter('new_above_threshold')">
+                            <span class="quiz-progress-key quiz-progress-new-above"></span>✓ New (<t t-esc="props.summary.new_above_threshold"/>)
+                        </span>
+                        <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'new_below_threshold' ? 'quiz-progress-legend-active' : '' }}"
+                              title="Click to show only these questions"
+                              t-on-click="() => props.onFilter('new_below_threshold')">
+                            <span class="quiz-progress-key quiz-progress-new-below"></span>✗ New (<t t-esc="props.summary.new_below_threshold"/>)
+                        </span>
+                    </t>
+                    <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'not_tried' ? 'quiz-progress-legend-active' : '' }}"
+                          title="Click to show only these questions"
+                          t-on-click="() => props.onFilter('not_tried')">
+                        <span class="quiz-progress-key quiz-progress-not-tried"></span>Not tried (<t t-esc="props.summary.not_tried_questions"/>)
+                    </span>
+                </t>
+                <t t-else="">
+                    <span>
+                        <span class="quiz-progress-key quiz-progress-not-known"></span>
+                        Learning (<t t-esc="props.summary.not_known_questions"/>)
+                    </span>
+                    <t t-if="props.summary.student_attempt_threshold !== 1">
+                        <span>
+                            <span class="quiz-progress-key quiz-progress-new-above"></span>✓ New (<t t-esc="props.summary.new_above_threshold"/>)
+                        </span>
+                        <span>
+                            <span class="quiz-progress-key quiz-progress-new-below"></span>✗ New (<t t-esc="props.summary.new_below_threshold"/>)
+                        </span>
+                    </t>
+                    <span>
+                        <span class="quiz-progress-key quiz-progress-not-tried"></span>Not tried (<t t-esc="props.summary.not_tried_questions"/>)
+                    </span>
+                </t>
+            </div>
+        </div>
+    </t>
+
+    <!-- ── Statistics widget template (used in quiz form's Statistics tab) ── -->
+    <t t-name="quiz_game.QuizStatisticsTemplate" owl="1">
+        <div class="o_quiz_statistics_widget o_quiz_page">
+            <div t-if="state.loading" class="text-muted p-3">
+                Loading statistics…
+            </div>
+            <div t-elif="state.error" class="alert alert-warning m-3">
+                <t t-esc="state.error"/>
+            </div>
+            <div t-elif="state.students.length === 0" class="alert alert-info m-3">
+                No students have answered any questions in this quiz yet.
+            </div>
+            <t t-else="">
+                <table class="table table-sm table-hover o_quiz_statistics_table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th class="text-center">Known</th>
+                            <th class="text-center">Learning</th>
+                            <th class="text-center">✓ New</th>
+                            <th class="text-center">✗ New</th>
+                            <th class="text-center">Not tried</th>
+                            <th>Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="state.students" t-as="student" t-key="student.user_id">
+                            <td><t t-esc="student.user_name"/></td>
+                            <td class="text-center"><t t-esc="student.progress_summary.known_questions"/></td>
+                            <td class="text-center"><t t-esc="student.progress_summary.not_known_questions"/></td>
+                            <td class="text-center"><t t-esc="student.progress_summary.new_above_threshold"/></td>
+                            <td class="text-center"><t t-esc="student.progress_summary.new_below_threshold"/></td>
+                            <td class="text-center"><t t-esc="student.progress_summary.not_tried_questions"/></td>
+                            <td class="o_quiz_statistics_bar_cell">
+                                <QuizProgressBar summary="student.progress_summary"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
         </div>
     </t>
 

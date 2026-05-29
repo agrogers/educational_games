@@ -1042,3 +1042,43 @@
     color: #9ca3af;
     font-size: 0.9rem;
 }
+
+/* ── Statistics tab widget ──────────────────────────────────────────── */
+.o_quiz_statistics_widget {
+    padding: 1rem;
+}
+
+.o_quiz_statistics_table {
+    width: 100%;
+}
+
+/* Override the white text colours from .o_quiz_page for progress bars
+   rendered inside the light-background statistics table. */
+.o_quiz_statistics_widget .quiz-progress-summary {
+    background: transparent;
+    backdrop-filter: none;
+    padding: 0;
+    border-radius: 0;
+    max-width: none;
+}
+
+.o_quiz_statistics_widget .quiz-progress-text {
+    color: #374151;
+    font-size: 0.8rem;
+}
+
+.o_quiz_statistics_widget .quiz-progress-bar {
+    background: #e5e7eb;
+    height: 0.5rem;
+    min-width: 6rem;
+}
+
+.o_quiz_statistics_widget .quiz-progress-legend {
+    color: #6b7280;
+    font-size: 0.75rem;
+    flex-wrap: nowrap;
+}
+
+.o_quiz_statistics_bar_cell {
+    min-width: 10rem;
+}
