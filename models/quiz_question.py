@@ -27,6 +27,7 @@ class QuizQuestion(models.Model):
         help='If checked, students can select more than one answer.',
     )
     answer_ids = fields.One2many('quiz.answer', 'question_id', string='Answers')
+    response_ids = fields.One2many('quiz.response', 'question_id', string='Responses')
     correct_answer = fields.Html(
         string='Correct Answer',
         compute='_compute_correct_answer',

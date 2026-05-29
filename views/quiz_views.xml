@@ -347,41 +347,73 @@
         <field name="arch" type="xml">
             <form string="Question">
                 <sheet>
-                    <group>
-                        <group>
-                            <field name="quiz_id" string="Primary Quiz"/>
-                            <field name="sequence"/>
-                            <field name="marks"/>
-                            <field name="allow_multiple"/>
-                            <field name="import_group"/>
-                            <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                            <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
-                        </group>
-                        <group>
-                            <field name="correct_answer_count" readonly="1" string="Correct Options"/>
-                            <field name="correct_answer" readonly="1" widget="html"/>
-                            <field name="attempt_count" readonly="1" string="Attempts"/>
-                            <field name="pct_correct_all" readonly="1" string="% Correct (All)"/>
-                            <field name="pct_correct_recent" readonly="1" string="% Correct (1h)"/>
-                        </group>
-                    </group>
-                    <field name="question_text" widget="html" placeholder="Enter the question…"/>
-                    <group>
-                        <field name="all_quiz_ids" widget="many2many_tags" options="{'no_create': True}"
-                               help="All quizzes this question belongs to."/>
-                    </group>
-                    <separator string="Answers"/>
-                    <field name="answer_ids">
-                        <list editable="bottom" string="Answers">
-                            <field name="sequence" widget="handle"/>
-                            <field name="answer_text" widget="html" string="Answer Text"/>
-                            <field name="is_correct" string="Correct?"/>
-                            <field name="create_date" string="Created" readonly="1" optional="show"/>
-                            <field name="select_count" readonly="1" string="Selected" optional="show"/>
-                            <field name="select_pct_all" readonly="1" string="% (All)" optional="show"/>
-                            <field name="select_pct_recent" readonly="1" string="% (1h)" optional="hide"/>
-                        </list>
-                    </field>
+                    <!-- Question prominently at the top -->
+                    <div class="oe_title">
+                        <label for="question_text" string="Question"/>
+                        <field name="question_text" widget="html" placeholder="Enter the question…"/>
+                    </div>
+
+                    <notebook>
+                        <!-- ── Tab 1: Answers ── -->
+                        <page string="Answers" name="answers">
+                            <field name="answer_ids">
+                                <list editable="bottom" string="Answers" decoration-success="is_correct">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="answer_text" widget="html" string="Answer Text"/>
+                                    <field name="is_correct" string="Correct?"/>
+                                    <field name="create_date" string="Created" readonly="1" optional="show"/>
+                                    <field name="select_count" readonly="1" string="Selected" optional="show"/>
+                                    <field name="select_pct_all" readonly="1" string="% (All)" optional="show"/>
+                                    <field name="select_pct_recent" readonly="1" string="% (1h)" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- ── Tab 2: Responses ── -->
+                        <page string="Responses" name="responses">
+                            <group>
+                                <field name="pct_correct_all" readonly="1" string="% Correct"/>
+                                <field name="attempt_count" readonly="1" string="Attempts"/>
+                            </group>
+                            <field name="response_ids" string="Student Responses">
+                                <list editable="top" string="Student Responses"
+                                      decoration-success="is_correct"
+                                      decoration-danger="not is_correct">
+                                    <field name="create_date" string="Date Attempted" optional="show"/>
+                                    <field name="user_id" string="Student" optional="show"/>
+                                    <field name="answer_id" string="Selected Answer" optional="show"/>
+                                    <field name="result_label" string="Result" widget="badge"
+                                           optional="show"/>
+                                    <field name="is_correct" string="Correct?" optional="hide"/>
+                                    <field name="attempt_token" string="Attempt Token" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- ── Tab 3: Info ── -->
+                        <page string="Info" name="info">
+                            <group>
+                                <group>
+                                    <field name="quiz_id" string="Primary Quiz"/>
+                                    <field name="sequence"/>
+                                    <field name="marks"/>
+                                    <field name="allow_multiple"/>
+                                    <field name="import_group"/>
+                                    <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                    <field name="tag_ids" widget="many2many_tags" options="{'no_create': False}"/>
+                                </group>
+                                <group>
+                                    <field name="correct_answer_count" readonly="1" string="Correct Options"/>
+                                    <field name="correct_answer" readonly="1" widget="html"/>
+                                    <field name="pct_correct_recent" readonly="1" string="% Correct (1h)"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="all_quiz_ids" widget="many2many_tags" options="{'no_create': True}"
+                                       help="All quizzes this question belongs to."/>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
