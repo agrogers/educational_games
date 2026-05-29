@@ -1,4 +1,5 @@
-from odoo import models, fields
+import re
+from odoo import models, fields, api
 
 
 class QuizAnswer(models.Model):
@@ -7,6 +8,14 @@ class QuizAnswer(models.Model):
     _order = 'question_id, sequence, id'
 
     question_id = fields.Many2one('quiz.question', string='Question', required=True, ondelete='cascade')
+    display_name = fields.Char(compute='_compute_display_name', store=True)
+
+    @api.depends('answer_text', 'sequence')
+    def _compute_display_name(self):
+        _strip = re.compile(r'<[^>]+>')
+        for record in self:
+            plain = _strip.sub('', record.answer_text or '').strip()
+            record.display_name = plain[:80] if plain else f'Answer #{record.sequence}'
     sequence = fields.Integer(string='Sequence', default=10)
     answer_text = fields.Html(string='Answer Option', required=True, sanitize=True)
     is_correct = fields.Boolean(string='Correct Answer', default=False)

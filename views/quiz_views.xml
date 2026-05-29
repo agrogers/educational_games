@@ -387,6 +387,8 @@
                                     <field name="user_id" string="Student" optional="show"/>
                                     <field name="answer_id" string="Selected Answer" optional="show"/>
                                     <field name="result_label" string="Result" widget="badge"
+                                           decoration-success="is_correct"
+                                           decoration-danger="not is_correct"
                                            optional="show"/>
                                     <field name="is_correct" string="Correct?" optional="hide"/>
                                     <field name="attempt_token" string="Attempt Token" optional="hide"/>
