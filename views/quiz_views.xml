@@ -91,7 +91,7 @@
                                     Questions from the quizzes below are automatically included when this quiz is played.
                                     Circular references are not allowed.
                                 </div>
-                                <field name="include_other_quizzes" widget="many2many_tags"
+                                <field name="include_other_quizzes" widget="clickable_many2many_tags" 
                                        options="{'no_create': True, 'no_open': False}"
                                        colspan="2"
                                        placeholder="Select quizzes to inherit questions from…"/>
@@ -138,6 +138,7 @@
                                         class="btn btn-secondary"
                                         icon="fa-upload"
                                         context="{'default_quiz_id': id}"/>
+                                <span class="me-2 border-start d-inline-block" style="height: 1.5em; vertical-align: middle;"/>
                                 <button name="%(educational_games.action_quiz_question_list)d"
                                         string="Open Questions List"
                                         type="action"

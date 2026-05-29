@@ -186,3 +186,38 @@ class QuizQuestion(models.Model):
             'view_mode': 'form',
             'target': 'current',
         }
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._resync_quizzes_that_include_us()
+        return records
+
+    def write(self, vals):
+        result = super().write(vals)
+        if 'all_quiz_ids' in vals:
+            self._resync_quizzes_that_include_us()
+        return result
+
+    def unlink(self):
+        # Before deletion, find which quizzes need re-syncing
+        affected_quiz_ids = self.mapped('all_quiz_ids').ids
+        result = super().unlink()
+        if affected_quiz_ids:
+            including = self.env['quiz.quiz'].search(
+                [('include_other_quizzes', 'in', affected_quiz_ids)]
+            )
+            if including:
+                including._sync_inherited_questions()
+        return result
+
+    def _resync_quizzes_that_include_us(self):
+        """Re-sync any quiz that *includes* a quiz these questions belong to."""
+        direct_quiz_ids = self.mapped('all_quiz_ids').ids
+        if not direct_quiz_ids:
+            return
+        including = self.env['quiz.quiz'].search(
+            [('include_other_quizzes', 'in', direct_quiz_ids)]
+        )
+        if including:
+            including._sync_inherited_questions()

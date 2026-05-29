@@ -44,11 +44,42 @@ export class QuizStatisticsWidget extends Component {
             loading: true,
             error: "",
             students: [],
+            sortKey: "user_name",
+            sortDir: 1,  // 1 = asc, -1 = desc
         });
 
         onWillStart(async () => {
             await this.loadStatistics();
         });
+    }
+
+    /** Returns students sorted by the active sort column. */
+    get sortedStudents() {
+        const { students, sortKey, sortDir } = this.state;
+        const getVal = (s) => {
+            if (sortKey === "user_name") return s.user_name || "";
+            return s.progress_summary?.[sortKey] ?? 0;
+        };
+        return [...students].sort((a, b) => {
+            const av = getVal(a), bv = getVal(b);
+            if (av < bv) return -sortDir;
+            if (av > bv) return sortDir;
+            return 0;
+        });
+    }
+
+    setSort(key) {
+        if (this.state.sortKey === key) {
+            this.state.sortDir = -this.state.sortDir;
+        } else {
+            this.state.sortKey = key;
+            this.state.sortDir = 1;
+        }
+    }
+
+    sortIcon(key) {
+        if (this.state.sortKey !== key) return "↕";
+        return this.state.sortDir === 1 ? "↑" : "↓";
     }
 
     async loadStatistics() {

@@ -47,7 +47,7 @@
 
 /* ── Page base ──────────────────────────────────────── */
 .o_quiz_page {
-    background: #f0ebff;
+    /* background: #f0ebff; */
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
@@ -1052,6 +1052,22 @@
     width: 100%;
 }
 
+.o_quiz_statistics_table thead .o_quiz_sort_col {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.o_quiz_statistics_table thead .o_quiz_sort_col:hover {
+    background-color: #e9ecef;
+}
+
+.o_quiz_statistics_table .o_quiz_sort_icon {
+    font-size: 0.7rem;
+    opacity: 0.5;
+    margin-left: 2px;
+}
+
 /* Override the white text colors from .o_quiz_page for progress bars
    rendered inside the light-background statistics table. */
 .o_quiz_statistics_widget .quiz-progress-summary {
@@ -1063,8 +1079,19 @@
 }
 
 .o_quiz_statistics_widget .quiz-progress-text {
-    color: #374151;
-    font-size: 0.8rem;
+    display: none;
+}
+
+.o_quiz_statistics_widget .quiz-progress-legend {
+    display: none;
+}
+
+.o_quiz_statistics_widget .o_quiz_statistics_table tbody tr:nth-child(odd) > * {
+    --table-bg: #ffffff;
+}
+
+.o_quiz_statistics_widget .o_quiz_statistics_table tbody tr:nth-child(even) > * {
+    --table-bg: #f3f4f6;
 }
 
 .o_quiz_statistics_widget .quiz-progress-bar {

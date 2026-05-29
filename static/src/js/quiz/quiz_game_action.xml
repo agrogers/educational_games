@@ -475,17 +475,29 @@
                 <table class="table table-sm table-hover o_quiz_statistics_table">
                     <thead>
                         <tr>
-                            <th>Student</th>
-                            <th class="text-center">Known</th>
-                            <th class="text-center">Learning</th>
-                            <th class="text-center">✓ New</th>
-                            <th class="text-center">✗ New</th>
-                            <th class="text-center">Not tried</th>
+                            <th class="o_quiz_sort_col" t-on-click="() => this.setSort('user_name')">
+                                Student <span class="o_quiz_sort_icon" t-esc="this.sortIcon('user_name')"/>
+                            </th>
+                            <th class="text-center o_quiz_sort_col" t-on-click="() => this.setSort('known_questions')">
+                                Known <span class="o_quiz_sort_icon" t-esc="this.sortIcon('known_questions')"/>
+                            </th>
+                            <th class="text-center o_quiz_sort_col" t-on-click="() => this.setSort('not_known_questions')">
+                                Learning <span class="o_quiz_sort_icon" t-esc="this.sortIcon('not_known_questions')"/>
+                            </th>
+                            <th class="text-center o_quiz_sort_col" t-on-click="() => this.setSort('new_above_threshold')">
+                                ✓ New <span class="o_quiz_sort_icon" t-esc="this.sortIcon('new_above_threshold')"/>
+                            </th>
+                            <th class="text-center o_quiz_sort_col" t-on-click="() => this.setSort('new_below_threshold')">
+                                ✗ New <span class="o_quiz_sort_icon" t-esc="this.sortIcon('new_below_threshold')"/>
+                            </th>
+                            <th class="text-center o_quiz_sort_col" t-on-click="() => this.setSort('not_tried_questions')">
+                                Not tried <span class="o_quiz_sort_icon" t-esc="this.sortIcon('not_tried_questions')"/>
+                            </th>
                             <th>Progress</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr t-foreach="state.students" t-as="student" t-key="student.user_id">
+                        <tr t-foreach="this.sortedStudents" t-as="student" t-key="student.user_id">
                             <td><t t-esc="student.user_name"/></td>
                             <td class="text-center"><t t-esc="student.progress_summary.known_questions"/></td>
                             <td class="text-center"><t t-esc="student.progress_summary.not_known_questions"/></td>
