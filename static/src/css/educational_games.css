@@ -1052,7 +1052,7 @@
     width: 100%;
 }
 
-/* Override the white text colours from .o_quiz_page for progress bars
+/* Override the white text colors from .o_quiz_page for progress bars
    rendered inside the light-background statistics table. */
 .o_quiz_statistics_widget .quiz-progress-summary {
     background: transparent;
