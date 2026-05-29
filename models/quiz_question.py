@@ -27,6 +27,7 @@ class QuizQuestion(models.Model):
         help='If checked, students can select more than one answer.',
     )
     answer_ids = fields.One2many('quiz.answer', 'question_id', string='Answers')
+    response_ids = fields.One2many('quiz.response', 'question_id', string='Responses')
     correct_answer = fields.Html(
         string='Correct Answer',
         compute='_compute_correct_answer',
@@ -60,14 +61,16 @@ class QuizQuestion(models.Model):
     )
     attempt_count = fields.Integer(
         string='Attempts',
-        default=0,
+        compute='_compute_attempt_stats',
+        store=True,
         readonly=True,
         help='Total number of answer selections recorded for this question.',
     )
     pct_correct_all = fields.Float(
         string='% Correct (All)',
         digits=(5, 1),
-        default=0.0,
+        compute='_compute_attempt_stats',
+        store=True,
         readonly=True,
         help='Percentage of all recorded answer selections that were correct.',
     )
@@ -94,6 +97,14 @@ class QuizQuestion(models.Model):
                 record.correct_answer = correct_answers.answer_text
             else:
                 record.correct_answer = '<br/>'.join(a.answer_text or '' for a in correct_answers)
+
+    @api.depends('response_ids.is_correct')
+    def _compute_attempt_stats(self):
+        for question in self:
+            total = len(question.response_ids)
+            correct = sum(1 for r in question.response_ids if r.is_correct)
+            question.attempt_count = total
+            question.pct_correct_all = round(correct / total * 100, 1) if total else 0.0
 
     @api.model
     def _recompute_stats(self, question_ids):
@@ -144,10 +155,6 @@ class QuizQuestion(models.Model):
             q_total_rec = sum(v[0] for v in q_rec.values())
             q_correct_rec = sum(v[1] for v in q_rec.values())
 
-            question.attempt_count = q_total_all
-            question.pct_correct_all = (
-                round(q_correct_all / q_total_all * 100, 1) if q_total_all else 0.0
-            )
             question.pct_correct_recent = (
                 round(q_correct_rec / q_total_rec * 100, 1) if q_total_rec else 0.0
             )
