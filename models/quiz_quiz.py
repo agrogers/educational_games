@@ -164,15 +164,28 @@ class Quiz(models.Model):
             'Paste it into the resource URL field in the APEX module.'
         ),
     )
-    @api.depends('question_ids')
+    @api.depends('question_ids', 'filter_tag_ids', 'filter_subject_ids')
     def _compute_question_count(self):
         for record in self:
-            record.question_count = len(record.question_ids)
+            questions = record._filtered_questions()
+            record.question_count = len(questions)
 
-    @api.depends('question_ids.marks')
+    @api.depends('question_ids.marks', 'filter_tag_ids', 'filter_subject_ids')
     def _compute_total_marks(self):
         for record in self:
-            record.total_marks = sum(q.marks for q in record.question_ids)
+            questions = record._filtered_questions()
+            record.total_marks = sum(q.marks for q in questions)
+
+    def _filtered_questions(self):
+        """Return question_ids filtered by filter_tag_ids and filter_subject_ids."""
+        questions = self.question_ids
+        if self.filter_tag_ids:
+            tag_ids = set(self.filter_tag_ids.ids)
+            questions = questions.filtered(lambda q: tag_ids.intersection(q.tag_ids.ids))
+        if self.filter_subject_ids:
+            subject_ids = set(self.filter_subject_ids.ids)
+            questions = questions.filtered(lambda q: subject_ids.intersection(q.subject_ids.ids))
+        return questions
 
     def _sync_inherited_questions(self):
         """Sync question_ids to include questions from include_other_quizzes.

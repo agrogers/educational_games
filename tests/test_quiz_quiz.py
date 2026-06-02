@@ -676,3 +676,76 @@ class TestQuizInheritQuestions(TransactionCase):
 
         with self.assertRaises(ValidationError):
             quiz_a.include_other_quizzes = [(4, quiz_a.id)]
+
+
+class TestQuizFilteredQuestionCount(TransactionCase):
+    """Tests that question_count and total_marks respect filter_tag_ids and filter_subject_ids."""
+
+    def _make_question(self, text, tags=None, subjects=None, marks=1):
+        q = self.env['quiz.question'].create({'question_text': text, 'marks': marks})
+        if tags:
+            q.tag_ids = [(6, 0, [t.id for t in tags])]
+        if subjects:
+            q.subject_ids = [(6, 0, [s.id for s in subjects])]
+        return q
+
+    def _make_quiz(self, name, questions=None, filter_tags=None, filter_subjects=None):
+        vals = {'name': name}
+        if questions:
+            vals['question_ids'] = [(6, 0, [q.id for q in questions])]
+        if filter_tags:
+            vals['filter_tag_ids'] = [(6, 0, [t.id for t in filter_tags])]
+        if filter_subjects:
+            vals['filter_subject_ids'] = [(6, 0, [s.id for s in filter_subjects])]
+        return self.env['quiz.quiz'].create(vals)
+
+    def test_question_count_with_no_filters_counts_all(self):
+        q1 = self._make_question('Q1')
+        q2 = self._make_question('Q2')
+        quiz = self._make_quiz('Quiz', questions=[q1, q2])
+        self.assertEqual(quiz.question_count, 2)
+
+    def test_question_count_filtered_by_tag(self):
+        tag_a = self.env['quiz.tag'].create({'name': 'Tag A'})
+        tag_b = self.env['quiz.tag'].create({'name': 'Tag B'})
+        q_with_tag = self._make_question('Tagged', tags=[tag_a])
+        q_without_tag = self._make_question('Untagged', tags=[tag_b])
+        quiz = self._make_quiz('Quiz', questions=[q_with_tag, q_without_tag], filter_tags=[tag_a])
+        self.assertEqual(quiz.question_count, 1)
+
+    def test_question_count_filtered_by_subject(self):
+        subject_a = self.env['aps.subject'].create({'name': 'Maths'})
+        subject_b = self.env['aps.subject'].create({'name': 'English'})
+        q_match = self._make_question('Maths Q', subjects=[subject_a])
+        q_no_match = self._make_question('English Q', subjects=[subject_b])
+        quiz = self._make_quiz('Quiz', questions=[q_match, q_no_match], filter_subjects=[subject_a])
+        self.assertEqual(quiz.question_count, 1)
+
+    def test_question_count_filtered_by_tag_and_subject(self):
+        tag = self.env['quiz.tag'].create({'name': 'Tag'})
+        subject = self.env['aps.subject'].create({'name': 'Science'})
+        q_both = self._make_question('Both', tags=[tag], subjects=[subject])
+        q_tag_only = self._make_question('Tag only', tags=[tag])
+        q_subject_only = self._make_question('Subject only', subjects=[subject])
+        q_neither = self._make_question('Neither')
+        quiz = self._make_quiz(
+            'Quiz',
+            questions=[q_both, q_tag_only, q_subject_only, q_neither],
+            filter_tags=[tag],
+            filter_subjects=[subject],
+        )
+        self.assertEqual(quiz.question_count, 1)
+
+    def test_total_marks_filtered_by_tag(self):
+        tag = self.env['quiz.tag'].create({'name': 'Tag'})
+        q_match = self._make_question('Match', tags=[tag], marks=3)
+        q_no_match = self._make_question('No match', marks=5)
+        quiz = self._make_quiz('Quiz', questions=[q_match, q_no_match], filter_tags=[tag])
+        self.assertEqual(quiz.total_marks, 3)
+
+    def test_total_marks_filtered_by_subject(self):
+        subject = self.env['aps.subject'].create({'name': 'Biology'})
+        q_match = self._make_question('Match', subjects=[subject], marks=4)
+        q_no_match = self._make_question('No match', marks=2)
+        quiz = self._make_quiz('Quiz', questions=[q_match, q_no_match], filter_subjects=[subject])
+        self.assertEqual(quiz.total_marks, 4)
