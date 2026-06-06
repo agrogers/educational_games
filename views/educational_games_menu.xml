@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Educational Games menu under APEX root - visible only to APEX Teachers -->
-    <menuitem id="educational_games_menu" name="Educational Games" parent="aps_sis.menu_apex_root" sequence="1020" groups="aps_sis.group_aps_teacher"/>
+    <!-- Educational Games menu under APEX root - visible only to APEX Managers -->
+    <menuitem id="educational_games_menu" name="Educational Games" parent="aps_sis.menu_apex_root" sequence="1020" groups="aps_sis.group_aps_manager"/>
 
     <record id="educational_games_dashboard_action" model="ir.actions.act_url" forcecreate="1">
         <field name="name">Games Dashboard (legacy URL)</field>
@@ -10,7 +10,7 @@
     </record>
 
     <!-- Dashboard menu item using the new OWL client action -->
-    <menuitem id="menu_educational_games_dashboard" name="Dashboard" parent="educational_games_menu" action="action_educational_games_dashboard" sequence="1" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_educational_games_dashboard" name="Dashboard" parent="educational_games_menu" action="action_educational_games_dashboard" sequence="1" groups="aps_sis.group_aps_manager"/>
 
     <record id="action_student_game" model="ir.actions.client" forcecreate="1">
         <field name="name">Classroom Challenge</field>
@@ -23,17 +23,17 @@
     </record>
 
     <!-- Menu items for each quiz/game -->
-    <menuitem id="menu_lonely_s_game" name="Lonely S" parent="educational_games_menu" action="action_lonely_s_game" sequence="10" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_lonely_s_game" name="Lonely S" parent="educational_games_menu" action="action_lonely_s_game" sequence="10" groups="aps_sis.group_aps_manager"/>
 
-    <menuitem id="menu_binary_conversions" name="Binary Conversions" parent="educational_games_menu" action="action_binary_conversions" sequence="20" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_binary_conversions" name="Binary Conversions" parent="educational_games_menu" action="action_binary_conversions" sequence="20" groups="aps_sis.group_aps_manager"/>
 
-    <menuitem id="menu_binary_adder_original" name="Binary Adder" parent="educational_games_menu" action="action_binary_adder_original" sequence="40" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_binary_adder_original" name="Binary Adder" parent="educational_games_menu" action="action_binary_adder_original" sequence="40" groups="aps_sis.group_aps_manager"/>
 
-    <menuitem id="menu_student_game" name="Classroom Challenge" parent="educational_games_menu" action="action_student_game" sequence="50" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_student_game" name="Classroom Challenge" parent="educational_games_menu" action="action_student_game" sequence="50" groups="aps_sis.group_aps_manager"/>
 
     <!-- Quiz sub-menu -->
-    <menuitem id="menu_quiz_admin" name="Quizzes" parent="educational_games_menu" action="action_quiz_list" sequence="60" groups="aps_sis.group_aps_teacher"/>
-    <menuitem id="menu_quiz_question_list" name="Questions" parent="educational_games_menu" action="educational_games.action_quiz_question_list" sequence="61" groups="aps_sis.group_aps_teacher"/>
-    <menuitem id="menu_quiz_question_import" name="Questions Import" parent="educational_games_menu" action="educational_games.action_quiz_question_import" sequence="62" groups="aps_sis.group_aps_teacher"/>
-    <menuitem id="menu_quiz_tag_list" name="Question Tags" parent="educational_games_menu" action="educational_games.action_quiz_tag_list" sequence="63" groups="aps_sis.group_aps_teacher"/>
+    <menuitem id="menu_quiz_admin" name="Quizzes" parent="educational_games_menu" action="action_quiz_list" sequence="60" groups="aps_sis.group_aps_manager"/>
+    <menuitem id="menu_quiz_question_list" name="Questions" parent="educational_games_menu" action="educational_games.action_quiz_question_list" sequence="61" groups="aps_sis.group_aps_manager"/>
+    <menuitem id="menu_quiz_question_import" name="Questions Import" parent="educational_games_menu" action="educational_games.action_quiz_question_import" sequence="62" groups="aps_sis.group_aps_manager"/>
+    <menuitem id="menu_quiz_tag_list" name="Question Tags" parent="educational_games_menu" action="educational_games.action_quiz_tag_list" sequence="63" groups="aps_sis.group_aps_manager"/>
 </odoo>
