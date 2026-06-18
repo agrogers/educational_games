@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import timedelta
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 
 
 class QuizQuestion(models.Model):
@@ -180,6 +181,89 @@ class QuizQuestion(models.Model):
             'context': {
                 'active_ids': self.ids,
                 'default_question_ids': [(6, 0, self.ids)],
+            },
+        }
+
+    def action_merge_questions(self):
+        """Merge two or more selected questions into one.
+
+        Keeps the first selected question, disposes of the others, and
+        transfers their incorrect answers, responses, tags, and quiz
+        memberships to the kept question.
+        """
+        if len(self) < 2:
+            raise UserError('Please select at least two questions to merge.')
+
+        questions = self
+        keep = questions[:1]
+        dispose = questions[1:]
+
+        # Collect tags and quizzes from disposed questions to merge
+        all_tags = keep.tag_ids | dispose.mapped('tag_ids')
+        all_quizzes = keep.all_quiz_ids | dispose.mapped('all_quiz_ids')
+
+        # Move incorrect answers from disposed questions to kept question.
+        # Correct answers from disposed questions are discarded — the kept
+        # question already has its own correct answer(s).
+        incorrect_answers = self.env['quiz.answer'].search([
+            ('question_id', 'in', dispose.ids),
+            ('is_correct', '=', False),
+        ])
+        if incorrect_answers:
+            incorrect_answers.write({'question_id': keep.id})
+
+        # Re-point responses that selected a disposed correct answer to the
+        # kept question's correct answer, so student scores are preserved.
+        disposed_correct = self.env['quiz.answer'].search([
+            ('question_id', 'in', dispose.ids),
+            ('is_correct', '=', True),
+        ])
+        kept_correct = keep.answer_ids.filtered('is_correct')
+        if disposed_correct and kept_correct:
+            # Use the first correct answer on the kept question as the target.
+            target_answer = kept_correct[:1]
+            resp_to_remap = self.env['quiz.response'].search([
+                ('answer_id', 'in', disposed_correct.ids),
+            ])
+            if resp_to_remap:
+                resp_to_remap.write({'answer_id': target_answer.id})
+
+        # Move remaining responses from disposed questions to kept question.
+        # These point to incorrect answers (already moved) or to correct
+        # answers that no longer exist (already remapped above).
+        responses = self.env['quiz.response'].search([
+            ('question_id', 'in', dispose.ids),
+        ])
+        if responses:
+            responses.write({'question_id': keep.id})
+
+        # Update kept question with merged tags and quizzes
+        keep.write({
+            'tag_ids': [(6, 0, all_tags.ids)],
+            'all_quiz_ids': [(6, 0, all_quizzes.ids)],
+        })
+
+        # Delete disposed questions (their answers and responses are now
+        # owned by the kept question, so they won't cascade-delete)
+        dispose.unlink()
+
+        # Recompute stats for the kept question
+        keep._recompute_stats([keep.id])
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Questions Merged',
+                'message': (
+                    f'Kept "{keep.display_name or keep.id}". '
+                    f'Merged {len(dispose)} question(s), '
+                    f'{len(incorrect_answers)} answer(s), '
+                    f'and {len(responses)} response(s).'
+                ),
+                'sticky': False,
+                'type': 'success',
+                'next': {'type': 'ir.actions.act_window_close'},
             },
         }
 

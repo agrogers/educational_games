@@ -330,6 +330,7 @@
 .o_quiz_page .quiz-question-card.card-active    { border-color: #7c3aed; box-shadow: 0 4px 18px rgba(124,58,237,.18); }
 .o_quiz_page .quiz-question-card.card-correct   { border-color: #10b981; }
 .o_quiz_page .quiz-question-card.card-incorrect { border-color: #ef4444; }
+.o_quiz_page .quiz-question-card.quiz-card-blur { cursor: pointer; }
 
 /* ── Result circle (top-right edge of card) ─────────── */
 .o_quiz_page .quiz-result-circle {
@@ -456,6 +457,12 @@
 
 .o_quiz_page .quiz-answer-text   { flex: 1; line-height: 1.5; }
 .o_quiz_page .quiz-answer-text p { margin: 0; }
+
+/* Blur effect for answer text when blur mode is enabled */
+.o_quiz_page .quiz-answer-blurred {
+    filter: blur(5px);
+    transition: filter 0.3s ease, color 0.3s ease;
+}
 
 .o_quiz_page .quiz-filter-summary {
     margin-top: 1rem;

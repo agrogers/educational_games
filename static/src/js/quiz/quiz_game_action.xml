@@ -79,6 +79,11 @@
                                style="font-size:0.85rem;"/>
                         </button>
                         <button class="quiz-font-btn quiz-layout-btn"
+                                t-att-title="getBlurModeTitle()"
+                                t-on-click="toggleBlurMode">
+                            <span class="quiz-layout-label"><t t-esc="getBlurModeLabel()"/></span>
+                        </button>
+                        <button class="quiz-font-btn quiz-layout-btn"
                                 t-att-title="getAnswerColumnButtonTitle()"
                                 t-on-click="toggleAnswerColumns">
                             <span class="quiz-layout-label"><t t-esc="getAnswerColumnButtonLabel()"/></span>
@@ -170,7 +175,8 @@
                                 </div>
 
                                 <!-- Question card -->
-                                <div t-attf-class="quiz-question-card {{ cardStatus }}">
+                                <div t-attf-class="quiz-question-card {{ cardStatus }} {{ this.isQuestionBlurred(question.id) ? 'quiz-card-blur' : '' }}"
+                                     t-on-click="() => this.unblurQuestion(question.id)">
 
                                     <!-- Result circle badge (top-right, after submission or check) -->
                                     <div t-if="showResult"
@@ -261,11 +267,12 @@
                                                            style="cursor:pointer; pointer-events:none;"/>
                                                 </t>
 
-                                                   <div t-out="answer.answer_text" class="quiz-answer-text"
+                                                   <div t-out="answer.answer_text" 
+                                                       t-attf-class="quiz-answer-text {{ this.isQuestionBlurred(question.id) ? 'quiz-answer-blurred' : '' }}"
                                                        t-att-data-image-viewer-model="'quiz.answer'"
                                                        t-att-data-image-viewer-id="answer.id"
                                                        t-att-data-image-viewer-field="'answer_text'"
-                                                     t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
+                                                       t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
 
                                                 <!-- ── Percentage-pie stats (teacher Check view) ── -->
                                                 <div t-if="ansStats" class="quiz-ans-stats ms-auto d-flex align-items-center gap-1 flex-shrink-0">

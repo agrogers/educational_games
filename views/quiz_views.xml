@@ -291,6 +291,7 @@
                 <header>
                     <button name="action_open_import_wizard" string="Import Questions" type="object" icon="fa-upload"/>
                     <button name="action_open_tag_wizard" string="Bulk Modify" type="object" icon="fa-pencil"/>
+                    <button name="action_merge_questions" string="Merge Questions" type="object" icon="fa-compress"/>
                 </header>
                 <field name="id" string="ID" optional="show"/>
                 <field name="quiz_id" optional="hide"/>

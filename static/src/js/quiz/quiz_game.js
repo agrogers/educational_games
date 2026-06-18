@@ -191,6 +191,10 @@ export class QuizGame extends Component {
             // null | 'not_known' | 'not_tried' — filters displayed questions
             // to a specific progress category from the header legend.
             progressFilter: null,
+            // Blur mode for answers: 0 = off, 1 = blur enabled
+            blurMode: 0,
+            // Per-question reveal tracking: { [questionId]: true } when all answers are unblurred
+            revealedQuestions: {},
         });
 
         this.resId = this._toInt(getParam("active_id")) || routeResId;
@@ -227,13 +231,14 @@ export class QuizGame extends Component {
         });
 
         onWillStart(async () => {
-            // Load persisted display preferences (font size, card mode).
+            // Load persisted display preferences (font size, card mode, blur mode).
             try {
                 const prefs = await this.orm.call("quiz.preference", "get_preferences", []);
                 if (prefs) {
                     this.state.fontSizeEm = prefs.font_size_em ?? 1.0;
                     this.state.useCards = prefs.use_cards ?? true;
                     this.state.answerColumns = prefs.answer_columns ?? 1;
+                    this.state.blurMode = prefs.blur_mode ?? 0;
                 }
             } catch (_e) {
                 // Preference table may not exist yet; keep defaults.
@@ -255,6 +260,7 @@ export class QuizGame extends Component {
     async loadQuiz() {
         try {
             this.state.loadError = "";
+            this.state.revealedQuestions = {};
             const quizData = await this.orm.call(
                 "quiz.quiz",
                 "get_quiz_for_student",
@@ -379,6 +385,46 @@ export class QuizGame extends Component {
     toggleCardMode() {
         this.state.useCards = !this.state.useCards;
         this._savePreferences();
+    }
+
+    /** Toggle answer blur mode on/off. */
+    toggleBlurMode() {
+        this.state.blurMode = this.state.blurMode === 0 ? 1 : 0;
+        // Clear all per-question reveal state when toggling mode.
+        this.state.revealedQuestions = {};
+        this._savePreferences();
+    }
+
+    /** True when answers for this question should render blurred. */
+    isQuestionBlurred(questionId) {
+        if (this.state.blurMode !== 1) {
+            return false;
+        }
+        return !this.state.revealedQuestions[questionId];
+    }
+
+    /** Unblur all answers for a question (called when clicking the question card area). */
+    unblurQuestion(questionId) {
+        if (this.state.blurMode !== 1 || this.state.revealedQuestions[questionId]) {
+            return;
+        }
+        this.state.revealedQuestions = {
+            ...this.state.revealedQuestions,
+            [questionId]: true,
+        };
+    }
+
+    /** Get button label for blur mode toggle. */
+    getBlurModeLabel() {
+        return this.state.blurMode === 1 ? "BLUR" : "SHOW";
+    }
+
+    /** Get button title/tooltip for blur mode toggle. */
+    getBlurModeTitle() {
+        if (this.state.blurMode === 1) {
+            return "Blur mode enabled: answers are hidden. Click anywhere on the question card to reveal all answers, then click an answer to select.";
+        }
+        return "Blur mode disabled. Click to enable blur mode for answers.";
     }
 
     toggleAnswerColumns() {
@@ -604,6 +650,7 @@ export class QuizGame extends Component {
             use_cards: this.state.useCards,
             font_size_em: this.state.fontSizeEm,
             answer_columns: this.state.answerColumns,
+            blur_mode: this.state.blurMode,
         }).catch(() => {});
     }
 
@@ -611,10 +658,25 @@ export class QuizGame extends Component {
      * Toggle an answer selection for a given question.
      * Single-answer questions: replaces any previous selection (radio behavior).
      * Multiple-answer questions: toggles the answer on/off (checkbox behavior).
+     * When blur mode is active:
+     *   - First click on an answer unblurs it (shows the text)
+     *   - Second click on the same unblurred answer selects it
      */
     toggleAnswer(question, answer) {
         if (this.state.submitted || question.checked) return;
         this.state.activeQuestionId = question.id;
+
+        // If blur mode is enabled and this question is still blurred,
+        // clicking any answer unblurs ALL answers for this question.
+        if (this.state.blurMode === 1 && !this.state.revealedQuestions[question.id]) {
+            this.state.revealedQuestions = {
+                ...this.state.revealedQuestions,
+                [question.id]: true,
+            };
+            return;
+        }
+
+        // Standard selection logic (blur disabled or question already revealed)
         if (question.allow_multiple) {
             const idx = question.selected_answers.indexOf(answer.id);
             if (idx === -1) {
@@ -987,6 +1049,7 @@ export class QuizGame extends Component {
         // Mark subsequent submissions as retakes so onGameFinished handles them correctly
         this.state.retakeMode = true;
         this.state.submitted = false;
+        this.state.revealedQuestions = {};
         this.state.isCheckingAll = false;
         this.state.hasCheckedAllAnswers = false;
         this.state.score = 0;
