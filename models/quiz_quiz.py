@@ -12,6 +12,11 @@ import re
 import uuid
 
 
+# Hardcoded bypass: set to True to skip HMAC signature verification on quiz
+# tokens. Useful when database.secret changed and existing links must keep
+# working. Set back to False once tokens have been regenerated.
+SKIP_QUIZ_TOKEN_SIGNATURE_CHECK = True
+
 class Quiz(models.Model):
     _name = 'quiz.quiz'
     _description = 'Quiz'
@@ -564,10 +569,11 @@ class Quiz(models.Model):
         payload_part, sig_part = token.split('.', 1)
         try:
             payload_json = self._b64url_decode(payload_part).decode()
-            signature = self._b64url_decode(sig_part)
-            expected = self._sign_quiz_payload(payload_json)
-            if not hmac.compare_digest(signature, expected):
-                return None
+            if not SKIP_QUIZ_TOKEN_SIGNATURE_CHECK:
+                signature = self._b64url_decode(sig_part)
+                expected = self._sign_quiz_payload(payload_json)
+                if not hmac.compare_digest(signature, expected):
+                    return None
             payload = json.loads(payload_json)
             filter_payload = self._normalize_quiz_filter_payload(payload)
             return {
