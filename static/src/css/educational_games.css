@@ -822,7 +822,7 @@
    ═══════════════════════════════════════════════════════ */
 
 .eg-dashboard {
-    background: #f4f6fb;
+    background: var(--body-bg);
     font-family: inherit;
 }
 
@@ -874,7 +874,7 @@
 
 /* ── Stat cards ─────────────────────────────────────── */
 .eg-stat-card {
-    background: #fff;
+    background: var(--body-bg);
     border-radius: 12px;
     padding: 1.5rem 1rem;
     text-align: center;
@@ -905,32 +905,32 @@
     font-size: 2.2rem;
     font-weight: 800;
     line-height: 1;
-    color: #1e1b4b;
+    color: var(--body-color);
 }
 
 .eg-stat-label {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #6b7280;
+    color: var(--gray-500, #6b7280);
     margin-top: 0.3rem;
 }
 
 /* ── Content cards ──────────────────────────────────── */
 .eg-card {
-    background: #fff;
+    background: var(--body-bg);
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.07);
     overflow: hidden;
 }
 
 .eg-card-header {
-    background: #f8faff;
-    border-bottom: 1px solid #e5e7eb;
+    background: var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
     padding: 0.85rem 1.2rem;
     font-weight: 600;
     font-size: 0.95rem;
-    color: #374151;
+    color: var(--body-color);
 }
 
 .eg-card-body {
@@ -939,16 +939,16 @@
 
 .eg-see-all-btn {
     font-size: 0.78rem;
-    color: #4f46e5;
-    border: 1px solid #c7d2fe;
+    color: var(--link-color);
+    border: 1px solid var(--link-color);
     border-radius: 6px;
     padding: 0.2rem 0.6rem;
     background: transparent;
     transition: background 0.15s;
 }
 .eg-see-all-btn:hover {
-    background: #ede9fe;
-    color: #3730a3;
+    background: var(--gray-200);
+    color: var(--link-color);
 }
 
 /* ── Tables ─────────────────────────────────────────── */
@@ -959,20 +959,20 @@
 
 .eg-table thead th {
     padding: 0.6rem 1rem;
-    background: #f9fafb;
-    border-bottom: 2px solid #e5e7eb;
+    background: var(--gray-200);
+    border-bottom: 2px solid var(--border-color);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #6b7280;
+    color: var(--gray-500, #6b7280);
     font-weight: 600;
 }
 
 .eg-table tbody td {
     padding: 0.7rem 1rem;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--border-color);
     vertical-align: middle;
-    color: #374151;
+    color: var(--body-color);
 }
 
 .eg-table tbody tr:last-child td {
@@ -984,7 +984,7 @@
     transition: background 0.12s;
 }
 .eg-clickable-row:hover {
-    background: #f5f3ff;
+    background: var(--gray-200);
 }
 
 .eg-name-cell {
@@ -1009,7 +1009,7 @@
 
 /* ── Progress bar ───────────────────────────────────── */
 .eg-progress-bar-wrap {
-    background: #e5e7eb;
+    background: var(--border-color);
     border-radius: 4px;
     height: 10px;
     overflow: hidden;
@@ -1027,12 +1027,12 @@
     font-size: 1.1rem;
 }
 
-.eg-leaderboard-gold   { background: #fffbeb; }
-.eg-leaderboard-silver { background: #f8fafc; }
-.eg-leaderboard-bronze { background: #fff7ed; }
-.eg-leaderboard-gold:hover   { background: #fef9c3; }
-.eg-leaderboard-silver:hover { background: #f1f5f9; }
-.eg-leaderboard-bronze:hover { background: #ffedd5; }
+.eg-leaderboard-gold   { background: rgba(250, 204, 21, 0.08); }
+.eg-leaderboard-silver { background: rgba(148, 163, 184, 0.08); }
+.eg-leaderboard-bronze { background: rgba(251, 146, 60, 0.08); }
+.eg-leaderboard-gold:hover   { background: rgba(250, 204, 21, 0.18); }
+.eg-leaderboard-silver:hover { background: rgba(148, 163, 184, 0.18); }
+.eg-leaderboard-bronze:hover { background: rgba(251, 146, 60, 0.18); }
 
 .eg-quiz-count-badge {
     background: #4f46e5;
@@ -1046,7 +1046,7 @@
 .eg-empty-state {
     padding: 2rem;
     text-align: center;
-    color: #9ca3af;
+    color: var(--gray-500, #9ca3af);
     font-size: 0.9rem;
 }
 
