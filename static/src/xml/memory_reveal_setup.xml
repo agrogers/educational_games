@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="educational_games.MemoryRevealSetup">
+        <div t-att-class="shellClassName" t-ref="shell" tabindex="0">
+            <aside class="aps-image-viewer-sidebar" t-on-click="onSidebarClick">
+                <div class="aps-image-viewer-sidebar-head">
+                    <div class="aps-image-viewer-title-wrap">
+                        <div class="aps-image-viewer-title">Memory Reveal Setup</div>
+                    </div>
+                </div>
+
+                <div class="aps-image-viewer-sidebar-body">
+                    <!-- Navigation controls -->
+                    <div class="aps-image-viewer-group aps-image-viewer-button-grid">
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn" t-att-disabled="state.loading" t-on-click="zoomOut" title="Zoom out">
+                            <i class="fa fa-search-minus" aria-hidden="true"/>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn" t-att-disabled="state.loading" t-on-click="zoomIn" title="Zoom in">
+                            <i class="fa fa-search-plus" aria-hidden="true"/>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn" t-att-disabled="state.loading" t-on-click="fitWholeImage" title="Fit whole image">
+                            <i class="fa fa-compress" aria-hidden="true"/>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn" t-att-disabled="state.loading" t-on-click="fitImageWidth" title="Fit image width">
+                            <i class="fa fa-arrows-h" aria-hidden="true"/>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn" t-att-disabled="state.loading" t-on-click="resetZoom" title="Reset zoom">
+                            <span>1:1</span>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn" t-on-click="toggleFullscreen" t-att-title="state.isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'">
+                            <i t-attf-class="fa {{ state.isFullscreen ? 'fa-compress' : 'fa-expand' }}" aria-hidden="true"/>
+                        </button>
+                    </div>
+
+                    <!-- Highlight selection toggle -->
+                    <div class="aps-image-viewer-group">
+                        <label class="form-label">Selection Tool</label>
+                        <div class="aps-image-viewer-button-grid-3">
+                            <button class="btn aps-image-viewer-icon-btn"
+                                    t-att-class="state.infoOpen ? 'btn-primary' : 'btn-outline-light'"
+                                    t-on-click="toggleInfo"
+                                    t-att-title="state.infoOpen ? 'Selection active — draw on image' : 'Enable selection tool'">
+                                <i class="fa fa-crop" aria-hidden="true"/>
+                            </button>
+                        </div>
+                        <div t-if="state.infoOpen" class="alert alert-success mt-2 mb-0 py-1 px-2" style="font-size:0.8em;">
+                            Draw a rectangle on the image to define a region.
+                        </div>
+                    </div>
+
+                    <!-- Region list -->
+                    <div class="aps-image-viewer-group">
+                        <label class="form-label">
+                            Regions
+                            <span t-if="state.regions.length" class="badge bg-primary ms-1" t-esc="state.regions.length"/>
+                        </label>
+                        <div t-if="state.regions.length === 0" class="text-muted small py-2">
+                            No regions defined yet. Use the selection tool above to draw regions on the image.
+                        </div>
+                        <div t-foreach="state.regions" t-as="region" t-key="region.id"
+                             class="d-flex align-items-center gap-1 mb-1 p-1 rounded"
+                             t-att-style="'cursor:pointer;' + (region.id === state.selectedRegionId ? 'background:rgba(34,197,94,0.15);' : '')"
+                             t-on-click="() => this.selectRegion(region)">
+                            <span class="badge bg-secondary me-1" t-esc="region_index + 1"/>
+                            <span class="flex-grow-1 text-truncate" t-esc="region.name" style="font-size:0.85em;"/>
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                                    t-on-click.stop="() => this.deleteRegion(region)"
+                                    title="Delete region">
+                                <i class="fa fa-times" aria-hidden="true"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scoring summary -->
+                    <div t-if="state.regions.length > 0" class="aps-image-viewer-group">
+                        <div class="alert alert-info py-1 px-2 mb-0" style="font-size:0.85em;">
+                            <strong t-esc="state.regions.length"/> region(s) · <strong t-esc="state.regions.length * 2"/> possible points
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exit button at bottom of sidebar -->
+                <div class="aps-image-viewer-group">
+                    <button class="btn btn-secondary w-100"
+                            t-on-click="closeViewer">
+                        Close
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Sidebar mini toggle -->
+            <div class="aps-image-viewer-sidebar-mini" t-if="state.sidebarCollapsed" t-on-click="toggleSidebar">
+                <button class="btn btn-outline-light aps-image-viewer-sidebar-toggle" title="Open sidebar">
+                    <i class="fa fa-bars" aria-hidden="true"/>
+                </button>
+            </div>
+
+            <!-- Stage -->
+            <main class="aps-image-viewer-stage-wrap">
+                 <div t-att-class="stageClassName"
+                     t-ref="stage"
+                     t-on-wheel.prevent="onWheel"
+                     t-on-pointerdown="onPointerDown"
+                     t-on-pointermove="onPointerMove"
+                     t-on-pointerup="onPointerUp"
+                     t-on-pointerleave="onPointerUp"
+                     t-on-pointercancel="onPointerCancel">
+                    <div t-if="!state.currentUrl and !state.errorMessage" class="aps-image-viewer-empty">
+                        Loading quiz image…
+                    </div>
+                    <div t-if="state.errorMessage" class="aps-image-viewer-error-state" aria-live="polite">
+                        <div class="aps-image-viewer-error-card">
+                            <div class="aps-image-viewer-error-icon">
+                                <i class="fa fa-exclamation-triangle" aria-hidden="true"/>
+                            </div>
+                            <div class="aps-image-viewer-error-title">Unable to load image</div>
+                            <div class="aps-image-viewer-error-text"><t t-esc="state.errorMessage"/></div>
+                        </div>
+                    </div>
+                    <div t-if="state.currentUrl" class="aps-image-viewer-scene" t-ref="scene" t-att-style="sceneStyle">
+                        <img t-att-src="state.currentUrl"
+                             t-ref="image"
+                             t-on-load="onDisplayedImageLoad"
+                             class="aps-image-viewer-image"
+                             alt="Quiz image"
+                             draggable="false"
+                             t-att-style="imageStyle"/>
+                        <!-- Region overlays -->
+                        <t t-foreach="state.regions" t-as="region" t-key="region.id">
+                            <div class="memory-reveal-region-overlay"
+                                 t-att-style="regionOverlayStyle(region)"/>
+                        </t>
+                        <!-- Selection preview -->
+                        <div class="aps-image-viewer-highlight-preview" t-att-style="selectionPreviewStyle"/>
+                    </div>
+                    <div t-if="state.loading" class="aps-image-viewer-loading-overlay" aria-live="polite">
+                        <div class="aps-image-viewer-loading-card">
+                            <div class="spinner-border text-light" role="status">
+                                <span class="visually-hidden">Loading image</span>
+                            </div>
+                            <div class="aps-image-viewer-loading-text">Loading image...</div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Region naming modal -->
+            <div t-if="state.namingRegion" class="modal d-block" tabindex="-1" role="dialog"
+                 style="background:rgba(0,0,0,0.5);">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Name this Region</h5>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label">Brief description of what is hidden in this region:</label>
+                            <input type="text" class="form-control"
+                                   t-model="state.regionNameInput"
+                                   t-on-keydown="onNameInputKeydown"
+                                   placeholder="e.g. CPU, RAM, Motherboard…"
+                                   autofocus="autofocus"/>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" t-on-click="cancelRegionName">Cancel</button>
+                            <button class="btn btn-primary" t-on-click="confirmRegionName"
+                                    t-att-disabled="!state.regionNameInput.trim()">
+                                Add Region
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

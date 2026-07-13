@@ -55,6 +55,26 @@ class QuizQuestion(models.Model):
         string='Import Group',
         help='Optional grouping ID used to identify questions imported together.',
     )
+    region_x1 = fields.Float(
+        string='Region Left (%)',
+        default=0.0,
+        help='Left edge of the blur region as a percentage of image width (0-100).',
+    )
+    region_y1 = fields.Float(
+        string='Region Top (%)',
+        default=0.0,
+        help='Top edge of the blur region as a percentage of image height (0-100).',
+    )
+    region_x2 = fields.Float(
+        string='Region Right (%)',
+        default=0.0,
+        help='Right edge of the blur region as a percentage of image width (0-100).',
+    )
+    region_y2 = fields.Float(
+        string='Region Bottom (%)',
+        default=0.0,
+        help='Bottom edge of the blur region as a percentage of image height (0-100).',
+    )
     correct_answer_count = fields.Integer(
         string='Correct Answers',
         compute='_compute_correct_answer_count',
@@ -278,10 +298,64 @@ class QuizQuestion(models.Model):
             'target': 'current',
         }
 
+    @api.model
+    def ensure_memory_reveal_answers(self, question_id):
+        """Ensure the 3 traffic-light self-assessment answers exist for a
+        Memory Reveal region/question.  Creates them if missing.
+
+        Returns a dict mapping marks → answer id, e.g. ``{2: id, 1: id, 0: id}``.
+        """
+        question = self.browse(int(question_id))
+        if not question.exists():
+            return {"error": "Question not found"}
+
+        existing = {a.marks: a for a in question.answer_ids}
+
+        traffic_light_answers = [
+            {
+                "marks": 2,
+                "answer_text": "Correct (Easy) – I knew it!",
+                "is_correct": True,
+                "sequence": 3,
+            },
+            {
+                "marks": 1,
+                "answer_text": "Correct (Hard) – I got it with difficulty",
+                "is_correct": True,
+                "sequence": 2,
+            },
+            {
+                "marks": 0,
+                "answer_text": "Incorrect – I did not know it",
+                "is_correct": False,
+                "sequence": 1,
+            },
+        ]
+
+        result = {}
+        for cfg in traffic_light_answers:
+            if cfg["marks"] in existing:
+                result[cfg["marks"]] = existing[cfg["marks"]].id
+            else:
+                answer = self.env["quiz.answer"].create({
+                    "question_id": question.id,
+                    "answer_text": cfg["answer_text"],
+                    "is_correct": cfg["is_correct"],
+                    "marks": cfg["marks"],
+                    "sequence": cfg["sequence"],
+                })
+                result[cfg["marks"]] = answer.id
+
+        return result
+
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
         records._resync_quizzes_that_include_us()
+        # Auto-create default self-assessment answers for memory_reveal questions
+        for rec in records:
+            if rec.quiz_id and rec.quiz_id.quiz_type == 'memory_reveal' and not rec.answer_ids:
+                rec._create_memory_reveal_default_answers()
         return records
 
     def write(self, vals):
@@ -289,6 +363,18 @@ class QuizQuestion(models.Model):
         if 'all_quiz_ids' in vals:
             self._resync_quizzes_that_include_us()
         return result
+
+    def _create_memory_reveal_default_answers(self):
+        """Create the three default self-assessment answers for a memory_reveal question."""
+        Answer = self.env['quiz.answer']
+        defaults = [
+            {'sequence': 1, 'answer_text': 'Strong Correct', 'is_correct': True, 'marks': 2},
+            {'sequence': 2, 'answer_text': 'Correct with Difficulty', 'is_correct': True, 'marks': 1},
+            {'sequence': 3, 'answer_text': 'Incorrect', 'is_correct': False, 'marks': 0},
+        ]
+        for vals in defaults:
+            vals['question_id'] = self.id
+        Answer.create(defaults)
 
     def unlink(self):
         # Before deletion, find which quizzes need re-syncing

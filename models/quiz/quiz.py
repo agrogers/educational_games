@@ -23,6 +23,17 @@ class Quiz(models.Model):
     _order = 'name'
 
     name = fields.Char(string='Quiz Name', required=True)
+    quiz_type = fields.Selection(
+        [
+            ('standard', 'Standard Quiz'),
+            ('memory_reveal', 'Memory Reveal'),
+        ],
+        string='Quiz Type',
+        default='standard',
+        required=True,
+        help='Standard Quiz: traditional question-and-answer format. '
+             'Memory Reveal: students self-assess memory of concealed image regions.',
+    )
     subject_ids = fields.Many2many(
         'aps.subject',
         'educational_games_quiz_subject_rel',
@@ -632,11 +643,24 @@ class Quiz(models.Model):
             record.quiz_url_params = f'action:{action_id}?{"&".join(parts)}'
 
     def action_preview_quiz(self):
-        """Launch the student quiz view in preview/practice mode."""
+        """Launch the student quiz view in preview/practice mode.
+
+        For memory_reveal quizzes, opens the Memory Reveal game instead.
+        """
         self.ensure_one()
         quiz_id = self._origin.id or (self.id if isinstance(self.id, int) else 0)
         if not quiz_id:
             raise UserError("Please save the quiz before previewing.")
+
+        # Memory Reveal quizzes use a dedicated game view
+        if self.quiz_type == 'memory_reveal':
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'action_memory_reveal_game_js',
+                'name': self.name,
+                'params': {'quiz_id': quiz_id},
+                'context': {'quiz_id': quiz_id},
+            }
 
         # Use a signed token so URL params can configure quiz difficulty without
         # exposing editable plain counts in the browser address bar.
@@ -903,30 +927,44 @@ class Quiz(models.Model):
                 answers = all_answers
                 rng.shuffle(answers)
 
-            questions.append({
+            answers_list = []
+            for a in answers:
+                ans_data = {
+                    'id': a.id,
+                    'answer_text': a.answer_text or '',
+                }
+                if quiz.quiz_type == 'memory_reveal':
+                    ans_data['marks'] = a.marks
+                answers_list.append(ans_data)
+
+            q_data = {
                 'id': question.id,
                 'question_text': question.question_text or '',
                 'marks': question.marks,
                 'allow_multiple': question.allow_multiple,
                 'student_attempt_count': question_student_stats['attempt_count'],
                 'student_weighted_score_pct': round(question_student_stats['weighted_score_pct'] or 0),
-                'answers': [
-                    {
-                        'id': a.id,
-                        'answer_text': a.answer_text or '',
-                    }
-                    for a in answers
-                ],
-            })
+                'answers': answers_list,
+            }
+            if quiz.quiz_type == 'memory_reveal':
+                q_data['region'] = {
+                    'x1': question.region_x1,
+                    'y1': question.region_y1,
+                    'x2': question.region_x2,
+                    'y2': question.region_y2,
+                }
+                q_data['region_name'] = question.question_text or ''
+            questions.append(q_data)
 
         displayed_marks = sum(q['marks'] for q in questions)
         is_teacher = (
             self.env.user.has_group('aps_sis.group_aps_teacher') or
             self.env.user.has_group('aps_sis.group_aps_manager')
         )
-        return {
+        result = {
             'id': quiz.id,
             'name': quiz.name,
+            'quiz_type': quiz.quiz_type,
             'total_marks': displayed_marks,
             'allow_resubmission': allow_resubmission,
             'filter_summary': quiz._build_filter_summary(filter_payload),
@@ -940,6 +978,9 @@ class Quiz(models.Model):
             'questions': questions,
             'is_teacher': is_teacher,
         }
+        if quiz.quiz_type == 'memory_reveal':
+            result['image_url'] = quiz.image_url or ''
+        return result
 
     @api.model
     def submit_quiz_answers(self, quiz_id, answers, quiz_token=None):

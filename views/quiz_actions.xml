@@ -51,4 +51,16 @@
         <field name="tag">action_quiz_game_js</field>
     </record>
 
+    <!-- Client action: memory reveal teacher setup (OWL component) -->
+    <record id="action_memory_reveal_setup" model="ir.actions.client">
+        <field name="name">Memory Reveal Setup</field>
+        <field name="tag">action_memory_reveal_setup_js</field>
+    </record>
+
+    <!-- Client action: memory reveal student game (OWL component) -->
+    <record id="action_memory_reveal_game" model="ir.actions.client">
+        <field name="name">Memory Reveal</field>
+        <field name="tag">action_memory_reveal_game_js</field>
+    </record>
+
 </odoo>

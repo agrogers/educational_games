@@ -19,6 +19,13 @@ class QuizAnswer(models.Model):
     sequence = fields.Integer(string='Sequence', default=10)
     answer_text = fields.Html(string='Answer Option', required=True, sanitize=True)
     is_correct = fields.Boolean(string='Correct Answer', default=False)
+    marks = fields.Integer(
+        string='Marks',
+        default=0,
+        help='Points awarded when this answer is selected. '
+             'Used by Memory Reveal quizzes for self-assessment scoring '
+             '(e.g. Strong Correct=2, Correct with Difficulty=1, Incorrect=0).',
+    )
     select_count = fields.Integer(
         string='Times Selected',
         default=0,

@@ -7,7 +7,7 @@
     'author': 'Your Name',
     'website': '',
     'license': 'LGPL-3',
-    'depends': ['base', 'web', 'mail', 'aps_sis'],
+    'depends': ['base', 'web', 'mail', 'aps_sis', 'aui_enhancements'],
     'data': [
         'security/ir.model.access.csv',
         'views/quiz_actions.xml',
@@ -37,6 +37,12 @@
             'educational_games/static/src/xml/game_action.xml',
             'educational_games/static/src/js/quiz/quiz_game.js',
             'educational_games/static/src/js/quiz/quiz_game_action.xml',
+            # Memory Reveal: teacher setup viewer
+            'educational_games/static/src/js/memory_reveal/memory_reveal_setup.js',
+            'educational_games/static/src/xml/memory_reveal_setup.xml',
+            # Memory Reveal: student game viewer
+            'educational_games/static/src/js/memory_reveal/memory_reveal_game.js',
+            'educational_games/static/src/xml/memory_reveal_game.xml',
         ],
     },
     'installable': True,

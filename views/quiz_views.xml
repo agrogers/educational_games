@@ -69,14 +69,15 @@
                         <page string="Settings" name="settings">
                             <group>
                                 <group string="Display Settings">
-                                    <field name="question_count" readonly="1"/>
-                                    <field name="total_marks" readonly="1"/>
+                                    <field name="quiz_type"/>
+                                    <field name="question_count" readonly="1" invisible="quiz_type == 'memory_reveal'"/>
+                                    <field name="total_marks" readonly="1" invisible="quiz_type == 'memory_reveal'"/>
                                     <field name="subject_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                    <field name="display_question_count"/>
-                                    <field name="display_option_count"/>
-                                    <field name="allow_resubmission"/>
+                                    <field name="display_question_count" invisible="quiz_type == 'memory_reveal'"/>
+                                    <field name="display_option_count" invisible="quiz_type == 'memory_reveal'"/>
+                                    <field name="allow_resubmission" invisible="quiz_type == 'memory_reveal'"/>
                                 </group>
-                                <group class="quiz-form-header-image">
+                                <group class="quiz-form-header-image" invisible="quiz_type == 'memory_reveal'">
                                     <field name="header_image" widget="image"
                                            string="Header Image"
                                            options="{'size': [400, 50]}"
@@ -84,6 +85,12 @@
                                     <field name="description" widget="html" nolabel="0"
                                        placeholder="Optional description shown to students…"/>
 
+                                </group>
+                                <group string="Memory Reveal Image" invisible="quiz_type != 'memory_reveal'">
+                                    <field name="image_content" widget="html"
+                                           options="{'image_upload': True}"
+                                           nolabel="1"
+                                           placeholder="Paste or upload an image. The first image found will be used as the quiz image."/>
                                 </group>
                             </group>
                             <group string="Inherited Quizzes">
@@ -129,8 +136,8 @@
                                 </group>
                             </group>
                         </page>
-                        <!-- ── Questions tab ── -->
-                        <page string="Questions" name="questions">
+                        <!-- ── Questions tab (standard quizzes only) ── -->
+                        <page string="Questions" name="questions" invisible="quiz_type == 'memory_reveal'">
                             <div class="mb-2">
                                 <button name="%(educational_games.action_quiz_question_import)d"
                                         string="Import Questions"
@@ -192,7 +199,61 @@
                                 </form>
                             </field>
                         </page>
-                        <page string="Bulk Add by ID" name="bulk_add">
+                        <!-- ── Image Setup tab (memory reveal only) ── -->
+                        <page string="Image Setup" name="image_setup" invisible="quiz_type != 'memory_reveal'">
+                            <div class="alert alert-info m-2">
+                                <strong>Memory Reveal Setup:</strong> Each question represents a blurred region on the image.
+                                Use the <em>Memory Reveal Setup</em> action from the quiz form header to draw regions interactively,
+                                or add questions manually below with region coordinates (0-100% of image dimensions).
+                            </div>
+                            <div class="mb-2">
+                                <button name="action_open_memory_reveal_setup"
+                                        string="Open Image Setup"
+                                        type="object"
+                                        class="btn btn-primary"
+                                        icon="fa-crop"/>
+                            </div>
+                            <field name="question_ids" context="{'default_quiz_id': id}">
+                                <list string="Regions">
+                                    <field name="id" string="ID" optional="show"/>
+                                    <field name="sequence" widget="handle" optional="hide"/>
+                                    <field name="question_text" widget="html" string="Region Name" class="quiz-question-text"/>
+                                    <field name="region_x1" string="Left %" optional="show"/>
+                                    <field name="region_y1" string="Top %" optional="show"/>
+                                    <field name="region_x2" string="Right %" optional="show"/>
+                                    <field name="region_y2" string="Bottom %" optional="show"/>
+                                    <field name="create_date" string="Created" optional="show"/>
+                                </list>
+                                <form string="Region">
+                                    <sheet>
+                                        <group>
+                                            <field name="sequence"/>
+                                            <field name="question_text" widget="html" placeholder="Region description…"/>
+                                        </group>
+                                        <group string="Region Coordinates (% of image dimensions)">
+                                            <group>
+                                                <field name="region_x1"/>
+                                                <field name="region_y1"/>
+                                            </group>
+                                            <group>
+                                                <field name="region_x2"/>
+                                                <field name="region_y2"/>
+                                            </group>
+                                        </group>
+                                        <separator string="Self-Assessment Options"/>
+                                        <field name="answer_ids">
+                                            <list string="Answers" decoration-success="is_correct">
+                                                <field name="sequence" widget="handle"/>
+                                                <field name="answer_text" widget="html" string="Option"/>
+                                                <field name="is_correct" string="Correct?"/>
+                                                <field name="marks" string="Marks"/>
+                                            </list>
+                                        </field>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Bulk Add by ID" name="bulk_add" invisible="quiz_type == 'memory_reveal'">
                             <div class="alert alert-info" role="alert">
                                 <strong>Bulk Add by Question ID:</strong>
                                 <p class="mb-1 mt-1">Paste IDs separated by commas, spaces, or new lines. Click <strong>Check</strong> to stage questions, remove unwanted rows, then click <strong>Add Questions</strong>.</p>
