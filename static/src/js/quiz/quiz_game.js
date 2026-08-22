@@ -147,6 +147,7 @@ export class QuizGame extends Component {
 
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this.action = useService("action");
 
         const arStr = getParam("allowResubmission");
         // Read submission_state early so we can initialise retakeMode correctly below.
@@ -430,6 +431,23 @@ export class QuizGame extends Component {
     toggleAnswerColumns() {
         this.state.answerColumns = this.state.answerColumns >= 4 ? 1 : this.state.answerColumns + 1;
         this._savePreferences();
+    }
+
+    /**
+     * Open the backend quiz.quiz form view for the quiz currently being played.
+     * Only reachable by staff (button is rendered when state.isTeacher).
+     */
+    openQuizRecord() {
+        if (!this.quizId) {
+            return;
+        }
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "quiz.quiz",
+            res_id: this.quizId,
+            views: [[false, "form"]],
+            target: "current",
+        });
     }
 
     async resetQuestionFilters() {

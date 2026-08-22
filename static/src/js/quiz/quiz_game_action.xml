@@ -54,6 +54,13 @@
                     </div>
                     <!-- Font-size controls (top-right, discrete) -->
                     <div class="quiz-font-controls">
+                        <!-- Staff only: jump back to the quiz.quiz record form -->
+                        <button t-if="state.isTeacher"
+                                class="quiz-font-btn quiz-layout-btn quiz-edit-quiz-btn"
+                                title="Open this quiz's record"
+                                t-on-click="openQuizRecord">
+                            <i class="fa fa-pencil-square-o" style="font-size:0.85rem;"/>
+                        </button>
                         <button class="quiz-font-btn"
                                 title="Decrease font size"
                                 t-on-click="decreaseFontSize"
