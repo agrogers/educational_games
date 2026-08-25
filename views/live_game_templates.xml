@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Standalone pages for live realtime games.
+
+        Both mount an OWL 2 app into #lg-root; main.js reads the data-* attrs
+        to decide which component to boot.  The pages are primary copies of
+        web.frontend_layout (same pattern as survey.user_input_session) so
+        they pull the full frontend asset bundles (web.layout itself loads NO
+        assets) while staying isolated from website.layout's inheritance,
+        which requires website rendering context (website/main_object) that
+        plain controller pages do not provide.
+    -->
+
+    <template id="live_game_layout" name="Live Game Layout"
+              inherit_id="web.frontend_layout" primary="True">
+        <!-- Full-height page, no site chrome -->
+        <xpath expr="//html" position="attributes">
+            <attribute name="t-att-data-kind">kind</attribute>
+        </xpath>
+        <xpath expr="//div[@id='wrapwrap']" position="attributes">
+            <attribute name="t-att-style">height: 100%;</attribute>
+        </xpath>
+        <xpath expr="//div[@id='wrapwrap']/header" position="before">
+            <t t-set="no_header" t-value="True"/>
+            <t t-set="no_footer" t-value="True"/>
+        </xpath>
+        <xpath expr="//main" position="attributes">
+            <attribute name="t-att-style">height: 100%;</attribute>
+        </xpath>
+        <xpath expr="//main/t[@t-out='0']" position="replace">
+            <div id="lg-root" class="lg-page"
+                 t-att-data-kind="kind"
+                 t-att-data-session-id="session_id"
+                 t-att-data-default-code="default_code"/>
+        </xpath>
+    </template>
+
+    <template id="live_game_host_page" name="Live Game Host Console">
+        <t t-call="educational_games.live_game_layout">
+            <t t-set="kind" t-value="'host'"/>
+            <t t-set="session_id" t-value="session_id"/>
+            <t t-set="title"><t t-out="session_name"/> — Live Game Host</t>
+        </t>
+    </template>
+
+    <template id="live_game_play_page" name="Live Game Player">
+        <t t-call="educational_games.live_game_layout">
+            <t t-set="kind" t-value="'play'"/>
+            <t t-set="default_code" t-value="default_code"/>
+            <t t-set="title">Join Live Game</t>
+        </t>
+    </template>
+</odoo>

@@ -7,10 +7,14 @@
     'author': 'Your Name',
     'website': '',
     'license': 'LGPL-3',
-    'depends': ['base', 'web', 'mail', 'aps_sis', 'aui_enhancements'],
+    'depends': ['base', 'web', 'mail', 'bus', 'aps_sis', 'aui_enhancements'],
     'data': [
         'security/ir.model.access.csv',
         'views/quiz_actions.xml',
+        # live_game_views.xml defines action_live_game_session_from_quiz,
+        # which quiz_views.xml references via %(xml_id)d — it must load first.
+        'views/live_game_views.xml',
+        'views/live_game_templates.xml',
         'views/quiz_views.xml',
         'views/actions.xml',
         'views/educational_games_menu.xml',
@@ -43,6 +47,21 @@
             # Memory Reveal: student game viewer
             'educational_games/static/src/js/memory_reveal/memory_reveal_game.js',
             'educational_games/static/src/xml/memory_reveal_game.xml',
+        ],
+        # Live realtime games run on standalone frontend pages
+        # (/educational_games/live/...) rendered via web.frontend_layout, so
+        # their assets go in the frontend bundle.  Order matters: shared
+        # modules (live_bus, track) must come before the components that
+        # import them.
+        'web.assets_frontend': [
+            'educational_games/static/src/js/live/live_game.css',
+            'educational_games/static/src/js/live/live_bus.js',
+            'educational_games/static/src/js/live/track.js',
+            'educational_games/static/src/js/live/host_console.js',
+            'educational_games/static/src/js/live/host_console.xml',
+            'educational_games/static/src/js/live/student_player.js',
+            'educational_games/static/src/js/live/student_player.xml',
+            'educational_games/static/src/js/live/main.js',
         ],
     },
     'installable': True,

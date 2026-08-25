@@ -1,0 +1,67 @@
+<templates>
+    <t t-name="educational_games.LiveGameHost">
+        <div class="lg-host lg-screen">
+            <header class="lg-header">
+                <h1 t-out="state.snapshot?.name || 'Live Game'"/>
+                <span class="lg-badge" t-att-data-state="state_">
+                    <t t-if="isLobby">Lobby</t>
+                    <t t-elif="isRunning">Running</t>
+                    <t t-elif="isFinished">Finished</t>
+                    <t t-else="">{{ state_ }}</t>
+                </span>
+                <div class="lg-header-actions">
+                    <button t-if="state_ === 'draft'" class="btn btn-primary btn-lg"
+                            t-on-click="doOpenLobby">Open Lobby</button>
+                    <button t-if="isLobby" class="btn btn-success btn-lg"
+                            t-on-click="doStart">Start Race</button>
+                    <button t-if="isRunning" class="btn btn-danger btn-lg"
+                            t-on-click="doFinish">Finish</button>
+                </div>
+            </header>
+
+            <div t-if="state.error" class="alert alert-danger m-3" role="alert">
+                <t t-out="state.error"/>
+            </div>
+
+            <div t-if="!state.loaded and !state.error" class="lg-loading">
+                Connecting…
+            </div>
+
+            <!-- Lobby: big join code + participant list -->
+            <div t-if="isLobby" class="lg-lobby">
+                <div class="lg-join-code-card">
+                    <div class="lg-join-code-label">Join at</div>
+                    <div class="lg-join-url"><t t-out="playUrl"/></div>
+                    <div class="lg-join-code-label">Game code</div>
+                    <div class="lg-join-code"><t t-out="accessCode"/></div>
+                </div>
+                <div class="lg-lobby-participants">
+                    <h2>Players (<t t-out="(state.snapshot?.participants || []).length"/>)</h2>
+                    <ul class="lg-player-list">
+                        <li t-foreach="state.snapshot?.participants || []" t-as="p" t-key="p.id">
+                            <span t-attf-class="lg-avatar-dot lg-avatar-{{ p.avatar }}"/>
+                            <t t-out="p.nickname"/>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Running / finished: perimeter track -->
+            <div t-if="isRunning or isFinished"
+                 class="lg-track-container"
+                 t-ref="track_container"/>
+
+            <!-- Finished: leaderboard overlay -->
+            <div t-if="isFinished" class="lg-leaderboard">
+                <h2>Results</h2>
+                <ol>
+                    <li t-foreach="leaderboard" t-as="p" t-key="p.id">
+                        <span t-attf-class="lg-avatar-dot lg-avatar-{{ p.avatar }}"/>
+                        <strong><t t-out="p.nickname"/></strong>
+                        — <t t-out="p.score"/> pts
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </t>
+</templates>

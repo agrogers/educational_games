@@ -1,0 +1,93 @@
+<templates>
+    <t t-name="educational_games.LiveGamePlayer">
+        <div class="lg-player lg-screen">
+            <!-- Join screen -->
+            <div t-if="state.phase === 'join'" class="lg-join-screen">
+                <div class="lg-join-card">
+                    <h1>Join a Live Game</h1>
+                    <input type="text" class="lg-code-input" maxlength="6"
+                           placeholder="GAME CODE" t-model="state.code"
+                           t-on-keydown.enter="doJoin"/>
+                    <button class="btn btn-primary btn-lg" t-on-click="doJoin">
+                        Join Game
+                    </button>
+                    <div t-if="state.error" class="alert alert-danger mt-3" role="alert">
+                        <t t-out="state.error"/>
+                    </div>
+                </div>
+ </div>
+
+            <!-- Loading -->
+            <div t-if="state.phase === 'loading'" class="lg-loading">Joining…</div>
+
+            <!-- Playing -->
+            <div t-if="state.phase === 'playing'">
+                <!-- Lobby -->
+                <div t-if="isLobby" class="lg-waiting">
+                    <h1>You're in!</h1>
+                    <p>Waiting for the teacher to start…</p>
+                    <span t-attf-class="lg-avatar-dot lg-avatar-{{ me?.avatar }} lg-avatar-big"/>
+                    <strong><t t-out="me?.nickname"/></strong>
+                </div>
+
+                <!-- Running: question card + mini track -->
+                <div t-if="isRunning" class="lg-play-area">
+                    <div class="lg-mini-track-container"/>
+
+                    <div t-if="!state.question and !state.feedback" class="lg-loading">
+                        Loading question…
+                    </div>
+
+                    <div t-if="state.question" class="lg-question-card">
+                        <div class="lg-question-meta">
+                            Question <t t-out="state.question.index + 1"/> of
+                            <t t-out="state.question.total"/>
+                            · Score: <t t-out="me?.score || 0"/>
+                        </div>
+                        <h2 t-out="state.question.question_text"/>
+                        <ul class="lg-answer-list">
+                            <li t-foreach="state.question.answers" t-as="a" t-key="a.id">
+                                <button
+                                    t-attf-class="lg-answer-btn {{ state.selected.includes(a.id) ? 'selected' : '' }}"
+                                    t-on-click="() => this.toggleAnswer(a.id)"
+                                    t-att-disabled="state.submitting ? 'disabled' : undefined">
+                                    <t t-out="a.answer_text"/>
+                                </button>
+                            </li>
+                        </ul>
+                        <button t-if="state.question.allow_multiple"
+                                class="btn btn-primary btn-lg"
+                                t-att-disabled="!state.selected.length || state.submitting ? 'disabled' : undefined"
+                                t-on-click="doSubmit">
+                            Submit Answer
+                        </button>
+                    </div>
+
+                    <div t-if="state.feedback" class="lg-feedback" t-att-data-correct="state.feedback.correct">
+                        <h2 t-if="state.feedback.correct">Correct! 🎉</h2>
+                        <h2 t-else="">Not quite…</h2>
+                        <p>
+                            +<t t-out="state.feedback.points_earned"/> points
+                            · Score: <t t-out="state.feedback.score"/>
+                        </p>
+                        <button t-if="!state.feedback.finished" class="btn btn-success btn-lg"
+                                t-on-click="doNext">Next Question</button>
+                        <div t-else="" class="lg-loading">Finishing up…</div>
+                    </div>
+                </div>
+
+                <!-- Finished -->
+                <div t-if="isFinished" class="lg-final">
+                    <h1>Race complete!</h1>
+                    <p>Your rank: <strong><t t-out="myRank or '—'"/></strong></p>
+                    <ol class="lg-leaderboard-list">
+                        <li t-foreach="leaderboard" t-as="p" t-key="p.id">
+                            <span t-attf-class="lg-avatar-dot lg-avatar-{{ p.avatar }}"/>
+                            <t t-out="p.nickname"/> — <t t-out="p.score"/> pts
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

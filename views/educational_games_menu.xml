@@ -36,4 +36,7 @@
     <menuitem id="menu_quiz_question_list" name="Questions" parent="educational_games_menu" action="educational_games.action_quiz_question_list" sequence="61" groups="aps_sis.group_aps_manager"/>
     <menuitem id="menu_quiz_question_import" name="Questions Import" parent="educational_games_menu" action="educational_games.action_quiz_question_import" sequence="62" groups="aps_sis.group_aps_manager"/>
     <menuitem id="menu_quiz_tag_list" name="Question Tags" parent="educational_games_menu" action="educational_games.action_quiz_tag_list" sequence="63" groups="aps_sis.group_aps_manager"/>
+
+    <!-- Live realtime games -->
+    <menuitem id="menu_live_game_sessions" name="Live Games" parent="educational_games_menu" action="action_live_game_session" sequence="55" groups="aps_sis.group_aps_manager"/>
 </odoo>

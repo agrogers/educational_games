@@ -1,0 +1,273 @@
+/* Live realtime games — shared styles (host console + student player) */
+
+.lg-page {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: #1a1a2e;
+    color: #eee;
+    font-family: "Segoe UI", Roboto, sans-serif;
+}
+
+.lg-screen {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Header ------------------------------------------------------------- */
+.lg-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 24px;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 10;
+}
+.lg-header h1 {
+    font-size: 1.4rem;
+    margin: 0;
+    flex-grow: 1;
+}
+.lg-badge {
+    padding: 4px 14px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    background: #444;
+}
+.lg-badge[data-state="lobby"] { background: #b58900; }
+.lg-badge[data-state="running"] { background: #2e7d32; }
+.lg-badge[data-state="finished"] { background: #1565c0; }
+
+/* Lobby -------------------------------------------------------------- */
+.lg-lobby {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: space-around;
+    gap: 40px;
+    padding-top: 70px;
+}
+.lg-join-code-card {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 40px 60px;
+}
+.lg-join-code-label {
+    color: #9aa;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 0.85rem;
+}
+.lg-join-code {
+    font-size: 5rem;
+    font-weight: 800;
+    letter-spacing: 12px;
+    color: #ffd54f;
+}
+.lg-join-url {
+    font-size: 1.1rem;
+    word-break: break-all;
+    margin-bottom: 12px;
+}
+.lg-player-list {
+    list-style: none;
+    padding: 0;
+    columns: 2;
+    column-gap: 30px;
+}
+.lg-player-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 1.15rem;
+}
+
+/* Avatars ------------------------------------------------------------ */
+.lg-avatar-dot {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.75);
+    vertical-align: middle;
+}
+.lg-avatar-big {
+    width: 48px;
+    height: 48px;
+}
+.lg-avatar-red { background: #e53935; }
+.lg-avatar-orange { background: #fb8c00; }
+.lg-avatar-yellow { background: #fdd835; }
+.lg-avatar-green { background: #43a047; }
+.lg-avatar-teal { background: #00acc1; }
+.lg-avatar-blue { background: #1e88e5; }
+.lg-avatar-purple { background: #8e24aa; }
+.lg-avatar-pink { background: #d81b60; }
+.lg-avatar-black { background: #212121; }
+.lg-avatar-white { background: #fafafa; }
+
+/* Track -------------------------------------------------------------- */
+.lg-track-container,
+.lg-mini-track-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.lg-avatar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translate(0, 0);
+    transition: transform 0.6s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 5;
+}
+.lg-avatar .lg-avatar-dot {
+    width: 34px;
+    height: 34px;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+}
+.lg-avatar-label {
+    margin-top: 3px;
+    font-size: 0.78rem;
+    background: rgba(0, 0, 0, 0.55);
+    padding: 1px 8px;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+.lg-avatar-finished .lg-avatar-dot {
+    outline: 3px solid #ffd54f;
+}
+
+/* Leaderboard -------------------------------------------------------- */
+.lg-leaderboard {
+    position: absolute;
+    left: 50%;
+    bottom: 60px;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.72);
+    border-radius: 14px;
+    padding: 20px 40px;
+    z-index: 20;
+    max-width: 80vw;
+}
+.lg-leaderboard ol {
+    margin: 8px 0 0;
+    padding-left: 28px;
+}
+.lg-leaderboard li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.1rem;
+    padding: 3px 0;
+}
+
+/* Student player ------------------------------------------------------ */
+.lg-join-screen {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+}
+.lg-join-card {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.07);
+    padding: 50px 60px;
+    border-radius: 18px;
+}
+.lg-code-input {
+    display: block;
+    margin: 22px auto;
+    width: 240px;
+    font-size: 2rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 8px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 2px solid #556;
+    background: #10101e;
+    color: #fff;
+}
+.lg-waiting {
+    text-align: center;
+    padding-top: 18vh;
+}
+.lg-question-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(640px, 90vw);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(6px);
+    border-radius: 16px;
+    padding: 26px 32px;
+    z-index: 15;
+}
+.lg-question-meta {
+    color: #9ab;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+.lg-answer-list {
+    list-style: none;
+    padding: 0;
+    margin: 18px 0;
+    display: grid;
+    gap: 10px;
+}
+.lg-answer-list button {
+    width: 100%;
+    text-align: left;
+    padding: 12px 18px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 1.05rem;
+    cursor: pointer;
+}
+.lg-answer-list button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+}
+.lg-answer-list button.selected {
+    border-color: #ffd54f;
+    background: rgba(255, 213, 79, 0.18);
+}
+.lg-feedback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 36px 56px;
+    border-radius: 16px;
+    z-index: 25;
+}
+.lg-feedback[data-correct="true"] h2 { color: #66bb6a; }
+.lg-feedback[data-correct="false"] h2 { color: #ef5350; }
+
+/* Misc ---------------------------------------------------------------- */
+.lg-loading {
+    display: flex;
+    height: 60vh;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: #99a;
+}

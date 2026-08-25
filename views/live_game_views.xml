@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ═══════════════════════════════════════════════════════
+         live.game.session – List view
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_live_game_session_list" model="ir.ui.view">
+        <field name="name">live.game.session.list</field>
+        <field name="model">live.game.session</field>
+        <field name="arch" type="xml">
+            <list string="Live Game Sessions">
+                <field name="name"/>
+                <field name="game_type"/>
+                <field name="quiz_id" optional="show"/>
+                <field name="access_code" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'lobby'"
+                       decoration-success="state == 'running'"
+                       decoration-muted="state in ('finished', 'cancelled')"/>
+                <field name="participant_count" optional="show"/>
+                <field name="host_id" optional="hide"/>
+                <field name="create_date" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
+         live.game.session – Form view
+    ═══════════════════════════════════════════════════════ -->
+    <record id="view_live_game_session_form" model="ir.ui.view">
+        <field name="name">live.game.session.form</field>
+        <field name="model">live.game.session</field>
+        <field name="arch" type="xml">
+            <form string="Live Game Session">
+                <header>
+                    <button name="action_open_lobby" string="Open Lobby" type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_start" string="Start Game" type="object"
+                            class="btn-primary"
+                            invisible="state != 'lobby'"/>
+                    <button name="action_finish" string="Finish" type="object"
+                            invisible="state != 'running'"/>
+                    <button name="action_cancel" string="Cancel" type="object"
+                            invisible="state not in ('draft', 'lobby', 'running')"/>
+                    <button name="action_reopen_lobby" string="Reopen Lobby" type="object"
+                            invisible="state not in ('finished', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,lobby,running,finished"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Session Name"/>
+                        <h1><field name="name" placeholder="e.g. Year 10 Business — Live Race"/></h1>
+                    </div>
+                    <group>
+                        <group string="Game">
+                            <field name="game_type"/>
+                            <field name="quiz_id"
+                                   invisible="game_type != 'quiz_race'"/>
+                            <field name="access_code"/>
+                            <field name="bus_channel" readonly="1" groups="base.group_system"/>
+                        </group>
+                        <group string="Status">
+                            <field name="host_id"/>
+                            <field name="participant_count"/>
+                            <field name="started_at"/>
+                            <field name="finished_at"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Participants" name="participants">
+                            <field name="participant_ids">
+                                <list editable="bottom">
+                                    <field name="nickname"/>
+                                    <field name="user_id"/>
+                                    <field name="avatar" widget="badge"/>
+                                    <field name="score"/>
+                                    <field name="position" widget="progressbar"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Configuration" name="config">
+                            <group>
+                                <field name="config"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════
+         Actions (explicit view binding per Odoo 18 conventions)
+    ═══════════════════════════════════════════════════════ -->
+    <record id="action_live_game_session" model="ir.actions.act_window">
+        <field name="name">Live Games</field>
+        <field name="res_model">live.game.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'default_host_id': uid}</field>
+    </record>
+
+    <record id="action_live_game_session_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_live_game_session_list"/>
+        <field name="act_window_id" ref="action_live_game_session"/>
+    </record>
+
+    <record id="action_live_game_session_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_live_game_session_form"/>
+        <field name="act_window_id" ref="action_live_game_session"/>
+    </record>
+
+    <!-- Start a live race directly from a quiz -->
+    <record id="action_live_game_session_from_quiz" model="ir.actions.act_window">
+        <field name="name">Start Live Race</field>
+        <field name="res_model">live.game.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="target">new</field>
+        <field name="context">{
+            'default_game_type': 'quiz_race',
+            'default_quiz_id': active_id,
+            'default_name': active_name and ('%s — Live Race' % active_name) or 'Live Race'
+        }</field>
+    </record>
+</odoo>
