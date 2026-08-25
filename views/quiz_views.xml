@@ -94,7 +94,7 @@
                                 </group>
                             </group>
                             <group string="Inherited Quizzes">
-                                <div class="alert alert-info m-2">
+                                <div class="alert alert-info m-2" role="alert">
                                     Questions from the quizzes below are automatically included when this quiz is played.
                                     Circular references are not allowed.
                                 </div>
@@ -111,7 +111,7 @@
                                        help="Paste this into the resource URL field in APEX to open this quiz. The format is action:&lt;id&gt;?quiz_id=&lt;id&gt;&amp;… matching the pattern used by other games."/>
                             </group>
                             <group string="Question Filters">
-                                <div class="alert alert-success m-2" colspan="2">These filters will include questions that have at least one tag AND one subject.</div>
+                                <div class="alert alert-success m-2" colspan="2" role="alert">These filters will include questions that have at least one tag AND one subject.</div>
                                 <group>
                                     <field name="filter_tag_ids" widget="many2many_tags"
                                         options="{'no_create': False}"
@@ -123,13 +123,13 @@
                                         placeholder="Any matching subjects..."/>
                                 </group>
                                 <group string="Student's Own Answer History">
-                                    <div class="alert alert-warning">These filters will exclude questions that satisfy ALL the critiera below.</div>
+                                    <div class="alert alert-warning" role="alert">These filters will exclude questions that satisfy ALL the critiera below.</div>
                                     <field name="filter_student_attempts" placeholder="Leave empty to ignore"/>
                                     <field name="filter_student_weighted_score_pct" placeholder="Leave empty to ignore"/>
                                     <field name="filter_exclude_answered_days" placeholder="Leave empty to ignore"/>
                                 </group>
                                 <group string="All Students' History">
-                                    <div class="alert alert-success">These filters will include questions that satisfy ALL critiera.</div>
+                                    <div class="alert alert-success" role="alert">These filters will include questions that satisfy ALL critiera.</div>
                                     <field name="filter_min_attempts" placeholder="Leave empty to ignore"/>
                                     <field name="filter_max_attempts" placeholder="Leave empty to ignore"/>
                                     <field name="filter_max_pct_correct" placeholder="Leave empty to ignore"/>
@@ -201,7 +201,7 @@
                         </page>
                         <!-- ── Image Setup tab (memory reveal only) ── -->
                         <page string="Image Setup" name="image_setup" invisible="quiz_type != 'memory_reveal'">
-                            <div class="alert alert-info m-2">
+                            <div class="alert alert-info m-2" role="alert">
                                 <strong>Memory Reveal Setup:</strong> Each question represents a blurred region on the image.
                                 Use the <em>Memory Reveal Setup</em> action from the quiz form header to draw regions interactively,
                                 or add questions manually below with region coordinates (0-100% of image dimensions).
