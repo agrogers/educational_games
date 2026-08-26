@@ -19,14 +19,14 @@
             <attribute name="t-att-data-kind">kind</attribute>
         </xpath>
         <xpath expr="//div[@id='wrapwrap']" position="attributes">
-            <attribute name="t-att-style">height: 100%;</attribute>
+            <attribute name="style">height: 100%;</attribute>
         </xpath>
         <xpath expr="//div[@id='wrapwrap']/header" position="before">
             <t t-set="no_header" t-value="True"/>
             <t t-set="no_footer" t-value="True"/>
         </xpath>
         <xpath expr="//main" position="attributes">
-            <attribute name="t-att-style">height: 100%;</attribute>
+            <attribute name="style">height: 100%;</attribute>
         </xpath>
         <xpath expr="//main/t[@t-out='0']" position="replace">
             <div id="lg-root" class="lg-page"
