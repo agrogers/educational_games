@@ -62,7 +62,23 @@
                              t-att-style="'cursor:pointer;' + (region.id === state.selectedRegionId ? 'background:rgba(34,197,94,0.15);' : '')"
                              t-on-click="() => this.selectRegion(region)">
                             <span class="badge bg-secondary me-1" t-esc="region_index + 1"/>
-                            <span class="flex-grow-1 text-truncate" t-esc="region.name" style="font-size:0.85em;"/>
+                            <t t-if="state.editingRegionId === region.id">
+                                <input type="text"
+                                       class="form-control form-control-sm flex-grow-1"
+                                       t-model="state.editingRegionName"
+                                       t-on-click.stop=""
+                                       t-on-keydown="(ev) => this.onRegionNameKeydown(ev, region)"
+                                       t-on-blur="() => this.saveRegionName(region)"
+                                       autofocus="autofocus"/>
+                            </t>
+                            <t t-else="">
+                                <span class="flex-grow-1 text-truncate"
+                                      style="font-size:0.85em;cursor:text;"
+                                      t-on-click.stop="() => this.startEditingRegion(region)"
+                                      title="Click to edit">
+                                    <t t-esc="region.name"/>
+                                </span>
+                            </t>
                             <button class="btn btn-sm btn-outline-danger py-0 px-1"
                                     t-on-click.stop="() => this.deleteRegion(region)"
                                     title="Delete region">
@@ -147,10 +163,13 @@
             <!-- Region naming modal -->
             <div t-if="state.namingRegion" class="modal d-block" tabindex="-1" role="dialog"
                  style="background:rgba(0,0,0,0.5);">
-                <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-dialog modal-dialog-centered memory-reveal-naming-dialog"
+                     role="document" t-att-style="namingDialogStyle()">
                     <div class="modal-content">
-                        <div class="modal-header">
+                        <div class="modal-header memory-reveal-naming-dialog-header"
+                             t-on-pointerdown="startDraggingNamingDialog">
                             <h5 class="modal-title">Name this Region</h5>
+                            <span class="small text-muted ms-auto">Drag to move</span>
                         </div>
                         <div class="modal-body">
                             <label class="form-label">Brief description of what is hidden in this region:</label>

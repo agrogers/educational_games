@@ -18,6 +18,12 @@ const ZOOM_STEP = 0.08;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 
+function decodeHtmlText(value) {
+    const element = document.createElement("textarea");
+    element.innerHTML = value || "";
+    return element.value;
+}
+
 export class MemoryRevealGame extends ImageViewerDialog {
     static template = "educational_games.MemoryRevealGame";
     // Override props: accept client-action keys, make dialog keys optional
@@ -152,7 +158,9 @@ export class MemoryRevealGame extends ImageViewerDialog {
 
                 this.state.regions = questions.map((q, idx) => ({
                     id: q.id,
-                    name: (q.question_text || "").replace(/<[^>]+>/g, "").trim() || `Region ${idx + 1}`,
+                    name: decodeHtmlText(
+                        (q.question_text || "").replace(/<[^>]+>/g, "").trim()
+                    ) || `Region ${idx + 1}`,
                     x1: q.region_x1,
                     y1: q.region_y1,
                     x2: q.region_x2,
@@ -292,6 +300,25 @@ export class MemoryRevealGame extends ImageViewerDialog {
         }
     }
 
+    regionAssessmentStyle(region) {
+        // Place the controls below the region where possible; use the space
+        // above it when the region is close to the bottom of the image.
+        const left = Math.min(Math.max(region.x1, 1), 78);
+        const top = region.y2 <= 84
+            ? region.y2 + 1
+            : Math.max(region.y1 - 9, 1);
+
+        return `position:absolute;left:${left}%;top:${top}%;display:flex;` +
+            "gap:8px;z-index:30;pointer-events:auto;";
+    }
+
+    regionNumberStyle(region) {
+        const left = Math.min(Math.max(region.x1, 1), 96);
+        const top = Math.max(region.y1, 1);
+        return `position:absolute;left:${left}%;top:${top}%;z-index:25;` +
+            "transform:translate(-50%, -50%);pointer-events:none;";
+    }
+
     _updateActiveRegionInfo() {
         if (!this.state.activeRegionId) {
             this.state.activeRegionAnswers = [];
@@ -323,20 +350,20 @@ export class MemoryRevealGame extends ImageViewerDialog {
             const answer = region.answers.find(a => a.id === assessment);
             const color = answer?.marks === 2 ? "#22c55e" : answer?.marks === 1 ? "#f59e0b" : "#ef4444";
             return `position:absolute;left:${left}%;top:${top}%;width:${width}%;height:${height}%;` +
-                `border:3px solid ${color};background:transparent;pointer-events:none;`;
+                `border:5px solid ${color};background:transparent;pointer-events:none;`;
         }
         // Not revealed — blur or outline
         if (this.state.blurMode) {
             return `position:absolute;left:${left}%;top:${top}%;width:${width}%;height:${height}%;` +
-                `backdrop-filter:blur(4px);` + // Reduce blur intensity (120px is often too high for browsers to render cleanly)
-                `-webkit-backdrop-filter:blur(4px);` +
+                `backdrop-filter:blur(12px);` +
+                `-webkit-backdrop-filter:blur(12px);` +
                 `border-radius:12px;` +
                 `background: rgba(255, 255, 255, 0.01);` + // Use a light white tint instead of gray
-                `border: 1px solid rgba(255, 255, 255, 0.2);` + // Add a subtle border to define the edge
+                `border: 4px solid rgba(255, 255, 255, 0.45);` +
                 `cursor:pointer;`;
         } else {
             return `position:absolute;left:${left}%;top:${top}%;width:${width}%;height:${height}%;` +
-                `border:3px solid #f97316;border-radius:12px;background:rgba(249,115,22,0.15);cursor:pointer;`;
+                `border:5px solid #f97316;border-radius:12px;background:rgba(249,115,22,0.15);cursor:pointer;`;
         }
     }
 

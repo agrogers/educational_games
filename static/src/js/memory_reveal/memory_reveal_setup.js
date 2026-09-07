@@ -63,6 +63,10 @@ export class MemoryRevealSetup extends ImageViewerDialog {
             regionNameInput: "",
             selectedRegionId: null,
             deletingId: null,
+            editingRegionId: null,
+            editingRegionName: "",
+            namingDialogPosition: { x: 0, y: 0 },
+            draggingNamingDialog: false,
         });
 
         // Override infoOpen to default to true (for highlight selection mode)
@@ -93,6 +97,48 @@ export class MemoryRevealSetup extends ImageViewerDialog {
     async willUnmount() {
         await super.willUnmount?.();
         window.removeEventListener("keydown", this._onKeydown);
+        this._stopDraggingNamingDialog();
+    }
+
+    startDraggingNamingDialog(ev) {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        this._namingDialogDrag = {
+            startX: ev.clientX,
+            startY: ev.clientY,
+            originX: this.state.namingDialogPosition.x,
+            originY: this.state.namingDialogPosition.y,
+        };
+        this.state.draggingNamingDialog = true;
+        this._onNamingDialogPointerMove = (moveEvent) => {
+            const drag = this._namingDialogDrag;
+            if (!drag) return;
+            this.state.namingDialogPosition = {
+                x: drag.originX + moveEvent.clientX - drag.startX,
+                y: drag.originY + moveEvent.clientY - drag.startY,
+            };
+        };
+        this._onNamingDialogPointerUp = () => this._stopDraggingNamingDialog();
+        document.addEventListener("pointermove", this._onNamingDialogPointerMove);
+        document.addEventListener("pointerup", this._onNamingDialogPointerUp, { once: true });
+    }
+
+    _stopDraggingNamingDialog() {
+        if (this._onNamingDialogPointerMove) {
+            document.removeEventListener("pointermove", this._onNamingDialogPointerMove);
+        }
+        if (this._onNamingDialogPointerUp) {
+            document.removeEventListener("pointerup", this._onNamingDialogPointerUp);
+        }
+        this._onNamingDialogPointerMove = null;
+        this._onNamingDialogPointerUp = null;
+        this._namingDialogDrag = null;
+        if (this.state) this.state.draggingNamingDialog = false;
+    }
+
+    namingDialogStyle() {
+        const { x, y } = this.state.namingDialogPosition;
+        return `transform:translate(${x}px, ${y}px);`;
     }
 
     // ── Quiz data loading ──────────────────────────────────────────────────
@@ -224,6 +270,50 @@ export class MemoryRevealSetup extends ImageViewerDialog {
             this.confirmRegionName();
         } else if (ev.key === "Escape") {
             this.cancelRegionName();
+        }
+    }
+
+    startEditingRegion(region) {
+        this.state.selectedRegionId = region.id;
+        this.state.editingRegionId = region.id;
+        this.state.editingRegionName = region.name;
+        this._zoomToRegion(region);
+    }
+
+    cancelEditingRegion() {
+        this.state.editingRegionId = null;
+        this.state.editingRegionName = "";
+    }
+
+    async saveRegionName(region) {
+        if (this.state.editingRegionId !== region.id) return;
+
+        const name = (this.state.editingRegionName || "").trim();
+        if (!name) {
+            this.cancelEditingRegion();
+            return;
+        }
+
+        try {
+            await this.orm.write("quiz.question", [region.question_id], {
+                question_text: name,
+            });
+            region.name = name;
+            this.notification.add(_t("Region name updated"), { type: "success" });
+        } catch (e) {
+            console.error("[MemoryRevealSetup] Failed to update region name:", e);
+            this.notification.add(_t("Failed to update region name"), { type: "danger" });
+        }
+        this.cancelEditingRegion();
+    }
+
+    onRegionNameKeydown(ev, region) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this.saveRegionName(region);
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this.cancelEditingRegion();
         }
     }
 

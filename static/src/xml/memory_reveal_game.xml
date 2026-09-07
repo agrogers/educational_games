@@ -102,31 +102,6 @@
                     </div>
                 </div>
 
-                <!-- Traffic light assessment panel -->
-                <div t-if="state.activeRegionId &amp;&amp; !state.completed &amp;&amp; state.revealed[state.activeRegionId]"
-                     class="aps-image-viewer-group"
-                     style="background:rgba(0,0,0,0.15);border-radius:6px;padding:8px;">
-                    <div class="text-center mb-2">
-                        <span class="text-light small fw-bold">Assess:</span>
-                        <div class="text-white small"
-                             t-esc="state.activeRegionName"/>
-                    </div>
-                    <div class="d-flex flex-column gap-1">
-                        <t t-foreach="state.activeRegionAnswers" t-as="answer" t-key="answer.id">
-                            <button class="btn btn-sm d-flex align-items-center w-100 text-start"
-                                    t-attf-class="btn-{{ answer.marks === 2 ? 'success' : answer.marks === 1 ? 'warning' : 'danger' }}"
-                                    t-att-disabled="state.assessments[state.activeRegionId] ? 'disabled' : undefined"
-                                    t-on-click="(ev) => this.onAssessActiveRegion(answer)">
-                                <span class="me-2 d-inline-flex align-items-center justify-content-center rounded-circle" style="width:18px;height:18px;font-size:11px;color:white;"
-                                      t-attf-class="{{ answer.marks === 2 ? 'bg-success' : answer.marks === 1 ? 'bg-warning' : 'bg-danger' }}"/>
-                                <span class="flex-grow-1" t-out="answer.answer_text"/>
-                                <span class="badge bg-white text-dark ms-1"
-                                      t-esc="answer.marks + ' pts'"/>
-                            </button>
-                        </t>
-                    </div>
-                </div>
-
                 <!-- Assessment results list -->
                 <div t-if="Object.keys(state.assessments).length > 0" class="aps-image-viewer-group">
                     <label class="form-label text-light">Results</label>
@@ -140,15 +115,13 @@
                                 <span t-esc="region.index + 1"/>
                             </span>
                             <span class="small text-white text-truncate flex-grow-1" t-esc="region.name"/>
-                            <span class="small text-white-50 ms-1"
-                                  t-esc="assessmentLabel(region)"/>
                         </div>
                     </t>
                 </div>
 
                 <!-- Instruction hint -->
                 <div t-if="!state.completed &amp;&amp; state.regions.length > 0" class="aps-image-viewer-group">
-                    <div class="alert alert-secondary py-1 px-2 mb-0" style="font-size:0.8em;color:#ccc;">
+                    <div class="memory-reveal-instruction py-1 px-2 mb-0">
                         Click a numbered region to reveal it, then self-assess using the traffic light buttons.
                     </div>
                 </div>
@@ -165,7 +138,7 @@
 
                 <!-- Exit button at bottom of sidebar -->
                 <div class="aps-image-viewer-group">
-                    <button class="btn btn-secondary w-100"
+                        <button class="btn btn-secondary w-100 text-dark"
                             t-on-click="closeViewer">
                         <i class="fa fa-arrow-left me-1"/> Exit Game
                     </button>
@@ -220,6 +193,37 @@
                     <t t-foreach="state.regions" t-as="region" t-key="'overlay-' + region.id">
                         <div t-att-style="regionOverlayStyle(region)"
                              t-on-pointerdown.stop="() => this.onRegionClick(region)"></div>
+                    </t>
+
+                    <!-- Question number above the region's top-left corner -->
+                    <t t-foreach="state.regions" t-as="region" t-key="'number-' + region.id">
+                        <span class="memory-reveal-region-number"
+                              t-att-style="regionNumberStyle(region)">
+                            <t t-esc="region.index + 1"/>
+                        </span>
+                    </t>
+
+                    <!-- Circular self-assessment controls for the active region -->
+                    <t t-foreach="state.regions" t-as="region" t-key="'assessment-' + region.id">
+                        <div t-if="state.activeRegionId === region.id
+                                  &amp;&amp; state.revealed[region.id]
+                                  &amp;&amp; !state.assessments[region.id]
+                                  &amp;&amp; !state.completed"
+                             class="memory-reveal-region-assessment"
+                             t-att-style="regionAssessmentStyle(region)"
+                             t-on-pointerdown.stop="">
+                            <t t-foreach="state.activeRegionAnswers" t-as="answer" t-key="answer.id">
+                                <button type="button"
+                                        class="memory-reveal-assessment-button"
+                                        t-att-class="answer.marks === 2 ? 'memory-reveal-assessment-green' : answer.marks === 1 ? 'memory-reveal-assessment-yellow' : 'memory-reveal-assessment-red'"
+                                        t-att-title="answer.answer_text"
+                                        t-on-click.stop="() => this.onAssessActiveRegion(answer)">
+                                    <i t-if="answer.marks === 2" class="fa fa-check" aria-hidden="true"/>
+                                    <i t-elif="answer.marks === 1" class="fa fa-question" aria-hidden="true"/>
+                                    <i t-else="" class="fa fa-times" aria-hidden="true"/>
+                                </button>
+                            </t>
+                        </div>
                     </t>
                 </div>
 
