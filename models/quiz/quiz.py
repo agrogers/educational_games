@@ -602,6 +602,7 @@ class Quiz(models.Model):
         'display_option_count',
         'allow_resubmission',
         'filter_tag_ids',
+        'quiz_type',
         'filter_subject_ids',
         'filter_min_attempts',
         'filter_max_attempts',
@@ -611,18 +612,18 @@ class Quiz(models.Model):
         'filter_exclude_answered_days',
     )
     def _compute_quiz_url_params(self):
-        # Resolve the client action ID once for all records in this batch.
-        # The format APEX expects is: action:<action_id>?quiz_id=<quiz_id>&quiz_token=<signed>
+        # Resolve both client action IDs once for the batch.  The format APEX
+        # expects is: action:<action_id>?quiz_id=<id>&quiz_token=<signed>
         try:
-            action = self.env.ref('educational_games.action_quiz_game')
-            action_id = action.id
+            standard_action_id = self.env.ref('educational_games.action_quiz_game').id
+            memory_action_id = self.env.ref('educational_games.action_memory_reveal_game').id
         except ValueError:
             # External ID not found — log a warning so it is easy to diagnose
             import logging
             logging.getLogger(__name__).warning(
-                "educational_games.action_quiz_game not found; quiz URL will not contain a valid action ID."
+                "Educational Games client action not found; quiz URL will not contain a valid action ID."
             )
-            action_id = 'UNKNOWN'
+            standard_action_id = memory_action_id = 'UNKNOWN'
 
         for record in self:
             # During onchange on unsaved forms, record.id is a NewId placeholder.
@@ -640,6 +641,11 @@ class Quiz(models.Model):
                 record._get_quiz_filter_payload(),
             )
             parts = [f'quiz_id={quiz_id}', f'quiz_token={token}']
+            action_id = (
+                memory_action_id
+                if record.quiz_type == 'memory_reveal'
+                else standard_action_id
+            )
             record.quiz_url_params = f'action:{action_id}?{"&".join(parts)}'
 
     def action_preview_quiz(self):
@@ -979,7 +985,7 @@ class Quiz(models.Model):
             'is_teacher': is_teacher,
         }
         if quiz.quiz_type == 'memory_reveal':
-            result['image_url'] = quiz.image_url or ''
+            result['image_url'] = self.env['quiz.quiz'].get_memory_reveal_image_url(quiz.id) or ''
         return result
 
     @api.model

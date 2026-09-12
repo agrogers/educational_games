@@ -37,24 +37,44 @@
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
 }
 
+/* Bootstrap's theme can redefine .text-light with a dark colour. Keep all
+   Memory Reveal sidebar text readable against the viewer's dark background. */
+.aps-image-viewer-shell .text-light {
+    --color: #f8fafc !important;
+    color: #f8fafc !important;
+}
+
+.aps-image-viewer-shell .text-white {
+    color: #ffffff !important;
+}
+
+.aps-image-viewer-shell .btn.btn-secondary.text-dark {
+    color: #f8fafc !important;
+}
+
 .memory-reveal-assessment-button {
-    width: 48px;
-    height: 48px;
+    /* Keep the traffic-light controls proportional to the viewport. vmin
+       uses the smaller screen dimension so the buttons remain usable without
+       overflowing on narrow or short screens. */
+    width: 6vmin;
+    height: 6vmin;
+    min-width: 6vmin;
+    min-height: 6vmin;
     padding: 0;
-    border: 2px solid #fff;
+    border: 0.25vmin solid #fff;
     border-radius: 50%;
     color: #fff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 21px;
+    font-size: 3vmin;
     box-shadow: 0 2px 7px rgba(0, 0, 0, 0.5);
     cursor: pointer;
     transition: transform 120ms ease, filter 120ms ease;
 }
 
 .memory-reveal-assessment-button:hover {
-    transform: scale(1.12);
+    transform: scale(1.3);
     filter: brightness(1.1);
 }
 

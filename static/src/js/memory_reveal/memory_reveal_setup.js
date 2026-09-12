@@ -14,6 +14,23 @@ const ZOOM_STEP = 0.08;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 
+function getMemoryRevealQuizId(action) {
+    const sources = [action?.params, action?.context];
+    for (const source of sources) {
+        for (const key of ["quiz_id", "default_quiz_id", "active_id", "res_id"]) {
+            const value = Number.parseInt(source?.[key], 10);
+            if (Number.isInteger(value) && value > 0) {
+                return value;
+            }
+        }
+    }
+
+    // Client-action routing can preserve the record path while dropping the
+    // action params/context. Recover the quiz ID from /quiz.quiz/<id>/...
+    const match = window.location.pathname.match(/(?:^|\/)quiz\.quiz\/(\d+)(?:\/|$)/i);
+    return match ? Number.parseInt(match[1], 10) : 0;
+}
+
 export class MemoryRevealSetup extends ImageViewerDialog {
     static template = "educational_games.MemoryRevealSetup";
     // Override props: accept client-action keys, make dialog keys optional
@@ -55,7 +72,7 @@ export class MemoryRevealSetup extends ImageViewerDialog {
 
         // Additional state for memory reveal
         Object.assign(this.state, {
-            quizId: parseInt(this.props.action?.context?.default_quiz_id, 10) || 0,
+            quizId: getMemoryRevealQuizId(this.props.action),
             quizName: "",
             regions: [],       // [{id, name, x1, y1, x2, y2, question_id}]
             addingRegion: false,
@@ -154,6 +171,13 @@ export class MemoryRevealSetup extends ImageViewerDialog {
             await this._loadQuizData();
             this._quizDataLoaded = true;
         }
+        // Do not allow the generic viewer to construct its default "/1.jpg"
+        // URL when the quiz has no configured image.
+        if (!this.state.directUrl) {
+            this.state.currentUrl = "";
+            this.state.errorMessage = _t("No image is configured for this quiz.");
+            return;
+        }
         return super.loadCurrentImage();
     }
 
@@ -166,18 +190,22 @@ export class MemoryRevealSetup extends ImageViewerDialog {
         try {
             console.log("[MemoryRevealSetup] ORM reading quiz.quiz id:", this.state.quizId);
             const [quiz] = await this.orm.read("quiz.quiz", [this.state.quizId], [
-                "name", "quiz_type", "image_url", "question_ids",
+                "name", "quiz_type", "question_ids",
             ]);
             console.log("[MemoryRevealSetup] ORM result:", JSON.stringify(quiz));
             this.state.quizName = quiz.name || "";
 
-            // Set the image URL on the viewer state so it loads
-            if (quiz.image_url) {
-                console.log("[MemoryRevealSetup] Setting image URL:", quiz.image_url);
-                this.state.currentUrl = quiz.image_url;
-                this.state.directUrl = quiz.image_url;
+            const imageUrl = await this.orm.call(
+                "quiz.quiz",
+                "get_memory_reveal_image_url",
+                [this.state.quizId],
+            );
+            if (imageUrl) {
+                console.log("[MemoryRevealSetup] Setting image URL:", imageUrl);
+                this.state.currentUrl = imageUrl;
+                this.state.directUrl = imageUrl;
             } else {
-                console.warn("[MemoryRevealSetup] No image_url returned from ORM");
+                console.warn("[MemoryRevealSetup] No image URL returned from ORM");
             }
 
             if (quiz.question_ids && quiz.question_ids.length > 0) {

@@ -1,6 +1,5 @@
 from odoo import models, fields, api
 from odoo.exceptions import UserError
-import re
 import uuid
 
 
@@ -16,19 +15,30 @@ class Quiz(models.Model):
     image_url = fields.Char(
         string='Image URL',
         compute='_compute_image_url',
-        store=True,
         help='URL to load the quiz image in the frontend.',
     )
 
     @api.depends('image_content')
     def _compute_image_url(self):
         for record in self:
-            url = False
-            if record.image_content:
-                match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', record.image_content)
-                if match:
-                    url = match.group(1)
-            record.image_url = url
+            # The editor URL can point to an attachment owned by another
+            # record when an image is pasted from another HTML field. Serve
+            # it through the quiz-authorized controller instead.
+            record.image_url = (
+                f'/educational_games/memory_reveal/image/{record.id}'
+                if record.id and record.image_content
+                else False
+            )
+
+    @api.model
+    def get_memory_reveal_image_url(self, quiz_id):
+        """Return an image URL that is stable for all allowed quiz users."""
+        quiz = self.browse(int(quiz_id))
+        if not quiz.exists() or quiz.quiz_type != 'memory_reveal' or not quiz.image_content:
+            return False
+        quiz.check_access_rights('read')
+        quiz.check_access_rule('read')
+        return f'/educational_games/memory_reveal/image/{quiz.id}'
 
     def action_open_memory_reveal_setup(self):
         """Launch the Memory Reveal teacher setup for this quiz."""
@@ -125,7 +135,11 @@ class Quiz(models.Model):
             ('attempt_token', '=', token),
         ])
         total_score = sum(r.answer_id.marks for r in responses)
-        total_possible = len(quiz.question_ids) * 2  # 2 marks per region (strong correct)
+        attempted_questions = responses.mapped('question_id')
+        total_possible = sum(
+            max(question.answer_ids.mapped('marks') or [question.marks or 0])
+            for question in attempted_questions
+        )
 
         return {
             'marks_earned': answer.marks,

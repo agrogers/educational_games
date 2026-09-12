@@ -17,11 +17,38 @@ import {
 const ZOOM_STEP = 0.08;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
+const HIGHLIGHT_COLORS = [
+    "#ef4444",
+    "#f97316",
+    "#facc15",
+    "#22c55e",
+    "#06b6d4",
+    "#3b82f6",
+    "#8b5cf6",
+    "#ec4899",
+];
 
 function decodeHtmlText(value) {
     const element = document.createElement("textarea");
     element.innerHTML = value || "";
     return element.value;
+}
+
+function getMemoryRevealQuizId(action) {
+    const sources = [action?.params, action?.context];
+    for (const source of sources) {
+        for (const key of ["quiz_id", "default_quiz_id", "active_id", "res_id"]) {
+            const value = Number.parseInt(source?.[key], 10);
+            if (Number.isInteger(value) && value > 0) {
+                return value;
+            }
+        }
+    }
+
+    // Client-action routing can preserve the record path while dropping the
+    // action params/context. Recover the quiz ID from /quiz.quiz/<id>/...
+    const match = window.location.pathname.match(/(?:^|\/)quiz\.quiz\/(\d+)(?:\/|$)/i);
+    return match ? Number.parseInt(match[1], 10) : 0;
 }
 
 export class MemoryRevealGame extends ImageViewerDialog {
@@ -61,7 +88,7 @@ export class MemoryRevealGame extends ImageViewerDialog {
         const actionParams = this.props.action?.params || {};
 
         Object.assign(this.state, {
-            quizId: parseInt(actionParams.quiz_id || context.quiz_id || context.default_quiz_id, 10) || 0,
+            quizId: getMemoryRevealQuizId(this.props.action),
             submissionId: parseInt(actionParams.active_id || context.active_id, 10) || 0,
             submissionModel: actionParams.active_model || context.active_model || APS_SUBMISSION_MODEL,
             quizName: "",
@@ -75,9 +102,14 @@ export class MemoryRevealGame extends ImageViewerDialog {
             totalPossible: 0,
             completed: false,
             blurMode: true,     // true = blur, false = orange outline
+            highlightedRegionId: null,
+            highlightColor: "",
             attemptToken: "",
             loading: false,
         });
+
+        this._highlightInterval = null;
+        this._highlightTimeout = null;
 
         this._onKeydown = async (ev) => {
             if (ev.key === "Escape") {
@@ -96,6 +128,7 @@ export class MemoryRevealGame extends ImageViewerDialog {
     }
 
     async willUnmount() {
+        this._stopRegionHighlight();
         await super.willUnmount?.();
         window.removeEventListener("keydown", this._onKeydown);
     }
@@ -113,6 +146,13 @@ export class MemoryRevealGame extends ImageViewerDialog {
             await this._loadQuizData();
             this._quizDataLoaded = true;
         }
+        // Do not allow the generic viewer to construct its default "/1.jpg"
+        // URL when the quiz has no configured image.
+        if (!this.state.directUrl) {
+            this.state.currentUrl = "";
+            this.state.errorMessage = _t("No image is configured for this quiz.");
+            return;
+        }
         return super.loadCurrentImage();
     }
 
@@ -126,23 +166,27 @@ export class MemoryRevealGame extends ImageViewerDialog {
         try {
             console.log("[MemoryRevealGame] ORM reading quiz.quiz id:", this.state.quizId);
             const [quiz] = await this.orm.read("quiz.quiz", [this.state.quizId], [
-                "name", "quiz_type", "image_url", "question_ids",
+                "name", "quiz_type", "question_ids",
             ]);
             console.log("[MemoryRevealGame] ORM result:", JSON.stringify(quiz));
             this.state.quizName = quiz.name || "";
 
-            // Set the image URL on the viewer state so it loads
-            if (quiz.image_url) {
-                console.log("[MemoryRevealGame] Setting image URL:", quiz.image_url);
-                this.state.currentUrl = quiz.image_url;
-                this.state.directUrl = quiz.image_url;
+            const imageUrl = await this.orm.call(
+                "quiz.quiz",
+                "get_memory_reveal_image_url",
+                [this.state.quizId],
+            );
+            if (imageUrl) {
+                console.log("[MemoryRevealGame] Setting image URL:", imageUrl);
+                this.state.currentUrl = imageUrl;
+                this.state.directUrl = imageUrl;
             } else {
-                console.warn("[MemoryRevealGame] No image_url returned from ORM");
+                console.warn("[MemoryRevealGame] No image URL returned from ORM");
             }
 
             if (quiz.question_ids && quiz.question_ids.length > 0) {
                 const questions = await this.orm.read("quiz.question", quiz.question_ids, [
-                    "id", "question_text", "region_x1", "region_y1", "region_x2", "region_y2",
+                    "id", "question_text", "marks", "region_x1", "region_y1", "region_x2", "region_y2",
                     "answer_ids",
                 ]);
 
@@ -166,11 +210,10 @@ export class MemoryRevealGame extends ImageViewerDialog {
                     x2: q.region_x2,
                     y2: q.region_y2,
                     question_id: q.id,
+                    marks: q.marks,
                     answers: (q.answer_ids || []).map(aId => answerMap[aId]).filter(Boolean),
                     index: idx,
                 }));
-
-                this.state.totalPossible = this.state.regions.length * 2;
             }
 
             // Generate attempt token
@@ -193,8 +236,59 @@ export class MemoryRevealGame extends ImageViewerDialog {
             // Reveal the region
             this.state.revealed[region.id] = true;
             this.state.activeRegionId = region.id;
+            this._updateTotalPossible();
         }
         this._updateActiveRegionInfo();
+    }
+
+    onSidebarRegionClick(region) {
+        // Sidebar indicators locate a region without revealing its answer.
+        this._highlightRegion(region);
+    }
+
+    _getRegionMaxMarks(region) {
+        const answerMarks = (region.answers || [])
+            .map(answer => Number(answer.marks))
+            .filter(Number.isFinite);
+        return answerMarks.length
+            ? Math.max(...answerMarks)
+            : Math.max(Number(region.marks) || 0, 0);
+    }
+
+    _updateTotalPossible() {
+        this.state.totalPossible = this.state.regions
+            .filter(region => this.state.revealed[region.id])
+            .reduce((total, region) => total + this._getRegionMaxMarks(region), 0);
+    }
+
+    _highlightRegion(region) {
+        this._stopRegionHighlight();
+        this.state.highlightedRegionId = region.id;
+
+        let colorIndex = 0;
+        this.state.highlightColor = HIGHLIGHT_COLORS[colorIndex];
+        this._highlightInterval = setInterval(() => {
+            colorIndex = (colorIndex + 1) % HIGHLIGHT_COLORS.length;
+            this.state.highlightColor = HIGHLIGHT_COLORS[colorIndex];
+        }, 180);
+        this._highlightTimeout = setTimeout(() => {
+            this._stopRegionHighlight();
+        }, 5000);
+    }
+
+    _stopRegionHighlight() {
+        if (this._highlightInterval) {
+            clearInterval(this._highlightInterval);
+            this._highlightInterval = null;
+        }
+        if (this._highlightTimeout) {
+            clearTimeout(this._highlightTimeout);
+            this._highlightTimeout = null;
+        }
+        if (this.state) {
+            this.state.highlightedRegionId = null;
+            this.state.highlightColor = "";
+        }
     }
 
     async onAssess(region, answer) {
@@ -315,8 +409,21 @@ export class MemoryRevealGame extends ImageViewerDialog {
     regionNumberStyle(region) {
         const left = Math.min(Math.max(region.x1, 1), 96);
         const top = Math.max(region.y1, 1);
+        // Size the marker from the image's natural width so it remains
+        // proportional across images with different resolutions. The scene
+        // applies the same zoom transform to the image and this marker.
+        const markerSize = this.state.imageWidth
+            ? this.state.imageWidth * 0.02
+            : 28;
+        const fontSize = markerSize * 0.46;
+        const borderWidth = Math.max(2, markerSize * 0.07);
+        const highlightStyle = this.state.highlightedRegionId === region.id
+            ? `background:${this.state.highlightColor};transform:translate(-50%, calc(-50% - 5px)) scale(1.8);`
+            : "transform:translate(-50%, calc(-50% - 5px));";
         return `position:absolute;left:${left}%;top:${top}%;z-index:25;` +
-            "transform:translate(-50%, -50%);pointer-events:none;";
+            `width:${markerSize}px;height:${markerSize}px;font-size:${fontSize}px;` +
+            `border-width:${borderWidth}px;` +
+            `${highlightStyle}pointer-events:none;`;
     }
 
     _updateActiveRegionInfo() {
