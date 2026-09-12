@@ -434,15 +434,10 @@ export class MemoryRevealSetup extends ImageViewerDialog {
     // ── Close override ─────────────────────────────────────────────────────
 
     async closeViewer() {
-        // As a client action, navigate back to the quiz form
-        if (this.state.quizId) {
-            this.action.doAction({
-                type: "ir.actions.act_window",
-                res_model: "quiz.quiz",
-                res_id: this.state.quizId,
-                views: [[false, "form"]],
-                target: "current",
-            });
+        // Restore the action that opened this client action instead of
+        // forcing navigation to the quiz form.
+        if (this.action?.restore) {
+            await this.action.restore();
         } else {
             await this.props.close();
         }

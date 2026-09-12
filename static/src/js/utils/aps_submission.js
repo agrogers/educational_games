@@ -66,6 +66,37 @@ export async function saveToApsSubmission(orm, notification, submissionId, score
 }
 
 /**
+ * Save a student-owned Memory Reveal result through its restricted server
+ * endpoint. The endpoint validates ownership and submission state before
+ * performing the protected write.
+ */
+export async function saveMemoryRevealResult(
+    orm, notification, submissionId, score, htmlReport, outOfMarks = null
+) {
+    console.log("[APS submission][memory reveal] saving result", {
+        submissionId,
+        score,
+        outOfMarks,
+        reportLength: htmlReport?.length || 0,
+    });
+    try {
+        const response = await orm.call("quiz.quiz", "submit_memory_reveal_result", [
+            submissionId,
+            score,
+            htmlReport,
+            outOfMarks,
+        ]);
+        console.log("[APS submission][memory reveal] server response", response);
+        notification.add("Results saved successfully!", { type: "success" });
+        return true;
+    } catch (error) {
+        console.error("[APS submission][memory reveal] server error", error);
+        notification.add("Error saving results. Please contact your teacher.", { type: "danger" });
+        return false;
+    }
+}
+
+/**
  * Create a copy of an existing aps.resource.submission for re-submission.
  *
  * Calls quiz.quiz.create_submission_copy() on the server, which uses the

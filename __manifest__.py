@@ -11,7 +11,12 @@
     'data': [
         'security/ir.model.access.csv',
         'views/quiz_actions.xml',
-        'views/quiz_views.xml',
+        'views/quiz_quiz_views.xml',
+        'views/quiz_tag_views.xml',
+        'views/quiz_question_views.xml',
+        'views/quiz_question_import_wizard_views.xml',
+        'views/quiz_question_tag_wizard_views.xml',
+        'views/quiz_response_views.xml',
         'views/actions.xml',
         'views/educational_games_menu.xml',
         'views/educational_games_views.xml',
@@ -44,6 +49,9 @@
             # Memory Reveal: student game viewer
             'educational_games/static/src/js/memory_reveal/memory_reveal_game.js',
             'educational_games/static/src/xml/memory_reveal_game.xml',
+        ],
+        'web.assets_web_dark': [
+            'educational_games/static/src/css/educational_games.dark.scss',
         ],
     },
     'installable': True,

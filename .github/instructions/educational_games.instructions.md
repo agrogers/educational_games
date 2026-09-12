@@ -33,10 +33,12 @@ This addon targets **Odoo 18 Community Edition** and delivers classroom mini-gam
 - Do not introduce `attrs` or `states`; use direct expression attributes.
 - Keep action/view wiring explicit and valid for Odoo 18 (`ir.actions.act_window.view` for fixed view binding).
 - Do not add deprecated model naming patterns (use `display_name` behavior; avoid `name_get`).
+- Never minify or collapse source files. Preserve readable indentation, line breaks, and one logical XML element per line where practical.
+- For every XML view architecture field, put a newline or whitespace immediately after `<field name="arch" type="xml">`; never write the nested view element directly after the opening tag. Odoo's filesystem view loader requires non-`None` text there.
 
 ## Change routing hints
 
-- "Add new quiz setting": edit `quiz.quiz` fields + quiz form/list views.
+- "Add new quiz setting": edit `quiz.quiz` fields + the relevant split quiz form/list view under `views/quiz_quiz_views.xml`.
 - "Add new game": create JS under `static/src/js/...`, define `ir.actions.client`, add menu item, register assets in manifest.
 - "Add permissions": edit `security/ir.model.access.csv` and any relevant record rules.
 - "Broken game load": verify action tag in XML matches JS action registration and that asset order is correct in `__manifest__.py`.

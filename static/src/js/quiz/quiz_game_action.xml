@@ -407,21 +407,31 @@
             <div class="quiz-progress-bar" aria-hidden="true">
                 <div t-if="props.summary.known_questions"
                      class="quiz-progress-segment quiz-progress-known"
-                     t-att-style="'flex-basis:' + this.getWidth('known_questions') + '%'"/>
+                     t-att-style="'flex-basis:' + this.getWidth('known_questions') + '%'"
+                     t-att-title="this.getSegmentTitle('known_questions', 'Known')"
+                     t-att-aria-label="this.getSegmentTitle('known_questions', 'Known')"/>
                 <div t-if="props.summary.not_known_questions"
                      class="quiz-progress-segment quiz-progress-not-known"
-                     t-att-style="'flex-basis:' + this.getWidth('not_known_questions') + '%'"/>
+                     t-att-style="'flex-basis:' + this.getWidth('not_known_questions') + '%'"
+                     t-att-title="this.getSegmentTitle('not_known_questions', 'Learning')"
+                     t-att-aria-label="this.getSegmentTitle('not_known_questions', 'Learning')"/>
                 <t t-if="props.summary.student_attempt_threshold !== 1">
                     <div t-if="props.summary.new_above_threshold"
                          class="quiz-progress-segment quiz-progress-new-above"
-                         t-att-style="'flex-basis:' + this.getWidth('new_above_threshold') + '%'"/>
+                        t-att-style="'flex-basis:' + this.getWidth('new_above_threshold') + '%'"
+                        t-att-title="this.getSegmentTitle('new_above_threshold', 'New above threshold')"
+                        t-att-aria-label="this.getSegmentTitle('new_above_threshold', 'New above threshold')"/>
                     <div t-if="props.summary.new_below_threshold"
                          class="quiz-progress-segment quiz-progress-new-below"
-                         t-att-style="'flex-basis:' + this.getWidth('new_below_threshold') + '%'"/>
+                        t-att-style="'flex-basis:' + this.getWidth('new_below_threshold') + '%'"
+                        t-att-title="this.getSegmentTitle('new_below_threshold', 'New below threshold')"
+                        t-att-aria-label="this.getSegmentTitle('new_below_threshold', 'New below threshold')"/>
                 </t>
                 <div t-if="props.summary.not_tried_questions"
                      class="quiz-progress-segment quiz-progress-not-tried"
-                     t-att-style="'flex-basis:' + this.getWidth('not_tried_questions') + '%'"/>
+                     t-att-style="'flex-basis:' + this.getWidth('not_tried_questions') + '%'"
+                     t-att-title="this.getSegmentTitle('not_tried_questions', 'Not tried')"
+                     t-att-aria-label="this.getSegmentTitle('not_tried_questions', 'Not tried')"/>
             </div>
             <div class="quiz-progress-legend mt-1">
                 <span>

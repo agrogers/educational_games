@@ -11,6 +11,96 @@
     font-size: 0.8em;
 }
 
+.memory-reveal-progress-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    border: 0;
+    background: transparent;
+    padding: 0 0 0.35rem;
+    cursor: pointer;
+}
+
+.memory-reveal-progress-bar {
+    display: flex;
+    width: 100%;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #495057;
+    cursor: pointer;
+}
+
+.memory-progress-segment {
+    min-width: 0;
+    transition: width 180ms ease;
+}
+
+.memory-progress-known {
+    background: #22c55e;
+}
+
+.memory-progress-learning {
+    background: #f97316;
+}
+
+.memory-progress-new {
+    background: #facc15;
+}
+
+.memory-progress-not-tried {
+    background: #6c757d;
+}
+
+.memory-reveal-progress-legend,
+.memory-reveal-border-help {
+    color: #f8f9fa;
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
+.memory-reveal-progress-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.memory-reveal-border-help {
+    color: #ced4da;
+}
+
+.memory-border-swatch {
+    display: inline-block;
+    width: 1.1rem;
+    margin-right: 0.25rem;
+    vertical-align: middle;
+}
+
+.memory-border-known {
+    border-top: 4px solid #22c55e;
+}
+
+.memory-border-learning {
+    border-top: 3px solid #f97316;
+}
+
+.memory-border-due {
+    border-top: 2px dashed #22c55e;
+}
+
+.memory-region-known {
+    border-color: #22c55e !important;
+}
+
+.memory-region-learning {
+    border-color: #f97316 !important;
+}
+
+.memory-region-middle {
+    border-color: #adb5bd !important;
+}
+
 .memory-reveal-naming-dialog {
     position: relative;
     z-index: 1;

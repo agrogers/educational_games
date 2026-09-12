@@ -222,7 +222,17 @@
                                     <field name="region_y1" string="Top %" optional="show"/>
                                     <field name="region_x2" string="Right %" optional="show"/>
                                     <field name="region_y2" string="Bottom %" optional="show"/>
+                                    <field name="id" string="ID" optional="show"/>
+                                    <field name="marks" optional="hide"/>
+                                    <field name="import_group" optional="hide"/>
+                                    <field name="subject_ids" widget="many2many_tags" optional="show"/>
+                                    <field name="tag_ids" widget="many2many_tags" optional="show"/>
+                                    <field name="correct_answer_count" string="Correct Options" optional="hide"/>
+                                    <field name="attempt_count" string="Attempts" optional="show"/>
+                                    <field name="pct_correct_all" string="% Correct" optional="show"/>
+                                    <field name="pct_correct_recent" string="% Correct (1h)" optional="hide"/>
                                     <field name="create_date" string="Created" optional="show"/>
+                                    
                                 </list>
                                 <form string="Region">
                                     <sheet>

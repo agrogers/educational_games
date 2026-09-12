@@ -20,6 +20,9 @@ Use **Odoo 18 syntax and behaviors only**.
 - `controllers/main.py`: routes such as `/educational_games/dashboard`.
 - `views/quiz_actions.xml`: window/client actions for quiz admin and quiz game.
 - `views/quiz_views.xml`: list/form UI for `quiz.quiz` and nested questions/answers.
+- `views/quiz_quiz_views.xml`: list/form UI for `quiz.quiz` and nested questions/answers.
+- `views/quiz_question_views.xml`: list/search/form UI for `quiz.question`.
+- `views/quiz_response_views.xml`: list/search/form UI for `quiz.response`.
 - `views/educational_games_menu.xml`: menus under APEX teacher root.
 - `static/src/js/`: frontend game clients (Lonely S, quiz game, binary conversions, wrapper).
 - `static/src/js/utils/aps_submission.js`: shared submission utility used by game JS files.
@@ -31,6 +34,8 @@ Use **Odoo 18 syntax and behaviors only**.
 - Prefer explicit `ir.actions.act_window.view` bindings when an action must open specific list/form views.
 - Use `display_name` behavior for record naming (do not introduce deprecated `name_get`).
 - Keep ORM logic in models; avoid raw SQL unless strictly necessary.
+- Never minify source files. Keep XML, Python, JavaScript, and CSS readable with normal indentation and line breaks.
+- Never place `<form>`, `<list>`, `<search>`, or another view root immediately after `<field name="arch" type="xml">`; include a newline or whitespace. Odoo's filesystem view loader uses the field text and fails when it is `None`.
 
 ### Frontend and assets
 

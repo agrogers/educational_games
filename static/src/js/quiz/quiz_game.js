@@ -26,6 +26,15 @@ export class QuizProgressBar extends Component {
         }
         return ((s[key] || 0) / s.total_possible_questions) * 100;
     }
+
+    /** Returns the native browser tooltip text for a progress segment. */
+    getSegmentTitle(key, label) {
+        const summary = this.props.summary;
+        const count = summary?.[key] || 0;
+        const total = summary?.total_possible_questions || 0;
+        const percentage = total ? Math.round((count / total) * 100) : 0;
+        return `${label}: ${count} question${count === 1 ? "" : "s"} (${percentage}%)`;
+    }
 }
 
 // ── Statistics widget (shown in the Statistics tab of the quiz form) ─────────

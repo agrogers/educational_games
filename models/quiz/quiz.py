@@ -394,12 +394,24 @@ class Quiz(models.Model):
         for question in questions:
             attempts = list(grouped.get(question.id, {}).values())
             correct_ids = set(question.answer_ids.filtered('is_correct').ids)
+            is_memory_reveal = question.quiz_id and question.quiz_id.quiz_type == 'memory_reveal'
+            maximum_marks = max(question.answer_ids.mapped('marks') or [question.marks or 0])
             weighted_total = 0.0
             weight_sum = 0.0
 
             for index, attempt in enumerate(attempts, start=1):
                 weight = 1.0 / index
-                attempt_score = 100.0 if correct_ids and attempt['selected_ids'] == correct_ids else 0.0
+                if is_memory_reveal:
+                    selected_answer = question.answer_ids.filtered(
+                        lambda answer: answer.id in attempt['selected_ids']
+                    )[:1]
+                    attempt_score = (
+                        (selected_answer.marks / maximum_marks) * 100.0
+                        if selected_answer and maximum_marks
+                        else 0.0
+                    )
+                else:
+                    attempt_score = 100.0 if correct_ids and attempt['selected_ids'] == correct_ids else 0.0
                 weighted_total += attempt_score * weight
                 weight_sum += weight
 
@@ -1499,3 +1511,35 @@ class Quiz(models.Model):
 
         result.sort(key=lambda x: (x['user_name'] or '').lower())
         return result
+
+    @api.model
+    def submit_memory_reveal_result(
+        self, submission_id, score, answer, out_of_marks=None
+    ):
+        """Save a Memory Reveal result for the owning student.
+
+        Student submission record rules can reject a normal ORM ``write`` when
+        the submission's computed visibility has changed while the game is
+        open. This method performs the ownership/state checks in the normal
+        environment, then writes only the permitted result fields with sudo.
+        It avoids granting students general write access to submissions.
+        """
+        submission = self.env['aps.resource.submission'].sudo().browse(
+            int(submission_id)
+        ).exists()
+        if not submission:
+            raise UserError("Submission not found.")
+        if submission.student_id != self.env.user.partner_id:
+            raise AccessError("You can only submit results for your own submission.")
+        if submission.state != 'assigned':
+            raise UserError("This submission has already been submitted.")
+
+        values = {
+            'score': float(score or 0),
+            'answer': answer or '',
+            'state': 'submitted',
+        }
+        if out_of_marks is not None:
+            values['out_of_marks'] = float(out_of_marks)
+        submission.write(values)
+        return {'saved': True, 'submission_id': submission.id}

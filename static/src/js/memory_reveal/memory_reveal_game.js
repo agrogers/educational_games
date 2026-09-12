@@ -11,7 +11,7 @@ import { useService } from "@web/core/utils/hooks";
 import { ImageViewerDialog } from "@aui_enhancements/js/image_viewer_dialog";
 import {
     APS_SUBMISSION_MODEL,
-    saveToApsSubmission,
+    saveMemoryRevealResult,
 } from "@educational_games/js/utils/aps_submission";
 
 const ZOOM_STEP = 0.08;
@@ -34,21 +34,84 @@ function decodeHtmlText(value) {
     return element.value;
 }
 
+function getUrlQueryParams() {
+    const params = new URLSearchParams(window.location?.search || "");
+    const result = Object.fromEntries(params.entries());
+    console.log("[MemoryRevealGame][launch] URL params", result);
+    return result;
+}
+
+function loadStoredLaunchParams(key) {
+    try {
+        const raw = window.sessionStorage.getItem(key);
+        const result = raw ? JSON.parse(raw) || {} : {};
+        console.log("[MemoryRevealGame][launch] session storage", key, result);
+        return result;
+    } catch {
+        console.error("[MemoryRevealGame][launch] failed to read session storage", key);
+        return {};
+    }
+}
+
+function getLaunchParam(action, storedParams, key) {
+    const sources = [
+        getUrlQueryParams(),
+        action?.params,
+        action?.context,
+        storedParams,
+    ];
+    for (const [index, source] of sources.entries()) {
+        const value = source?.[key];
+        if (value !== undefined && value !== null && value !== "") {
+            console.log("[MemoryRevealGame][launch] resolved parameter", {
+                key,
+                value,
+                sourceIndex: index,
+            });
+            return value;
+        }
+    }
+    console.warn("[MemoryRevealGame][launch] missing parameter", key);
+    return undefined;
+}
+
 function getMemoryRevealQuizId(action) {
-    const sources = [action?.params, action?.context];
-    for (const source of sources) {
-        for (const key of ["quiz_id", "default_quiz_id", "active_id", "res_id"]) {
-            const value = Number.parseInt(source?.[key], 10);
-            if (Number.isInteger(value) && value > 0) {
-                return value;
-            }
+    // A submission launch carries active_id=the submission ID. Prefer the
+    // quiz ID encoded in the routed path before considering active_id.
+    const match = window.location.pathname.match(/(?:^|\/)quiz\.quiz\/(\d+)(?:\/|$)/i);
+    if (match) {
+        return Number.parseInt(match[1], 10);
+    }
+
+    for (const key of ["quiz_id", "default_quiz_id", "res_id"]) {
+        const value = Number.parseInt(
+            getLaunchParam(action, {}, key),
+            10,
+        );
+        if (Number.isInteger(value) && value > 0) {
+            return value;
         }
     }
 
-    // Client-action routing can preserve the record path while dropping the
-    // action params/context. Recover the quiz ID from /quiz.quiz/<id>/...
-    const match = window.location.pathname.match(/(?:^|\/)quiz\.quiz\/(\d+)(?:\/|$)/i);
-    return match ? Number.parseInt(match[1], 10) : 0;
+    return Number.parseInt(getLaunchParam(action, {}, "active_id"), 10) || 0;
+}
+
+function getSubmissionLaunchContext(action, storedParams) {
+    const context = {};
+    for (const key of [
+        "submission_id",
+        "submission_model",
+        "submission_state",
+        "active_model",
+        "active_id",
+    ]) {
+        const value = getLaunchParam(action, storedParams, key);
+        if (value !== undefined) {
+            context[key] = value;
+        }
+    }
+    console.log("[MemoryRevealGame][launch] submission context", context);
+    return context;
 }
 
 export class MemoryRevealGame extends ImageViewerDialog {
@@ -65,9 +128,9 @@ export class MemoryRevealGame extends ImageViewerDialog {
     };
 
     setup() {
-        console.log("[MemoryRevealGame] setup() called, props keys:", Object.keys(this.props));
-        console.log("[MemoryRevealGame] quiz_id from params:", this.props.action?.params?.quiz_id, "context:", this.props.action?.context?.quiz_id);
-
+        console.group("[MemoryRevealGame] setup");
+        console.log("props", this.props);
+        console.log("action", this.props.action);
         // Provide safe defaults for dialog props when used as a client action
         if (!this.props.imageConfig) {
             this.props.imageConfig = { directUrl: "" };
@@ -84,13 +147,45 @@ export class MemoryRevealGame extends ImageViewerDialog {
         this.action = useService("action");
 
         // Game state — read quiz_id and submission params from action context/params
-        const context = this.props.action?.context || {};
-        const actionParams = this.props.action?.params || {};
+        const storageKey = this._getLaunchStorageKey();
+        const storedParams = loadStoredLaunchParams(storageKey);
+        const pendingSubmission = loadStoredLaunchParams(
+            "educational_games.pending_submission_context",
+        );
+        const launchContext = getSubmissionLaunchContext(
+            this.props.action,
+            Object.keys(pendingSubmission).length ? pendingSubmission : storedParams,
+        );
+        const explicitSubmissionModel = launchContext.submission_model ||
+            launchContext.active_model || "";
+        const explicitSubmissionId = launchContext.submission_id;
+        const submissionIdValue = explicitSubmissionId || (
+            explicitSubmissionModel === APS_SUBMISSION_MODEL
+                ? launchContext.active_id
+                : 0
+        );
+        const submissionId = parseInt(submissionIdValue, 10) || 0;
+        const submissionModel = explicitSubmissionModel || (
+            explicitSubmissionId ? APS_SUBMISSION_MODEL : ""
+        );
+        const quizId = getMemoryRevealQuizId(this.props.action);
+        console.log("[MemoryRevealGame][launch] computed IDs", {
+            quizId,
+            explicitSubmissionModel,
+            explicitSubmissionId,
+            submissionIdValue,
+            submissionId,
+            submissionModel,
+            submissionState: launchContext.submission_state,
+            isSubmissionContext: submissionModel === APS_SUBMISSION_MODEL && !!submissionId,
+        });
 
         Object.assign(this.state, {
-            quizId: getMemoryRevealQuizId(this.props.action),
-            submissionId: parseInt(actionParams.active_id || context.active_id, 10) || 0,
-            submissionModel: actionParams.active_model || context.active_model || APS_SUBMISSION_MODEL,
+            quizId,
+            submissionId,
+            submissionModel,
+            submissionState: launchContext.submission_state || "",
+            isSubmissionContext: submissionModel === APS_SUBMISSION_MODEL && !!submissionId,
             quizName: "",
             regions: [],        // [{id, name, x1, y1, x2, y2, question_id, answers}]
             revealed: {},       // { questionId: true } — which regions are revealed
@@ -100,6 +195,13 @@ export class MemoryRevealGame extends ImageViewerDialog {
             activeRegionName: "",   // name of the currently active region
             score: 0,
             totalPossible: 0,
+            fullTotalMarks: 0,
+            knownAttemptThreshold: 0,
+            knownWeightedThreshold: 0,
+            answeredMaximum: 0,
+            progressSummary: {},
+            progressExpanded: false,
+            submissionSubmitted: false,
             completed: false,
             blurMode: true,     // true = blur, false = orange outline
             highlightedRegionId: null,
@@ -107,6 +209,14 @@ export class MemoryRevealGame extends ImageViewerDialog {
             attemptToken: "",
             loading: false,
         });
+        console.log("[MemoryRevealGame][launch] state after initialization", {
+            quizId: this.state.quizId,
+            submissionId: this.state.submissionId,
+            submissionModel: this.state.submissionModel,
+            submissionState: this.state.submissionState,
+            isSubmissionContext: this.state.isSubmissionContext,
+        });
+        console.groupEnd();
 
         this._highlightInterval = null;
         this._highlightTimeout = null;
@@ -142,6 +252,11 @@ export class MemoryRevealGame extends ImageViewerDialog {
      * when directUrl has not yet been populated.
      */
     async loadCurrentImage() {
+        console.log("[MemoryRevealGame][load] loadCurrentImage", {
+            quizDataLoaded: this._quizDataLoaded,
+            quizId: this.state.quizId,
+            directUrl: this.state.directUrl,
+        });
         if (!this._quizDataLoaded) {
             await this._loadQuizData();
             this._quizDataLoaded = true;
@@ -157,7 +272,10 @@ export class MemoryRevealGame extends ImageViewerDialog {
     }
 
     async _loadQuizData() {
-        console.log("[MemoryRevealGame] _loadQuizData() called, quizId:", this.state.quizId);
+        console.log("[MemoryRevealGame][load] _loadQuizData start", {
+            quizId: this.state.quizId,
+            isSubmissionContext: this.state.isSubmissionContext,
+        });
         if (!this.state.quizId) {
             console.warn("[MemoryRevealGame] No quizId, aborting");
             return;
@@ -165,17 +283,24 @@ export class MemoryRevealGame extends ImageViewerDialog {
         this.state.loading = true;
         try {
             console.log("[MemoryRevealGame] ORM reading quiz.quiz id:", this.state.quizId);
-            const [quiz] = await this.orm.read("quiz.quiz", [this.state.quizId], [
-                "name", "quiz_type", "question_ids",
-            ]);
-            console.log("[MemoryRevealGame] ORM result:", JSON.stringify(quiz));
-            this.state.quizName = quiz.name || "";
+            const data = await this.orm.call(
+                "quiz.quiz",
+                "get_memory_reveal_data",
+                [this.state.quizId],
+            );
+            console.log("[MemoryRevealGame][load] quiz data received", data);
+            this.state.quizName = data.quiz_name || "";
+            this.state.fullTotalMarks = data.full_total_marks || 0;
+            this.state.knownAttemptThreshold = data.filter_student_attempts || 0;
+            this.state.knownWeightedThreshold = data.filter_student_weighted_score_pct || 0;
+            this.state.progressSummary = data.progress_summary || {};
 
             const imageUrl = await this.orm.call(
                 "quiz.quiz",
                 "get_memory_reveal_image_url",
                 [this.state.quizId],
             );
+            console.log("[MemoryRevealGame][load] image URL received", imageUrl);
             if (imageUrl) {
                 console.log("[MemoryRevealGame] Setting image URL:", imageUrl);
                 this.state.currentUrl = imageUrl;
@@ -184,42 +309,29 @@ export class MemoryRevealGame extends ImageViewerDialog {
                 console.warn("[MemoryRevealGame] No image URL returned from ORM");
             }
 
-            if (quiz.question_ids && quiz.question_ids.length > 0) {
-                const questions = await this.orm.read("quiz.question", quiz.question_ids, [
-                    "id", "question_text", "marks", "region_x1", "region_y1", "region_x2", "region_y2",
-                    "answer_ids",
-                ]);
-
-                // Load answers for each question
-                const allAnswerIds = questions.flatMap(q => q.answer_ids || []);
-                let answerMap = {};
-                if (allAnswerIds.length > 0) {
-                    const answers = await this.orm.read("quiz.answer", allAnswerIds, [
-                        "id", "answer_text", "is_correct", "marks",
-                    ]);
-                    answerMap = Object.fromEntries(answers.map(a => [a.id, a]));
-                }
-
-                this.state.regions = questions.map((q, idx) => ({
+            this.state.regions = (data.regions || []).map((q, idx) => ({
                     id: q.id,
                     name: decodeHtmlText(
-                        (q.question_text || "").replace(/<[^>]+>/g, "").trim()
+                        (q.name || "").replace(/<[^>]+>/g, "").trim()
                     ) || `Region ${idx + 1}`,
-                    x1: q.region_x1,
-                    y1: q.region_y1,
-                    x2: q.region_x2,
-                    y2: q.region_y2,
+                    x1: q.x1,
+                    y1: q.y1,
+                    x2: q.x2,
+                    y2: q.y2,
                     question_id: q.id,
                     marks: q.marks,
-                    answers: (q.answer_ids || []).map(aId => answerMap[aId]).filter(Boolean),
-                    index: idx,
+                    answers: q.answers || [],
+                    index: q.index ?? idx,
+                    attemptCount: q.attempt_count || 0,
+                    weightedScorePct: q.weighted_score_pct,
+                    lastAnsweredAt: q.last_answered_at,
+                    category: q.category || "not_tried",
                 }));
-            }
 
             // Generate attempt token
             this.state.attemptToken = Date.now().toString(36) + Math.random().toString(36).slice(2);
         } catch (e) {
-            console.error("[MemoryRevealGame] Failed to load quiz data:", e);
+            console.error("[MemoryRevealGame][load] failed to load quiz data", e);
             this.notification.add(_t("Failed to load quiz"), { type: "danger" });
         } finally {
             this.state.loading = false;
@@ -256,6 +368,8 @@ export class MemoryRevealGame extends ImageViewerDialog {
     }
 
     _updateTotalPossible() {
+        this.state.fullTotalMarks = this.state.regions
+            .reduce((total, region) => total + this._getRegionMaxMarks(region), 0);
         this.state.totalPossible = this.state.regions
             .filter(region => this.state.revealed[region.id])
             .reduce((total, region) => total + this._getRegionMaxMarks(region), 0);
@@ -292,6 +406,12 @@ export class MemoryRevealGame extends ImageViewerDialog {
     }
 
     async onAssess(region, answer) {
+        console.log("[MemoryRevealGame][assessment] onAssess", {
+            regionId: region?.id,
+            questionId: region?.question_id,
+            answerId: answer?.id,
+            beforeAssessments: { ...this.state.assessments },
+        });
         if (this.state.assessments[region.id]) return; // already assessed
 
         this.state.assessments[region.id] = answer.id;
@@ -300,22 +420,34 @@ export class MemoryRevealGame extends ImageViewerDialog {
         this.state.score += answer.marks;
 
         try {
-            await this.orm.call("quiz.quiz", "submit_memory_reveal_assessment", [
+            const response = await this.orm.call("quiz.quiz", "submit_memory_reveal_assessment", [
                 this.state.quizId,
                 region.question_id,
                 answer.id,
             ], {
                 attempt_token: this.state.attemptToken,
             });
+            console.log("[MemoryRevealGame][assessment] server response", response);
         } catch (e) {
-            console.error("[MemoryRevealGame] Failed to save assessment:", e);
+            console.error("[MemoryRevealGame][assessment] failed to save assessment", e);
         }
+
+        this._updateAnsweredMaximum();
+        this._refreshProgressFromSession();
+        console.log("[MemoryRevealGame][assessment] state after assessment", {
+            assessments: { ...this.state.assessments },
+            score: this.state.score,
+            answeredMaximum: this.state.answeredMaximum,
+            canSubmitResults: this.canSubmitResults,
+            isSubmissionContext: this.state.isSubmissionContext,
+            submissionId: this.state.submissionId,
+            submissionState: this.state.submissionState,
+        });
 
         // Check if all regions are assessed
         if (Object.keys(this.state.assessments).length === this.state.regions.length) {
             this.state.completed = true;
             this.state.activeRegionId = null;
-            await this._submitScore();
         } else {
             // Move to next unassessed region
             const nextRegion = this.state.regions.find(
@@ -327,21 +459,88 @@ export class MemoryRevealGame extends ImageViewerDialog {
         }
     }
 
-    async _submitScore() {
-        if (!this.state.submissionId || !this.state.submissionModel) return;
+    async submitResults() {
+        console.log("[MemoryRevealGame][submit] submitResults clicked", {
+            isSubmissionContext: this.state.isSubmissionContext,
+            submissionId: this.state.submissionId,
+            submissionModel: this.state.submissionModel,
+            submissionState: this.state.submissionState,
+            assessments: { ...this.state.assessments },
+            score: this.state.score,
+            answeredMaximum: this.state.answeredMaximum,
+        });
+        if (!this.state.isSubmissionContext) {
+            console.warn("[MemoryRevealGame][submit] aborted: not a submission context");
+            return;
+        }
+        if (this.state.submissionState && this.state.submissionState !== "assigned") {
+            console.warn("[MemoryRevealGame][submit] aborted: submission is not assigned", this.state.submissionState);
+            this.notification.add(_t("This submission has already been submitted."), { type: "info" });
+            return;
+        }
         try {
             const htmlReport = this._buildReportHtml();
-            await saveToApsSubmission(
+            const saved = await saveMemoryRevealResult(
                 this.orm,
                 this.notification,
                 this.state.submissionId,
                 this.state.score,
                 htmlReport,
-                this.state.totalPossible,
+                this.state.answeredMaximum,
             );
+            console.log("[MemoryRevealGame][submit] save helper result", saved);
+            if (saved) {
+                this.state.submissionSubmitted = true;
+                this.state.submissionState = "submitted";
+            }
         } catch (e) {
-            console.error("[MemoryRevealGame] Failed to submit score:", e);
+            console.error("[MemoryRevealGame][submit] failed to submit score", e);
         }
+    }
+
+    _updateAnsweredMaximum() {
+        this.state.answeredMaximum = this.state.regions
+            .filter(region => this.state.assessments[region.id])
+            .reduce((total, region) => total + this._getRegionMaxMarks(region), 0);
+        this.state.totalPossible = this.state.answeredMaximum;
+    }
+
+    _refreshProgressFromSession() {
+        const summary = {
+            known_questions: 0,
+            not_known_questions: 0,
+            new_above_threshold: 0,
+            new_below_threshold: 0,
+            not_tried_questions: 0,
+        };
+        for (const region of this.state.regions) {
+            const selectedId = this.state.assessments[region.id];
+            if (selectedId) {
+                const answer = region.answers.find(item => item.id === selectedId);
+                region.attemptCount = Math.max(region.attemptCount || 0, 1);
+                region.weightedScorePct = answer
+                    ? (Number(answer.marks) / Math.max(this._getRegionMaxMarks(region), 1)) * 100
+                    : 0;
+                region.lastAnsweredAt = new Date().toISOString();
+                const meetsScore = !this.state.knownWeightedThreshold ||
+                    region.weightedScorePct >= this.state.knownWeightedThreshold;
+                const meetsAttempts = !this.state.knownAttemptThreshold ||
+                    region.attemptCount >= this.state.knownAttemptThreshold;
+                region.category = meetsScore && meetsAttempts
+                    ? "known"
+                    : region.weightedScorePct < 50
+                        ? "not_known"
+                        : "middle";
+            }
+            const categoryKey = region.category === "not_known"
+                ? "not_known_questions"
+                : `${region.category || "not_tried"}_questions`;
+            summary[categoryKey] += 1;
+        }
+        this.state.progressSummary = {
+            ...this.state.progressSummary,
+            ...summary,
+        };
     }
 
     _buildReportHtml() {
@@ -349,24 +548,31 @@ export class MemoryRevealGame extends ImageViewerDialog {
         const assessed = this.state.assessments;
         let rows = regions.map(r => {
             const answer = r.answers.find(a => a.id === assessed[r.id]);
-            const label = answer ? (answer.answer_text || "").replace(/<[^>]+>/g, "").trim() : "—";
+            const label = answer ? this._escapeHtml(answer.answer_text || "") : "—";
+            const name = this._escapeHtml(r.name);
             const color = answer?.marks === 2 ? "green" : answer?.marks === 1 ? "orange" : "red";
             return `<tr>
                 <td>${r.index + 1}</td>
-                <td>${r.name}</td>
+                <td>${name}</td>
                 <td style="color:${color};font-weight:bold;">${label}</td>
                 <td>${answer?.marks ?? 0}</td>
             </tr>`;
         }).join("");
 
         return `<div class="memory-reveal-report">
-            <h3>Memory Reveal: ${this.state.quizName}</h3>
-            <p>Score: <strong>${this.state.score} / ${this.state.totalPossible}</strong></p>
+            <h3>Memory Reveal: ${this._escapeHtml(this.state.quizName)}</h3>
+            <p>Score: <strong>${this.state.score}/${this.state.answeredMaximum}</strong> (from a possible total of ${this.state.fullTotalMarks})</p>
             <table class="table table-sm">
                 <thead><tr><th>#</th><th>Region</th><th>Assessment</th><th>Marks</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>
         </div>`;
+    }
+
+    _escapeHtml(value) {
+        const element = document.createElement("div");
+        element.textContent = value || "";
+        return element.innerHTML;
     }
 
     // ── Toggle blur mode ──────────────────────────────────────────────────
@@ -445,7 +651,6 @@ export class MemoryRevealGame extends ImageViewerDialog {
         const width = region.x2 - region.x1;
         const height = region.y2 - region.y1;
         const isRevealed = !!this.state.revealed[region.id];
-        const isActive = region.id === this.state.activeRegionId;
         const assessment = this.state.assessments[region.id];
 
         if (isRevealed && !assessment) {
@@ -457,20 +662,27 @@ export class MemoryRevealGame extends ImageViewerDialog {
             const answer = region.answers.find(a => a.id === assessment);
             const color = answer?.marks === 2 ? "#22c55e" : answer?.marks === 1 ? "#f59e0b" : "#ef4444";
             return `position:absolute;left:${left}%;top:${top}%;width:${width}%;height:${height}%;` +
-                `border:5px solid ${color};background:transparent;pointer-events:none;`;
+                `border:1px solid ${color};` +
+                `background:transparent;pointer-events:none;`;
         }
         // Not revealed — blur or outline
         if (this.state.blurMode) {
+            // Progress age controls the sidebar circle only. The image region
+            // keeps a stable border width, while its colour still indicates
+            // the current progress zone.
+            const borderColor = this.regionProgressBorderColor(region);
             return `position:absolute;left:${left}%;top:${top}%;width:${width}%;height:${height}%;` +
                 `backdrop-filter:blur(12px);` +
                 `-webkit-backdrop-filter:blur(12px);` +
-                `border-radius:12px;` +
+                `border-radius:10px;` +
                 `background: rgba(255, 255, 255, 0.01);` + // Use a light white tint instead of gray
-                `border: 4px solid rgba(255, 255, 255, 0.45);` +
+                `border:1px solid ${borderColor};` +
                 `cursor:pointer;`;
         } else {
+            const borderColor = this.regionProgressBorderColor(region);
             return `position:absolute;left:${left}%;top:${top}%;width:${width}%;height:${height}%;` +
-                `border:5px solid #f97316;border-radius:12px;background:rgba(249,115,22,0.15);cursor:pointer;`;
+                `border:5px solid ${borderColor};` +
+                `border-radius:12px;background:rgba(249,115,22,0.15);cursor:pointer;`;
         }
     }
 
@@ -492,6 +704,71 @@ export class MemoryRevealGame extends ImageViewerDialog {
         return this.state.completed;
     }
 
+    get canSubmitResults() {
+        const canSubmit = this.state.isSubmissionContext &&
+            !this.state.submissionSubmitted &&
+            (!this.state.submissionState || this.state.submissionState === "assigned") &&
+            Object.keys(this.state.assessments).length > 0;
+        console.log("[MemoryRevealGame][render] canSubmitResults", {
+            canSubmit,
+            isSubmissionContext: this.state.isSubmissionContext,
+            submissionSubmitted: this.state.submissionSubmitted,
+            submissionState: this.state.submissionState,
+            assessmentCount: Object.keys(this.state.assessments).length,
+        });
+        return canSubmit;
+    }
+
+    toggleProgressSummary() {
+        this.state.progressExpanded = !this.state.progressExpanded;
+    }
+
+    progressWidth(key) {
+        const total = this.state.regions.length || 1;
+        return ((this.state.progressSummary[key] || 0) / total) * 100;
+    }
+
+    regionProgressClass(region) {
+        // Once the student has responded, the sidebar number returns to its
+        // normal result indicator. The review-age border is only useful for
+        // regions still waiting to be reviewed.
+        if (this.state.assessments[region.id]) return "";
+        if (region.category === "known") return "memory-region-known";
+        if (region.category === "not_known") return "memory-region-learning";
+        if ((region.attemptCount || 0) > 0) return "memory-region-middle";
+        return "";
+    }
+
+    regionProgressStyle(region) {
+        if (this.state.assessments[region.id] || !(region.attemptCount || 0) || !region.lastAnsweredAt) {
+            return "";
+        }
+        const ageDays = this._regionAgeDays(region);
+        const width = Math.max(2, 9 - Math.floor(ageDays / 5));
+        const style = ageDays >= 10 ? "dashed" : "solid";
+        return `border-style:${style};border-width:${width}px;`;
+    }
+
+    regionProgressBorderColor(region) {
+        return region.category === "known"
+            ? "#22c55e"
+            : region.category === "not_known"
+                ? "#f97316"
+                : region.category === "middle"
+                    ? "#adb5bd"
+                    : "rgba(255, 255, 255, 0.45)";
+    }
+
+    _regionAgeDays(region) {
+        const timestamp = Date.parse(region.lastAnsweredAt);
+        if (!Number.isFinite(timestamp)) return 0;
+        return Math.max(0, (Date.now() - timestamp) / 86400000);
+    }
+
+    _getLaunchStorageKey() {
+        return `educational_games.memory_reveal.launch:${window.location.pathname}`;
+    }
+
     indicatorClass(region) {
         const assessment = this.state.assessments[region.id];
         if (assessment) {
@@ -504,6 +781,10 @@ export class MemoryRevealGame extends ImageViewerDialog {
         return "bg-secondary";
     }
 
+    indicatorStyle(region) {
+        return this.regionProgressStyle(region);
+    }
+
     assessmentLabel(region) {
         const assessment = this.state.assessments[region.id];
         if (!assessment) return "";
@@ -514,14 +795,11 @@ export class MemoryRevealGame extends ImageViewerDialog {
     // ── Close ─────────────────────────────────────────────────────────────
 
     async closeViewer() {
-        if (this.state.quizId) {
-            this.action.doAction({
-                type: "ir.actions.act_window",
-                res_model: "quiz.quiz",
-                res_id: this.state.quizId,
-                views: [[false, "form"]],
-                target: "current",
-            });
+        // Restore the action that opened this client action instead of
+        // forcing navigation to the quiz form. This preserves the previous
+        // list, resource, submission, or other originating view.
+        if (this.action?.restore) {
+            await this.action.restore();
         } else {
             await this.props.close();
         }

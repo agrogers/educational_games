@@ -147,3 +147,103 @@ class Quiz(models.Model):
             'total_possible': total_possible,
             'attempt_token': token,
         }
+
+    @api.model
+    def get_memory_reveal_data(self, quiz_id):
+        """Return all Memory Reveal regions and the student's flash-card progress."""
+        quiz = self.browse(int(quiz_id)).exists()
+        if not quiz or quiz.quiz_type != 'memory_reveal':
+            raise UserError("This quiz is not a Memory Reveal quiz.")
+        quiz.check_access_rights('read')
+        quiz.check_access_rule('read')
+
+        questions = quiz.question_ids.sorted(lambda question: (question.sequence, question.id))
+        student_stats = quiz._get_student_question_attempt_stats(questions, self.env.user)
+        attempt_threshold = quiz._sanitize_nonnegative_int(quiz.filter_student_attempts)
+        weighted_threshold = quiz._sanitize_nonnegative_int(
+            quiz.filter_student_weighted_score_pct
+        )
+        full_total = sum(
+            max(question.answer_ids.mapped('marks') or [question.marks or 0])
+            for question in questions
+        )
+
+        category_counts = {
+            'known_questions': 0,
+            'not_known_questions': 0,
+            'new_above_threshold': 0,
+            'new_below_threshold': 0,
+            'not_tried_questions': 0,
+        }
+        region_data = []
+        for index, question in enumerate(questions):
+            stats = student_stats.get(question.id, {})
+            attempts = stats.get('attempt_count', 0) or 0
+            weighted_score = stats.get('weighted_score_pct')
+            has_score_threshold = bool(weighted_threshold)
+            has_attempt_threshold = bool(attempt_threshold)
+            meets_score = (
+                weighted_score is not None and weighted_score >= weighted_threshold
+                if has_score_threshold else True
+            )
+            meets_attempts = attempts >= attempt_threshold if has_attempt_threshold else True
+            known = attempts > 0 and meets_score and meets_attempts
+            low_score = attempts > 0 and weighted_score is not None and weighted_score < 50
+
+            if attempts == 0:
+                category = 'not_tried'
+            elif known:
+                category = 'known'
+            elif low_score:
+                category = 'not_known'
+            elif has_attempt_threshold and attempts < attempt_threshold:
+                category = 'new_above_threshold' if meets_score else 'new_below_threshold'
+            else:
+                category = 'middle'
+            category_key = (
+                'not_known_questions' if category == 'not_known'
+                else f'{category}_questions'
+            )
+            if category_key in category_counts:
+                category_counts[category_key] += 1
+
+            answers = question.answer_ids.sorted(lambda answer: (answer.sequence, answer.id))
+            region_data.append({
+                'id': question.id,
+                'name': question.question_text or '',
+                'x1': question.region_x1,
+                'y1': question.region_y1,
+                'x2': question.region_x2,
+                'y2': question.region_y2,
+                'marks': question.marks,
+                'answers': [
+                    {
+                        'id': answer.id,
+                        'answer_text': answer.answer_text or '',
+                        'marks': answer.marks,
+                    }
+                    for answer in answers
+                ],
+                'index': index,
+                'attempt_count': attempts,
+                'weighted_score_pct': round(weighted_score or 0, 1),
+                'last_answered_at': fields.Datetime.to_string(stats['last_answered_at'])
+                if stats.get('last_answered_at') else False,
+                'category': category,
+            })
+
+        return {
+            'quiz_name': quiz.name,
+            'full_total_marks': full_total,
+            'filter_student_attempts': attempt_threshold,
+            'filter_student_weighted_score_pct': weighted_threshold,
+            'regions': region_data,
+            'progress_summary': {
+                **category_counts,
+                'total_possible_questions': len(questions),
+                'progress_text': (
+                    f'This quiz has {len(questions)} regions. '
+                    f'{category_counts["known_questions"]} are currently known.'
+                ),
+            },
+        }

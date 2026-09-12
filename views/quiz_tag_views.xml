@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_quiz_tag_list" model="ir.ui.view"><field name="name">quiz.tag.list</field><field name="model">quiz.tag</field><field name="arch" type="xml">
+        <list string="Question Tags"><field name="name"/><field name="description" optional="show"/><field name="create_date" string="Created" optional="show"/></list></field></record>
+    <record id="view_quiz_tag_form" model="ir.ui.view"><field name="name">quiz.tag.form</field><field name="model">quiz.tag</field><field name="arch" type="xml">
+        <form string="Question Tag"><sheet><group><field name="name"/><field name="description"/></group></sheet></form></field></record>
+</odoo>

@@ -1,0 +1,46 @@
+// Dark-mode overrides for the quiz statistics widget.
+.o_quiz_statistics_widget {
+    --quiz-statistics-background: var(--o-view-background-color, #1f2937);
+    --quiz-statistics-surface: var(--o-list-view-background-color, #283548);
+    --quiz-statistics-hover: var(--o-gray-700, #374151);
+    --quiz-statistics-border: var(--o-border-color, #4b5563);
+    --quiz-statistics-text: var(--o-main-text-color, #e5e7eb);
+    --quiz-statistics-muted: var(--o-muted-color, #9ca3af);
+}
+
+.o_quiz_statistics_widget .o_quiz_statistics_table {
+    color: var(--quiz-statistics-text);
+    --table-bg: var(--quiz-statistics-background);
+    --table-color: var(--quiz-statistics-text);
+    --table-border-color: var(--quiz-statistics-border);
+}
+
+.o_quiz_statistics_widget .o_quiz_statistics_table thead th {
+    background-color: var(--quiz-statistics-surface);
+    color: var(--quiz-statistics-text);
+    border-color: var(--quiz-statistics-border);
+}
+
+.o_quiz_statistics_widget .o_quiz_statistics_table thead .o_quiz_sort_col:hover {
+    background-color: var(--quiz-statistics-hover);
+}
+
+.o_quiz_statistics_widget .o_quiz_statistics_table tbody tr:nth-child(odd) > *,
+.o_quiz_statistics_widget .o_quiz_statistics_table tbody tr:nth-child(even) > * {
+    --table-bg: var(--quiz-statistics-background);
+    background-color: var(--quiz-statistics-background);
+    color: var(--quiz-statistics-text);
+    border-color: var(--quiz-statistics-border);
+}
+
+.o_quiz_statistics_widget .o_quiz_statistics_table tbody tr:hover > * {
+    background-color: var(--quiz-statistics-hover);
+}
+
+.o_quiz_statistics_widget .quiz-progress-bar {
+    background: var(--quiz-statistics-border);
+}
+
+.o_quiz_statistics_widget .quiz-progress-legend {
+    color: var(--quiz-statistics-muted);
+}

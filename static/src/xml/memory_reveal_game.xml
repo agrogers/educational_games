@@ -17,6 +17,42 @@
             </div>
 
             <div class="aps-image-viewer-sidebar-body">
+
+                <!-- Flash-card progress summary -->
+                <div t-if="state.regions.length > 0" class="aps-image-viewer-group memory-reveal-progress-group">
+                    <button type="button"
+                            class="memory-reveal-progress-toggle"
+                            t-on-click.stop="toggleProgressSummary"
+                            title="Show progress details">
+                        <span class="small text-light">Progress</span>
+                        <span class="small text-light">
+                            <t t-esc="state.progressSummary.known_questions || 0"/> known ·
+                            <t t-esc="state.progressSummary.not_tried_questions || 0"/> not tried
+                        </span>
+                    </button>
+                    <div class="memory-reveal-progress-bar" t-on-click.stop="toggleProgressSummary">
+                        <div class="memory-progress-segment memory-progress-known"
+                             t-att-style="'width:' + progressWidth('known_questions') + '%'">
+                        </div>
+                        <div class="memory-progress-segment memory-progress-learning"
+                             t-att-style="'width:' + progressWidth('not_known_questions') + '%'">
+                        </div>
+                        <div class="memory-progress-segment memory-progress-new"
+                             t-att-style="'width:' + ((progressWidth('new_above_threshold') + progressWidth('new_below_threshold'))) + '%'">
+                        </div>
+                        <div class="memory-progress-segment memory-progress-not-tried"
+                             t-att-style="'width:' + progressWidth('not_tried_questions') + '%'">
+                        </div>
+                    </div>
+                    <div t-if="state.progressExpanded" class="memory-reveal-progress-legend">
+                        <div>Known (<t t-esc="state.progressSummary.known_questions || 0"/>)</div>
+                        <div>Learning (<t t-esc="state.progressSummary.not_known_questions || 0"/>)</div>
+                        <div>✓ New (<t t-esc="state.progressSummary.new_above_threshold || 0"/>)</div>
+                        <div>✗ New (<t t-esc="state.progressSummary.new_below_threshold || 0"/>)</div>
+                        <div>Not tried (<t t-esc="state.progressSummary.not_tried_questions || 0"/>)</div>
+                    </div>
+                </div>
+
                 <!-- Zoom controls -->
                 <div class="aps-image-viewer-group aps-image-viewer-button-grid">
                     <button class="btn btn-outline-light aps-image-viewer-icon-btn" t-att-disabled="state.loading" t-on-click="zoomOut" title="Zoom out">
@@ -47,12 +83,21 @@
                             <t t-esc="state.score"/> / <t t-esc="state.totalPossible"/>
                         </span>
                     </div>
+
+                    <div t-if="canSubmitResults" class="aps-image-viewer-group">
+                        <button type="button" class="btn btn-success w-100" t-on-click="submitResults">
+                            Submit Results
+                        </button>
+                    </div>
+
+
                     <div class="progress" style="height:6px;">
-                        <div class="progress-bar bg-success"
+                        <div class="progress-bar bg-info"
                              role="progressbar"
                              t-att-style="'width:' + (state.totalPossible ? (state.score / state.totalPossible * 100) : 0) + '%'"/>
                     </div>
                 </div>
+
 
                 <!-- Remaining count -->
                 <div t-if="!state.completed" class="aps-image-viewer-group">
@@ -64,7 +109,7 @@
                 </div>
 
                 <!-- Toggle: blur vs orange outline -->
-                <div t-if="!state.completed" class="aps-image-viewer-group">
+                <div t-if="!state.completed" class="aps-image-viewer-group d-none">
                     <label class="form-label text-light">Cover Style</label>
                     <div class="aps-image-viewer-button-grid">
                         <button class="btn aps-image-viewer-icon-btn"
@@ -91,9 +136,8 @@
                     <div class="d-flex flex-wrap gap-2"
                          t-if="state.regions.length > 0">
                         <t t-foreach="state.regions" t-as="region" t-key="region.id">
-                            <button class="btn p-0 rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                                    t-attf-class="{{ indicatorClass(region) }}"
-                                    style="width:36px;height:36px;color:white;font-size:13px;"
+                                <button t-attf-class="btn p-0 rounded-circle d-flex align-items-center justify-content-center fw-bold {{ indicatorClass(region) }} {{ regionProgressClass(region) }}"
+                                    t-att-style="'width:36px;height:36px;color:white;font-size:13px;' + indicatorStyle(region)"
                                     t-on-click.stop="() => this.onSidebarRegionClick(region)"
                                     t-att-title="region.name">
                                 <span t-esc="region.index + 1"/>
@@ -122,7 +166,12 @@
                 <!-- Instruction hint -->
                 <div t-if="!state.completed &amp;&amp; state.regions.length > 0" class="aps-image-viewer-group">
                     <div class="memory-reveal-instruction py-1 px-2 mb-0">
-                        Click a numbered region to locate it, then click the blurred area to reveal it and self-assess.
+                        Click a numbered region to locate it, then click the blurred area to reveal it and self-assess. A thicker border means a more recent review so focus on those with thin borders first.
+                    </div>
+                    <div class="memory-reveal-border-help mt-2">
+                        <div><span class="memory-border-swatch memory-border-known"/> Green: known.</div>
+                        <div><span class="memory-border-swatch memory-border-learning"/> Orange: weighted score below 50%.</div>
+                        <div><span class="memory-border-swatch memory-border-due"/> Dashed green: you should try thisone again.</div>
                     </div>
                 </div>
 
@@ -137,12 +186,12 @@
                 </div>
 
                 <!-- Exit button at bottom of sidebar -->
-                <div class="aps-image-viewer-group">
+                <!-- <div class="aps-image-viewer-group">
                         <button class="btn btn-secondary w-100 text-dark"
                             t-on-click="closeViewer">
                         <i class="fa fa-arrow-left me-1"/> Exit Game
                     </button>
-                </div>
+                </div> -->
             </div>
 
         </aside>
