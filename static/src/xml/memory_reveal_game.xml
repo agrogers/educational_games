@@ -77,19 +77,19 @@
 
                 <!-- Score display -->
                 <div class="aps-image-viewer-group">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <span class="text-light small">Score</span>
-                        <span class="text-light fw-bold">
-                            <t t-esc="state.score"/> / <t t-esc="state.totalPossible"/>
-                        </span>
-                    </div>
-
                     <div t-if="canSubmitResults" class="aps-image-viewer-group">
                         <button type="button" class="btn btn-success w-100" t-on-click="submitResults">
                             Submit Results
                         </button>
                     </div>
 
+
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span class="text-light small">Score</span>
+                        <span class="text-light fw-bold">
+                            <t t-esc="state.score"/> / <t t-esc="state.totalPossible"/>
+                        </span>
+                    </div>
 
                     <div class="progress" style="height:6px;">
                         <div class="progress-bar bg-info"
@@ -171,7 +171,7 @@
                     <div class="memory-reveal-border-help mt-2">
                         <div><span class="memory-border-swatch memory-border-known"/> Green: known.</div>
                         <div><span class="memory-border-swatch memory-border-learning"/> Orange: weighted score below 50%.</div>
-                        <div><span class="memory-border-swatch memory-border-due"/> Dashed green: you should try thisone again.</div>
+                        <div><span class="memory-border-swatch memory-border-due"/> Dashed: It's been a while since you tried this question.</div>
                     </div>
                 </div>
 
