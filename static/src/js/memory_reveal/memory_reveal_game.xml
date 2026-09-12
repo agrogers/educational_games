@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="educational_games.MemoryRevealGame">
+        <div t-att-class="shellClassName" t-ref="shell" tabindex="0">
+            <div t-if="state.submitToastMessage"
+                 class="memory-reveal-submit-toast"
+                 role="status"
+                 aria-live="polite"
+                 t-att-class="'memory-reveal-submit-toast alert alert-' + state.submitToastType">
+                <span t-esc="state.submitToastMessage"></span>
+                <button type="button"
+                        class="btn-close"
+                        aria-label="Dismiss"
+                        t-on-click="dismissSubmitToast"></button>
+            </div>
+            <aside class="aps-image-viewer-sidebar" t-on-click="onSidebarClick">
+                <div class="aps-image-viewer-sidebar-head">
+                    <div class="aps-image-viewer-title-wrap">
+                        <div class="aps-image-viewer-title" t-esc="state.quizName || 'Memory Reveal'"/>
+                    </div>
+                </div>
+
+                <div class="aps-image-viewer-sidebar-body">
+                    <div t-if="state.regions.length > 0" class="aps-image-viewer-group memory-reveal-progress-group">
+                        <button type="button"
+                                class="memory-reveal-progress-toggle"
+                                t-on-click.stop="toggleProgressSummary"
+                                title="Show progress details">
+                            <span class="small text-light">Progress</span>
+                            <span class="small text-light">
+                                <t t-esc="state.progressSummary.known_questions || 0"/> known ·
+                                <t t-esc="state.progressSummary.not_tried_questions || 0"/> not tried
+                            </span>
+                        </button>
+                        <div class="memory-reveal-progress-bar" t-on-click.stop="toggleProgressSummary">
+                            <div class="memory-progress-segment memory-progress-known"
+                                 t-att-style="'width:' + progressWidth('known_questions') + '%'">
+                            </div>
+                            <div class="memory-progress-segment memory-progress-learning"
+                                 t-att-style="'width:' + progressWidth('not_known_questions') + '%'">
+                            </div>
+                            <div class="memory-progress-segment memory-progress-new"
+                                 t-att-style="'width:' + (progressWidth('new_above_threshold') + progressWidth('new_below_threshold')) + '%'">
+                            </div>
+                            <div class="memory-progress-segment memory-progress-not-tried"
+                                 t-att-style="'width:' + progressWidth('not_tried_questions') + '%'">
+                            </div>
+                        </div>
+                        <div t-if="state.progressExpanded" class="memory-reveal-progress-legend">
+                            <div>Known (<t t-esc="state.progressSummary.known_questions || 0"/>)</div>
+                            <div>Learning (<t t-esc="state.progressSummary.not_known_questions || 0"/>)</div>
+                            <div>✓ New (<t t-esc="state.progressSummary.new_above_threshold || 0"/>)</div>
+                            <div>✗ New (<t t-esc="state.progressSummary.new_below_threshold || 0"/>)</div>
+                            <div>Not tried (<t t-esc="state.progressSummary.not_tried_questions || 0"/>)</div>
+                        </div>
+                    </div>
+
+                    <div class="aps-image-viewer-group aps-image-viewer-button-grid">
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn"
+                                t-att-disabled="state.loading"
+                                t-on-click="zoomOut"
+                                title="Zoom out">
+                            <i class="fa fa-search-minus" aria-hidden="true"></i>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn"
+                                t-att-disabled="state.loading"
+                                t-on-click="zoomIn"
+                                title="Zoom in">
+                            <i class="fa fa-search-plus" aria-hidden="true"></i>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn"
+                                t-att-disabled="state.loading"
+                                t-on-click="fitWholeImage"
+                                title="Fit whole image">
+                            <i class="fa fa-compress" aria-hidden="true"></i>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn"
+                                t-att-disabled="state.loading"
+                                t-on-click="fitImageWidth"
+                                title="Fit image width">
+                            <i class="fa fa-arrows-h" aria-hidden="true"></i>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn"
+                                t-att-disabled="state.loading"
+                                t-on-click="resetZoom"
+                                title="Reset zoom">
+                            <span>1:1</span>
+                        </button>
+                        <button class="btn btn-outline-light aps-image-viewer-icon-btn"
+                                t-on-click="toggleFullscreen"
+                                t-att-title="state.isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'">
+                            <i t-attf-class="fa {{ state.isFullscreen ? 'fa-compress' : 'fa-expand' }}" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="aps-image-viewer-group">
+                        <div t-if="canSubmitResults and Object.keys(state.assessments).length > 0" class="aps-image-viewer-group">
+                            <button type="button"
+                                    class="btn btn-success w-100"
+                                    t-on-click="submitResults">
+                                Submit Results
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span class="text-light small">Score</span>
+                            <span class="text-light fw-bold">
+                                <t t-esc="state.score"/> / <t t-esc="state.totalPossible"/>
+                            </span>
+                        </div>
+                        <div class="progress" style="height:6px;">
+                            <div class="progress-bar bg-info"
+                                 role="progressbar"
+                                 t-att-style="'width:' + (state.totalPossible ? (state.score / state.totalPossible * 100) : 0) + '%'">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div t-if="!state.completed" class="aps-image-viewer-group">
+                        <div class="text-center">
+                            <span class="text-light small">
+                                <t t-esc="remainingCount"/> region(s) remaining
+                            </span>
+                        </div>
+                    </div>
+
+                    <div t-if="!state.completed" class="aps-image-viewer-group d-none">
+                        <label class="form-label text-light">Cover Style</label>
+                        <div class="aps-image-viewer-button-grid">
+                            <button class="btn aps-image-viewer-icon-btn"
+                                    t-att-class="state.blurMode ? 'btn-primary' : 'btn-outline-light'"
+                                    t-on-click="onBlurStyleClick"
+                                    title="Blur overlay">
+                                <i class="fa fa-tint" aria-hidden="true"></i>
+                            </button>
+                            <button class="btn aps-image-viewer-icon-btn"
+                                    t-att-class="!state.blurMode ? 'btn-primary' : 'btn-outline-light'"
+                                    t-on-click="onOutlineStyleClick"
+                                    title="Orange outline">
+                                <i class="fa fa-square-o" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="aps-image-viewer-group">
+                        <label class="form-label text-light">
+                            Regions
+                            <span class="badge bg-light text-dark ms-1" t-esc="state.regions.length"></span>
+                        </label>
+                        <div class="d-flex flex-wrap gap-2" t-if="state.regions.length > 0">
+                            <t t-foreach="state.regions" t-as="region" t-key="region.id">
+                                <button t-attf-class="btn p-0 rounded-circle d-flex align-items-center justify-content-center fw-bold {{ indicatorClass(region) }} {{ regionProgressClass(region) }}"
+                                        t-att-style="'width:36px;height:36px;color:white;font-size:13px;' + indicatorStyle(region)"
+                                        t-on-click.stop="() => this.onSidebarRegionClick(region)"
+                                        t-att-title="region.name">
+                                    <span t-esc="region.index + 1"></span>
+                                </button>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div t-if="Object.keys(state.assessments).length > 0" class="aps-image-viewer-group">
+                        <label class="form-label text-light">Results</label>
+                        <t t-foreach="state.regions" t-as="region" t-key="'result-' + region.id">
+                            <div t-if="state.assessments[region.id]"
+                                 class="d-flex align-items-center mb-1 p-1 rounded"
+                                 style="background:rgba(0,0,0,0.15);">
+                                <span class="badge rounded-circle me-2 d-flex align-items-center justify-content-center"
+                                      t-attf-class="{{ indicatorClass(region) }}"
+                                      style="width:22px;height:22px;font-size:10px;color:white;">
+                                    <span t-esc="region.index + 1"></span>
+                                </span>
+                                <span class="small text-white text-truncate flex-grow-1" t-esc="region.name"></span>
+                            </div>
+                        </t>
+                    </div>
+
+                    <div t-if="!state.completed and state.regions.length > 0" class="aps-image-viewer-group">
+                        <div class="memory-reveal-instruction py-1 px-2 mb-0">
+                            Click a numbered region to locate it, then click the blurred area to reveal it and self-assess. A thicker border means a more recent review so focus on those with thin borders first.
+                        </div>
+                        <div class="memory-reveal-border-help mt-2">
+                            <div><span class="memory-border-swatch memory-border-known"></span> Green: known.</div>
+                            <div><span class="memory-border-swatch memory-border-learning"></span> Orange: weighted score below 50%.</div>
+                            <div><span class="memory-border-swatch memory-border-due"></span> Dashed: It's been a while since you tried this question.</div>
+                        </div>
+                    </div>
+
+                    <div t-if="state.completed" class="aps-image-viewer-group text-center">
+                        <div class="fs-3 mb-1">🎉</div>
+                        <div class="text-white fw-bold mb-1">Complete!</div>
+                        <div class="text-light small">
+                            Final score: <span class="fw-bold" t-esc="state.score"></span> /
+                            <span t-esc="state.totalPossible"></span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="aps-image-viewer-sidebar-mini"
+                 t-if="state.sidebarCollapsed"
+                 t-on-click="toggleSidebar">
+                <button class="btn btn-outline-light aps-image-viewer-sidebar-toggle" title="Open sidebar">
+                    <i class="fa fa-bars" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <main class="aps-image-viewer-stage-wrap">
+                <div t-att-class="stageClassName"
+                     t-ref="stage"
+                     t-on-wheel.prevent="onWheel"
+                     t-on-pointerdown="onPointerDown"
+                     t-on-pointermove="onPointerMove"
+                     t-on-pointerup="onPointerUp"
+                     t-on-pointerleave="onPointerUp"
+                     t-on-pointercancel="onPointerCancel">
+                    <div t-if="!state.currentUrl and !state.errorMessage and !state.loading" class="aps-image-viewer-empty">
+                        No image loaded.
+                    </div>
+                    <div t-if="state.errorMessage" class="aps-image-viewer-error-state" aria-live="polite">
+                        <div class="aps-image-viewer-error-card">
+                            <div class="aps-image-viewer-error-icon">
+                                <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+                            </div>
+                            <div class="aps-image-viewer-error-title">Unable to load image</div>
+                            <div class="aps-image-viewer-error-text"><t t-esc="state.errorMessage"/></div>
+                        </div>
+                    </div>
+
+                    <div t-if="state.currentUrl"
+                         class="aps-image-viewer-scene"
+                         t-ref="scene"
+                         t-att-style="sceneStyle">
+                        <img t-att-src="state.currentUrl"
+                             t-ref="image"
+                             t-on-load="onDisplayedImageLoad"
+                             class="aps-image-viewer-image"
+                             alt="Quiz image"
+                             draggable="false"
+                             t-att-style="imageStyle"/>
+
+                        <t t-foreach="state.regions" t-as="region" t-key="'overlay-' + region.id">
+                            <div t-att-style="regionOverlayStyle(region)"
+                                 t-on-pointerdown.stop="() => this.onRegionClick(region)"></div>
+                        </t>
+
+                        <t t-foreach="state.regions" t-as="region" t-key="'number-' + region.id">
+                            <span class="memory-reveal-region-number"
+                                  t-att-style="regionNumberStyle(region)">
+                                <t t-esc="region.index + 1"/>
+                            </span>
+                        </t>
+
+                        <t t-foreach="state.regions" t-as="region" t-key="'assessment-' + region.id">
+                            <div t-if="state.activeRegionId === region.id and state.revealed[region.id] and !state.assessments[region.id] and !state.completed"
+                                 class="memory-reveal-region-assessment"
+                                 t-att-style="regionAssessmentStyle(region)"
+                                 t-on-pointerdown.stop="">
+                                <t t-foreach="state.activeRegionAnswers" t-as="answer" t-key="answer.id">
+                                    <button type="button"
+                                            class="memory-reveal-assessment-button"
+                                            t-att-class="answer.marks === 2 ? 'memory-reveal-assessment-green' : answer.marks === 1 ? 'memory-reveal-assessment-yellow' : 'memory-reveal-assessment-red'"
+                                            t-att-title="answer.answer_text"
+                                            t-on-click.stop="() => this.onAssessActiveRegion(answer)">
+                                        <i t-if="answer.marks === 2" class="fa fa-check" aria-hidden="true"></i>
+                                        <i t-elif="answer.marks === 1" class="fa fa-question" aria-hidden="true"></i>
+                                        <i t-else="" class="fa fa-times" aria-hidden="true"></i>
+                                    </button>
+                                </t>
+                            </div>
+                        </t>
+                    </div>
+
+                    <div t-if="state.loading" class="aps-image-viewer-loading-overlay" aria-live="polite">
+                        <div class="aps-image-viewer-loading-card">
+                            <div class="spinner-border text-light" role="status">
+                                <span class="visually-hidden">Loading image</span>
+                            </div>
+                            <div class="aps-image-viewer-loading-text">Loading quiz image…</div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </t>
+</templates>

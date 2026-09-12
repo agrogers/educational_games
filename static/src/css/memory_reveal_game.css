@@ -127,6 +127,17 @@
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
 }
 
+.memory-reveal-submit-toast {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    z-index: 2000;
+    min-width: min(24rem, calc(100% - 2rem));
+    transform: translateX(-50%);
+    margin: 0;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.35);
+}
+
 /* Bootstrap's theme can redefine .text-light with a dark colour. Keep all
    Memory Reveal sidebar text readable against the viewer's dark background. */
 .aps-image-viewer-shell .text-light {

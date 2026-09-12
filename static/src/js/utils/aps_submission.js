@@ -55,6 +55,12 @@ export async function saveToApsSubmission(orm, notification, submissionId, score
         if (outOfMarks !== null && outOfMarks !== undefined) {
             vals.out_of_marks = outOfMarks;
         }
+        console.log("[APS submission] writing result", {
+            submissionId,
+            score,
+            outOfMarks,
+            values: vals,
+        });
         await orm.write(APS_SUBMISSION_MODEL, [submissionId], vals);
         notification.add("Results saved successfully!", { type: "success" });
         return true;
@@ -87,7 +93,7 @@ export async function saveMemoryRevealResult(
             outOfMarks,
         ]);
         console.log("[APS submission][memory reveal] server response", response);
-        notification.add("Results saved successfully!", { type: "success" });
+        notification.add("Submit successful!", { type: "success" });
         return true;
     } catch (error) {
         console.error("[APS submission][memory reveal] server error", error);

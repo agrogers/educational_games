@@ -48,7 +48,7 @@
             'educational_games/static/src/xml/memory_reveal_setup.xml',
             # Memory Reveal: student game viewer
             'educational_games/static/src/js/memory_reveal/memory_reveal_game.js',
-            'educational_games/static/src/xml/memory_reveal_game.xml',
+            'educational_games/static/src/js/memory_reveal/memory_reveal_game.xml',
         ],
         'web.assets_web_dark': [
             'educational_games/static/src/css/educational_games.dark.scss',
