@@ -8,7 +8,8 @@ class Quiz(models.Model):
 
     def _memory_reveal_image_url(self):
         self.ensure_one()
-        version = (self.write_date or '').replace(' ', 'T').replace(':', '')
+        version = fields.Datetime.to_string(self.write_date or fields.Datetime.now())
+        version = version.replace(' ', 'T').replace(':', '')
         return f'/educational_games/memory_reveal/image/{self.id}?v={version}'
 
     image_content = fields.Html(

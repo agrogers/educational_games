@@ -16,6 +16,13 @@
             <aside class="aps-image-viewer-sidebar" t-on-click="onSidebarClick">
                 <div class="aps-image-viewer-sidebar-head">
                     <div class="aps-image-viewer-title-wrap">
+                        <button class="btn btn-outline-light aps-image-viewer-back-btn"
+                                type="button"
+                                t-on-click="closeViewer"
+                                title="Back"
+                                aria-label="Back">
+                            <i class="fa fa-arrow-left" aria-hidden="true"></i>
+                        </button>
                         <div class="aps-image-viewer-title" t-esc="state.quizName || 'Memory Reveal'"/>
                     </div>
                 </div>
