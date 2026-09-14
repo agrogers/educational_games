@@ -261,7 +261,7 @@
                                     <button type="button"
                                             class="memory-reveal-assessment-button"
                                             t-att-class="answer.marks === 2 ? 'memory-reveal-assessment-green' : answer.marks === 1 ? 'memory-reveal-assessment-yellow' : 'memory-reveal-assessment-red'"
-                                            t-att-title="answer.answer_text"
+                                            t-att-title="_stripHtml(answer.answer_text)"
                                             t-on-click.stop="() => this.onAssessActiveRegion(answer)">
                                         <img t-if="answer.marks === 2"
                                             src="/educational_games/static/src/js/memory_reveal/double-tick.svg"

@@ -57,14 +57,17 @@ class EducationalGamesController(http.Controller):
         if not attachment.exists() or not attachment.raw:
             return request.not_found()
 
-        return request.make_response(
-            attachment.raw,
-            headers=[
-                ('Content-Type', attachment.mimetype or 'application/octet-stream'),
-                ('Content-Disposition', 'inline'),
-                ('Cache-Control', 'private, max-age=3600'),
-            ],
-        )
+        etag = f'"{attachment.id}-{attachment.write_date.timestamp()}"'
+        response_headers = [
+            ('Content-Type', attachment.mimetype or 'application/octet-stream'),
+            ('Content-Disposition', 'inline'),
+            ('Cache-Control', 'private, max-age=315360000, must-revalidate'),
+            ('ETag', etag),
+        ]
+        if request.httprequest.headers.get('If-None-Match') == etag:
+            return request.make_response(b'', status=304, headers=response_headers)
+
+        return request.make_response(attachment.raw, headers=response_headers)
 
     @http.route('/educational_games/dashboard', type='http', auth='user')
     def dashboard(self, **kwargs):

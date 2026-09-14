@@ -6,6 +6,11 @@ import uuid
 class Quiz(models.Model):
     _inherit = 'quiz.quiz'
 
+    def _memory_reveal_image_url(self):
+        self.ensure_one()
+        version = (self.write_date or '').replace(' ', 'T').replace(':', '')
+        return f'/educational_games/memory_reveal/image/{self.id}?v={version}'
+
     image_content = fields.Html(
         string='Image Content',
         help='Rich text content with an image for Memory Reveal quizzes. '
@@ -25,7 +30,7 @@ class Quiz(models.Model):
             # record when an image is pasted from another HTML field. Serve
             # it through the quiz-authorized controller instead.
             record.image_url = (
-                f'/educational_games/memory_reveal/image/{record.id}'
+                record._memory_reveal_image_url()
                 if record.id and record.image_content
                 else False
             )
@@ -38,7 +43,7 @@ class Quiz(models.Model):
             return False
         quiz.check_access_rights('read')
         quiz.check_access_rule('read')
-        return f'/educational_games/memory_reveal/image/{quiz.id}'
+        return quiz._memory_reveal_image_url()
 
     def action_open_memory_reveal_setup(self):
         """Launch the Memory Reveal teacher setup for this quiz."""
