@@ -161,10 +161,10 @@
     /* Keep the traffic-light controls proportional to the viewport. vmin
        uses the smaller screen dimension so the buttons remain usable without
        overflowing on narrow or short screens. */
-    width: 6vmin;
-    height: 6vmin;
-    min-width: 6vmin;
-    min-height: 6vmin;
+    width: 75px;
+    height: 75px;
+    /* min-width: 75px;
+    min-height: 75px; */
     padding: 0;
     border: 0.25vmin solid #fff;
     border-radius: 50%;
@@ -172,7 +172,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 3vmin;
+    font-size: 40px;
     box-shadow: 0 2px 7px rgba(0, 0, 0, 0.5);
     cursor: pointer;
     transition: transform 120ms ease, filter 120ms ease;
@@ -183,13 +183,19 @@
     filter: brightness(1.1);
 }
 
+.memory-reveal-assessment-icon {
+    width: 75px;
+    height: 75px;
+    object-fit: contain;
+}
+
 .memory-reveal-assessment-red {
     background: #dc3545;
 }
 
 .memory-reveal-assessment-yellow {
     background: #ffc107;
-    color: #212529;
+    color: white;
 }
 
 .memory-reveal-assessment-green {

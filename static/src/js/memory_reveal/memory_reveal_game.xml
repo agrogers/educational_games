@@ -263,8 +263,11 @@
                                             t-att-class="answer.marks === 2 ? 'memory-reveal-assessment-green' : answer.marks === 1 ? 'memory-reveal-assessment-yellow' : 'memory-reveal-assessment-red'"
                                             t-att-title="answer.answer_text"
                                             t-on-click.stop="() => this.onAssessActiveRegion(answer)">
-                                        <i t-if="answer.marks === 2" class="fa fa-check" aria-hidden="true"></i>
-                                        <i t-elif="answer.marks === 1" class="fa fa-question" aria-hidden="true"></i>
+                                        <img t-if="answer.marks === 2"
+                                            src="/educational_games/static/src/js/memory_reveal/double-tick.svg"
+                                            alt="Easy"
+                                            class="memory-reveal-assessment-icon" style="height:50px;width:50px;filter: invert(1);"/>
+                                        <i t-elif="answer.marks === 1" class="fa fa-check" aria-hidden="true"></i>
                                         <i t-else="" class="fa fa-times" aria-hidden="true"></i>
                                     </button>
                                 </t>
