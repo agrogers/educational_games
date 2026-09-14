@@ -227,6 +227,7 @@ export class MemoryRevealGame extends ImageViewerDialog {
             completed: false,
             blurMode: true,
             highlightedRegionId: null,
+            hoveredRegionId: null,
             highlightColor: "",
             attemptToken: "",
             saving: false,
@@ -355,6 +356,16 @@ export class MemoryRevealGame extends ImageViewerDialog {
 
     onSidebarRegionClick(region) {
         this._highlightRegion(region);
+    }
+
+    onRegionPointerEnter(region) {
+        this.state.hoveredRegionId = region.id;
+    }
+
+    onRegionPointerLeave(region) {
+        if (this.state.hoveredRegionId === region.id) {
+            this.state.hoveredRegionId = null;
+        }
     }
 
     _getRegionMaxMarks(region) {

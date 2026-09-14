@@ -240,11 +240,13 @@
 
                         <t t-foreach="state.regions" t-as="region" t-key="'overlay-' + region.id">
                             <div t-att-style="regionOverlayStyle(region)"
+                                 t-on-pointerenter.stop="() => this.onRegionPointerEnter(region)"
+                                 t-on-pointerleave.stop="() => this.onRegionPointerLeave(region)"
                                  t-on-pointerdown.stop="() => this.onRegionClick(region)"></div>
                         </t>
 
                         <t t-foreach="state.regions" t-as="region" t-key="'number-' + region.id">
-                            <span class="memory-reveal-region-number"
+                            <span t-att-class="'memory-reveal-region-number' + (state.hoveredRegionId === region.id ? ' memory-reveal-region-number-hidden' : '')"
                                   t-att-style="regionNumberStyle(region)">
                                 <t t-esc="region.index + 1"/>
                             </span>
