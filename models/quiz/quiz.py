@@ -394,7 +394,7 @@ class Quiz(models.Model):
         for question in questions:
             attempts = list(grouped.get(question.id, {}).values())
             correct_ids = set(question.answer_ids.filtered('is_correct').ids)
-            is_memory_reveal = question.quiz_id and question.quiz_id.quiz_type == 'memory_reveal'
+            is_memory_reveal = self[:1].quiz_type == 'memory_reveal'
             maximum_marks = max(question.answer_ids.mapped('marks') or [question.marks or 0])
             weighted_total = 0.0
             weight_sum = 0.0
