@@ -1,7 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="view_quiz_quiz_list" model="ir.ui.view"><field name="name">quiz.quiz.list</field><field name="model">quiz.quiz</field><field name="arch" type="xml">
-        <list string="Quizzes"><field name="name"/><field name="subject_ids" widget="many2many_tags" optional="show"/><field name="question_count"/><field name="total_marks"/><field name="create_date" string="Created" optional="show"/></list></field></record>
+        <list string="Quizzes">
+            <field name="name" optional="show"/>
+            <field name="quiz_type" optional="show"/>
+            <field name="subject_ids" widget="many2many_tags" optional="show"/>
+            <field name="question_count" optional="show"/>
+            <field name="total_marks" optional="show"/>
+            <field name="header_image" widget="image" optional="show"/>
+            <field name="display_question_count" optional="hide"/>
+            <field name="display_option_count" optional="hide"/>
+            <field name="allow_resubmission" optional="hide"/>
+            <field name="filter_tag_ids" widget="many2many_tags" optional="hide"/>
+            <field name="filter_subject_ids" widget="many2many_tags" optional="hide"/>
+            <field name="filter_min_attempts" optional="hide"/>
+            <field name="filter_max_attempts" optional="hide"/>
+            <field name="filter_max_pct_correct" optional="hide"/>
+            <field name="filter_student_weighted_score_pct" optional="hide"/>
+            <field name="filter_student_attempts" optional="hide"/>
+            <field name="filter_exclude_answered_days" optional="hide"/>
+            <field name="filter_summary_preview" optional="hide"/>
+            <field name="create_date" string="Created" optional="show"/>
+        </list></field></record>
     <record id="view_quiz_quiz_search" model="ir.ui.view"><field name="name">quiz.quiz.search</field><field name="model">quiz.quiz</field><field name="arch" type="xml">
         <search string="Search Quizzes"><field name="name"/><field name="subject_ids"/><field name="filter_tag_ids" string="Tag"/><separator/><filter string="Allow Resubmission" name="filter_allow_resubmission" domain="[('allow_resubmission', '=', True)]"/><filter string="Has Questions" name="filter_has_questions" domain="[('question_ids', '!=', False)]"/><group expand="0" string="Group By"><filter string="Subject" name="group_by_subject" context="{'group_by': 'subject_ids'}"/><filter string="Tag" name="group_by_tag" context="{'group_by': 'filter_tag_ids'}"/><filter string="Allow Resubmission" name="group_by_resubmission" context="{'group_by': 'allow_resubmission'}"/></group><searchpanel><field name="subject_ids" string="Subject" select="multi" icon="fa-book" enable_counters="1"/><field name="filter_tag_ids" string="Tag" select="multi" icon="fa-tag" enable_counters="1"/></searchpanel></search></field></record>
     <record id="view_quiz_quiz_form" model="ir.ui.view"><field name="name">quiz.quiz.form</field><field name="model">quiz.quiz</field><field name="arch" type="xml">
