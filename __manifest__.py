@@ -10,6 +10,7 @@
     'depends': ['base', 'web', 'mail', 'aps_sis', 'aui_enhancements'],
     'data': [
         'security/ir.model.access.csv',
+        'data/quiz_cron.xml',
         'views/quiz_actions.xml',
         'views/quiz_quiz_views.xml',
         'views/quiz_tag_views.xml',

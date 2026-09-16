@@ -574,9 +574,23 @@ class TestQuizInheritQuestions(TransactionCase):
         quiz = self._make_quiz('Main Quiz', questions=[q1])
         quiz.include_other_quizzes = [(4, source.id)]
 
-        effective = quiz._get_effective_question_ids()
-        self.assertIn(q1.id, effective.ids)
-        self.assertIn(q2.id, effective.ids)
+        self.assertIn(q1.id, quiz.question_ids.ids)
+        self.assertIn(q2.id, quiz.question_ids.ids)
+        self.assertEqual(quiz.inherited_question_ids.ids, [q2.id])
+
+    def test_create_with_included_quiz_syncs_questions_immediately(self):
+        question = self._make_question('Created inherited question')
+        source = self._make_quiz('Source', questions=[question])
+
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Main',
+            'include_other_quizzes': [(6, 0, [source.id])],
+        })
+
+        self.assertEqual(quiz.question_ids.ids, [question.id])
+        self.assertEqual(quiz.inherited_question_ids.ids, [question.id])
+        self.assertEqual(quiz.question_count, 1)
+        self.assertEqual(quiz.total_marks, question.marks)
 
     def test_question_count_includes_inherited_questions(self):
         q1 = self._make_question('Own')
@@ -621,9 +635,12 @@ class TestQuizInheritQuestions(TransactionCase):
         q_later = self._make_question('Later added question')
         source.question_ids = [(4, q_later.id)]
 
-        effective = quiz._get_effective_question_ids()
-        self.assertIn(q_initial.id, effective.ids)
-        self.assertIn(q_later.id, effective.ids)
+        self.assertIn(q_initial.id, quiz.question_ids.ids)
+        self.assertIn(q_later.id, quiz.question_ids.ids)
+        self.assertEqual(
+            set(quiz.inherited_question_ids.ids),
+            {q_initial.id, q_later.id},
+        )
 
     def test_no_duplicate_questions_when_own_and_inherited_overlap(self):
         """A question that is both directly in the quiz and in an included quiz
@@ -633,8 +650,36 @@ class TestQuizInheritQuestions(TransactionCase):
         quiz = self._make_quiz('Main', questions=[q_shared])
         quiz.include_other_quizzes = [(4, source.id)]
 
-        effective = quiz._get_effective_question_ids()
-        self.assertEqual(effective.ids.count(q_shared.id), 1)
+        self.assertEqual(quiz.question_ids.ids.count(q_shared.id), 1)
+
+    def test_manual_overlap_survives_removing_source_quiz(self):
+        question = self._make_question('Shared question')
+        source = self._make_quiz('Source', questions=[question])
+        quiz = self._make_quiz('Main', questions=[question])
+
+        quiz.include_other_quizzes = [(4, source.id)]
+        quiz.include_other_quizzes = [(3, source.id)]
+
+        self.assertEqual(quiz.question_ids.ids, [question.id])
+        self.assertEqual(quiz.inherited_question_ids.ids, [])
+
+    def test_removing_and_readding_source_refreshes_materialized_questions(self):
+        first = self._make_question('First')
+        second = self._make_question('Second')
+        source = self._make_quiz('Source', questions=[first])
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Main',
+            'include_other_quizzes': [(4, source.id)],
+        })
+
+        quiz.include_other_quizzes = [(3, source.id)]
+        self.assertEqual(quiz.question_ids.ids, [])
+
+        source.question_ids = [(4, second.id)]
+        quiz.include_other_quizzes = [(4, source.id)]
+
+        self.assertEqual(set(quiz.question_ids.ids), {first.id, second.id})
+        self.assertEqual(set(quiz.inherited_question_ids.ids), {first.id, second.id})
 
     def test_transitive_inheritance(self):
         """Quiz A includes B which includes C — A should see C's questions."""
@@ -645,8 +690,41 @@ class TestQuizInheritQuestions(TransactionCase):
         quiz_a = self._make_quiz('Quiz A')
         quiz_a.include_other_quizzes = [(4, quiz_b.id)]
 
-        effective = quiz_a._get_effective_question_ids()
-        self.assertIn(q_c.id, effective.ids)
+        self.assertIn(q_c.id, quiz_a.question_ids.ids)
+        self.assertIn(q_c.id, quiz_a.inherited_question_ids.ids)
+
+    def test_maintenance_sync_repairs_stale_materialized_questions(self):
+        question = self._make_question('Stale inherited question')
+        source = self._make_quiz('Source', questions=[question])
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Main',
+            'include_other_quizzes': [(4, source.id)],
+        })
+
+        quiz.with_context(skip_quiz_manual_tracking=True).write({
+            'question_ids': [(5, 0, 0)],
+            'inherited_question_ids': [(5, 0, 0)],
+        })
+        self.assertEqual(quiz.question_ids.ids, [])
+
+        self.env['quiz.quiz']._cron_sync_inherited_questions()
+
+        self.assertEqual(quiz.question_ids.ids, [question.id])
+        self.assertEqual(quiz.inherited_question_ids.ids, [question.id])
+
+    def test_deleting_source_quiz_removes_stale_inherited_questions(self):
+        question = self._make_question('Deleted source question')
+        source = self._make_quiz('Source', questions=[question])
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Main',
+            'include_other_quizzes': [(4, source.id)],
+        })
+
+        source.unlink()
+
+        self.assertEqual(quiz.include_other_quizzes.ids, [])
+        self.assertEqual(quiz.question_ids.ids, [])
+        self.assertEqual(quiz.inherited_question_ids.ids, [])
 
     # ── Circular reference ─────────────────────────────────────────────────
 
@@ -749,3 +827,16 @@ class TestQuizFilteredQuestionCount(TransactionCase):
         q_no_match = self._make_question('No match', marks=2)
         quiz = self._make_quiz('Quiz', questions=[q_match, q_no_match], filter_subjects=[subject])
         self.assertEqual(quiz.total_marks, 4)
+
+    def test_filtered_count_and_marks_refresh_after_question_metadata_changes(self):
+        tag = self.env['quiz.tag'].create({'name': 'Review'})
+        question = self._make_question('Question', marks=2)
+        quiz = self._make_quiz('Quiz', questions=[question], filter_tags=[tag])
+
+        self.assertEqual(quiz.question_count, 0)
+        self.assertEqual(quiz.total_marks, 0)
+
+        question.write({'tag_ids': [(4, tag.id)], 'marks': 5})
+
+        self.assertEqual(quiz.question_count, 1)
+        self.assertEqual(quiz.total_marks, 5)

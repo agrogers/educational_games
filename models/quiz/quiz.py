@@ -68,6 +68,14 @@ class Quiz(models.Model):
         string='Inherited Questions',
         help='Questions automatically pulled in from included quizzes. Managed automatically — do not edit manually.',
     )
+    manual_question_ids = fields.Many2many(
+        'quiz.question',
+        'quiz_manual_question_rel',
+        'quiz_id',
+        'question_id',
+        string='Manual Questions',
+        help='Internal tracking of questions linked directly to this quiz.',
+    )
     question_count = fields.Integer(
         string='Number of Questions',
         compute='_compute_question_count',
@@ -180,13 +188,29 @@ class Quiz(models.Model):
             'Paste it into the resource URL field in the APEX module.'
         ),
     )
-    @api.depends('question_ids', 'filter_tag_ids', 'filter_subject_ids')
+    @api.depends(
+        'question_ids',
+        'question_ids.tag_ids',
+        'question_ids.subject_ids',
+        'inherited_question_ids',
+        'include_other_quizzes',
+        'filter_tag_ids',
+        'filter_subject_ids',
+    )
     def _compute_question_count(self):
         for record in self:
             questions = record._filtered_questions()
             record.question_count = len(questions)
 
-    @api.depends('question_ids.marks', 'filter_tag_ids', 'filter_subject_ids')
+    @api.depends(
+        'question_ids.marks',
+        'question_ids.tag_ids',
+        'question_ids.subject_ids',
+        'inherited_question_ids',
+        'include_other_quizzes',
+        'filter_tag_ids',
+        'filter_subject_ids',
+    )
     def _compute_total_marks(self):
         for record in self:
             questions = record._filtered_questions()
@@ -211,7 +235,7 @@ class Quiz(models.Model):
         Only questions that are no longer inherited AND were not also manually
         added are removed from question_ids.
         """
-        for quiz in self:
+        for quiz in self.exists():
             visited_quiz_ids = set()
             new_inherited_ids = set()
 
@@ -226,19 +250,46 @@ class Quiz(models.Model):
             for included in quiz.include_other_quizzes:
                 _collect(included)
 
+            current_question_ids = set(quiz.question_ids.ids)
             old_inherited_ids = set(quiz.inherited_question_ids.ids)
-            manually_added_ids = set(quiz.question_ids.ids) - old_inherited_ids
+            manual_question_ids = set(quiz.manual_question_ids.ids)
 
-            to_add = new_inherited_ids - set(quiz.question_ids.ids)
-            to_remove = old_inherited_ids - new_inherited_ids - manually_added_ids
+            # Records created before manual_question_ids was introduced may
+            # not have any provenance data yet. Preserve their current
+            # non-inherited links as manual links the first time they sync.
+            if not manual_question_ids:
+                manual_question_ids = current_question_ids - old_inherited_ids
+                if manual_question_ids:
+                    quiz.with_context(
+                        skip_quiz_manual_tracking=True,
+                    ).write({
+                        'manual_question_ids': [(6, 0, list(manual_question_ids))],
+                    })
+
+            to_add = new_inherited_ids - current_question_ids
+            to_remove = old_inherited_ids - new_inherited_ids - manual_question_ids
 
             # Update the hidden tracking set
-            quiz.inherited_question_ids = self.env['quiz.question'].browse(list(new_inherited_ids))
+            quiz.with_context(
+                skip_quiz_manual_tracking=True,
+            ).write({
+                'inherited_question_ids': [
+                    (6, 0, list(new_inherited_ids)),
+                ],
+            })
             # Propagate changes into question_ids
             if to_add:
-                quiz.question_ids = [(4, qid) for qid in to_add]
+                quiz.with_context(
+                    skip_quiz_manual_tracking=True,
+                ).write({
+                    'question_ids': [(4, qid) for qid in to_add],
+                })
             if to_remove:
-                quiz.question_ids = [(3, qid) for qid in to_remove]
+                quiz.with_context(
+                    skip_quiz_manual_tracking=True,
+                ).write({
+                    'question_ids': [(3, qid) for qid in to_remove],
+                })
 
     @api.constrains('include_other_quizzes')
     def _check_no_circular_include(self):
@@ -263,8 +314,57 @@ class Quiz(models.Model):
                         f"would create a cycle."
                     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+
+        # Capture questions supplied on the initial create as manual links
+        # before materialized inherited questions are added.
+        for record in records:
+            if record.question_ids:
+                record.with_context(
+                    skip_quiz_manual_tracking=True,
+                ).write({
+                    'manual_question_ids': [(6, 0, record.question_ids.ids)],
+                })
+
+        records._sync_inherited_questions()
+        return records
+
     def write(self, vals):
+        old_question_ids = {
+            record.id: set(record.question_ids.ids)
+            for record in self
+        }
+        old_inherited_ids = {
+            record.id: set(record.inherited_question_ids.ids)
+            for record in self
+        }
+        old_manual_ids = {
+            record.id: set(record.manual_question_ids.ids)
+            for record in self
+        }
+
         result = super().write(vals)
+
+        if 'question_ids' in vals and not self.env.context.get(
+            'skip_quiz_manual_tracking'
+        ):
+            for record in self:
+                current_ids = set(record.question_ids.ids)
+                retained_manual_ids = old_manual_ids[record.id] & current_ids
+                newly_added_ids = (
+                    current_ids
+                    - old_question_ids[record.id]
+                    - old_inherited_ids[record.id]
+                )
+                manual_ids = retained_manual_ids | newly_added_ids
+                record.with_context(
+                    skip_quiz_manual_tracking=True,
+                ).write({
+                    'manual_question_ids': [(6, 0, list(manual_ids))],
+                })
+
         if 'include_other_quizzes' in vals:
             self._sync_inherited_questions()
         if 'question_ids' in vals:
@@ -275,6 +375,23 @@ class Quiz(models.Model):
             if including_quizzes:
                 including_quizzes._sync_inherited_questions()
         return result
+
+    def unlink(self):
+        including_quizzes = self.env['quiz.quiz'].search([
+            ('include_other_quizzes', 'in', self.ids),
+        ])
+        result = super().unlink()
+        including_quizzes = including_quizzes.exists()
+        if including_quizzes:
+            including_quizzes._sync_inherited_questions()
+        return result
+
+    @api.model
+    def _cron_sync_inherited_questions(self):
+        """Repair materialized inherited question links once per day."""
+        quizzes = self.sudo().search([])
+        quizzes._sync_inherited_questions()
+        return True
 
     @staticmethod
     def _sanitize_nonnegative_int(value):
