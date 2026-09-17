@@ -9,3 +9,4 @@ from . import quiz_response
 from . import quiz_preference
 from . import quiz_tag_wizard
 from . import quiz_question_import_wizard
+from . import course_explorer
