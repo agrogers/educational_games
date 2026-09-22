@@ -116,6 +116,9 @@
                                     <field name="filter_tag_ids" widget="many2many_tags"
                                         options="{'no_create': False}"
                                         placeholder="Any matching tags..."/>
+                                    <field name="filter_exclude_tag_ids" widget="many2many_tags"
+                                        options="{'no_create': False}"
+                                        placeholder="Exclude questions with these tags..."/>
                                 </group>
                                 <group>                                
                                     <field name="filter_subject_ids" widget="many2many_tags"

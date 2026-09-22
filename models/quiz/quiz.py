@@ -127,6 +127,14 @@ class Quiz(models.Model):
             'Leave empty to include all questions regardless of tag.'
         ),
     )
+    filter_exclude_tag_ids = fields.Many2many(
+        'quiz.tag',
+        'quiz_quiz_filter_exclude_tag_rel',
+        'quiz_id',
+        'tag_id',
+        string='Exclude Questions With Tags',
+        help='Exclude questions that have at least one of these tags.',
+    )
     filter_subject_ids = fields.Many2many(
         'aps.subject',
         'educational_games_quiz_filter_subject_rel',
@@ -195,6 +203,7 @@ class Quiz(models.Model):
         'inherited_question_ids',
         'include_other_quizzes',
         'filter_tag_ids',
+        'filter_exclude_tag_ids',
         'filter_subject_ids',
     )
     def _compute_question_count(self):
@@ -209,6 +218,7 @@ class Quiz(models.Model):
         'inherited_question_ids',
         'include_other_quizzes',
         'filter_tag_ids',
+        'filter_exclude_tag_ids',
         'filter_subject_ids',
     )
     def _compute_total_marks(self):
@@ -222,6 +232,11 @@ class Quiz(models.Model):
         if self.filter_tag_ids:
             tag_ids = set(self.filter_tag_ids.ids)
             questions = questions.filtered(lambda q: tag_ids.intersection(q.tag_ids.ids))
+        if self.filter_exclude_tag_ids:
+            excluded_tag_ids = set(self.filter_exclude_tag_ids.ids)
+            questions = questions.filtered(
+                lambda q: not excluded_tag_ids.intersection(q.tag_ids.ids)
+            )
         if self.filter_subject_ids:
             subject_ids = set(self.filter_subject_ids.ids)
             questions = questions.filtered(lambda q: subject_ids.intersection(q.subject_ids.ids))
@@ -243,7 +258,10 @@ class Quiz(models.Model):
                 if q.id in visited_quiz_ids:
                     return
                 visited_quiz_ids.add(q.id)
-                new_inherited_ids.update(q.question_ids.ids)
+                # Apply each included quiz's static filters before its
+                # questions are inherited.  Runtime/student filters are
+                # still applied by the quiz that is ultimately played.
+                new_inherited_ids.update(q._filtered_questions().ids)
                 for included in q.include_other_quizzes:
                     _collect(included)
 
@@ -374,6 +392,14 @@ class Quiz(models.Model):
             )
             if including_quizzes:
                 including_quizzes._sync_inherited_questions()
+        if {'filter_tag_ids', 'filter_exclude_tag_ids', 'filter_subject_ids'}.intersection(vals):
+            # A source quiz's static filters determine which questions it
+            # contributes, including through transitive inheritance.
+            including_quizzes = self.env['quiz.quiz'].search(
+                [('include_other_quizzes', 'in', self.ids)]
+            )
+            if including_quizzes:
+                including_quizzes._sync_inherited_questions()
         return result
 
     def unlink(self):
@@ -402,6 +428,7 @@ class Quiz(models.Model):
     def _get_quiz_filter_payload(self):
         return {
             'filter_tag_ids': sorted(self.filter_tag_ids.ids),
+            'filter_exclude_tag_ids': sorted(self.filter_exclude_tag_ids.ids),
             'filter_subject_ids': sorted(self.filter_subject_ids.ids),
             'filter_min_attempts': self._sanitize_nonnegative_int(self.filter_min_attempts),
             'filter_max_attempts': self._sanitize_nonnegative_int(self.filter_max_attempts),
@@ -416,6 +443,7 @@ class Quiz(models.Model):
         payload = payload or {}
         return {
             'filter_tag_ids': sorted(int(tag_id) for tag_id in (payload.get('filter_tag_ids') or [])),
+            'filter_exclude_tag_ids': sorted(int(tag_id) for tag_id in (payload.get('filter_exclude_tag_ids') or [])),
             'filter_subject_ids': sorted(int(subject_id) for subject_id in (payload.get('filter_subject_ids') or [])),
             'filter_min_attempts': cls._sanitize_nonnegative_int(payload.get('filter_min_attempts')),
             'filter_max_attempts': cls._sanitize_nonnegative_int(payload.get('filter_max_attempts')),
@@ -432,6 +460,9 @@ class Quiz(models.Model):
         if filter_payload['filter_tag_ids']:
             tags = self.env['quiz.tag'].sudo().browse(filter_payload['filter_tag_ids']).exists().mapped('name')
             parts.append(f"Tags: {', '.join(tags)}")
+        if filter_payload['filter_exclude_tag_ids']:
+            tags = self.env['quiz.tag'].sudo().browse(filter_payload['filter_exclude_tag_ids']).exists().mapped('name')
+            parts.append(f"Exclude tags: {', '.join(tags)}")
         if filter_payload['filter_subject_ids']:
             subjects = self.env['aps.subject'].sudo().browse(filter_payload['filter_subject_ids']).exists().mapped('name')
             parts.append(f"Subjects: {', '.join(subjects)}")
@@ -466,6 +497,7 @@ class Quiz(models.Model):
 
     @api.depends(
         'filter_tag_ids',
+        'filter_exclude_tag_ids',
         'filter_subject_ids',
         'filter_min_attempts',
         'filter_max_attempts',
@@ -547,6 +579,9 @@ class Quiz(models.Model):
         if filter_payload['filter_tag_ids']:
             if not set(filter_payload['filter_tag_ids']).intersection(question.tag_ids.ids):
                 return False
+        if filter_payload['filter_exclude_tag_ids']:
+            if set(filter_payload['filter_exclude_tag_ids']).intersection(question.tag_ids.ids):
+                return False
 
         if filter_payload['filter_subject_ids']:
             if not set(filter_payload['filter_subject_ids']).intersection(question.subject_ids.ids):
@@ -599,6 +634,9 @@ class Quiz(models.Model):
 
         if filter_payload['filter_tag_ids']:
             if not set(filter_payload['filter_tag_ids']).intersection(question.tag_ids.ids):
+                return False
+        if filter_payload['filter_exclude_tag_ids']:
+            if set(filter_payload['filter_exclude_tag_ids']).intersection(question.tag_ids.ids):
                 return False
 
         if filter_payload['filter_subject_ids']:
@@ -726,11 +764,56 @@ class Quiz(models.Model):
         except Exception:
             return None
 
+    @api.model
+    def rebuild_quiz_token(self, quiz_id, current_token=None, question_count=None, option_count=None, allow_resubmission=None):
+        """Return a token with the same filter scope but a different display cap.
+
+        This is used by the quiz client when the user clicks "ALL" to clear only
+        the display_question_count cap while keeping the quiz's real Tag/Subject
+        filters intact.
+        """
+        quiz_id = int(quiz_id or 0)
+        if not quiz_id:
+            return ''
+
+        quiz = self.browse(quiz_id)
+        decoded = self._decode_quiz_token(current_token) if current_token else {}
+        filter_payload = {}
+        if decoded:
+            filter_payload = self._normalize_quiz_filter_payload(decoded)
+        elif quiz.exists():
+            filter_payload = quiz._get_quiz_filter_payload()
+
+        if question_count is None:
+            next_question_count = max(0, int(quiz.display_question_count or 0))
+        else:
+            next_question_count = max(0, int(question_count or 0))
+        next_option_count = max(0, int(option_count if option_count is not None else (decoded.get('option_count') if decoded else 0)))
+        next_allow_resubmission = bool(
+            allow_resubmission if allow_resubmission is not None else (decoded.get('allow_resubmission') if decoded else False)
+        )
+
+        payload = {
+            'quiz_id': quiz_id,
+            'question_count': next_question_count,
+            'option_count': next_option_count,
+            'allow_resubmission': next_allow_resubmission,
+            **filter_payload,
+        }
+        return quiz._build_quiz_token(
+            quiz_id,
+            next_question_count,
+            next_option_count,
+            next_allow_resubmission,
+            payload,
+        )
+
     @api.depends(
         'display_question_count',
         'display_option_count',
         'allow_resubmission',
         'filter_tag_ids',
+        'filter_exclude_tag_ids',
         'quiz_type',
         'filter_subject_ids',
         'filter_min_attempts',
@@ -977,6 +1060,11 @@ class Quiz(models.Model):
         if not quiz.exists():
             raise UserError("Quiz not found.")
 
+        # Inherited questions are materialized in question_ids for fast access.
+        # Synchronize here as well as on writes so quizzes created before
+        # inherited filters were configured cannot serve stale unfiltered data.
+        quiz._sync_inherited_questions()
+
         allow_resubmission = False
 
         # Signed token mode: trust only values encoded in the token.
@@ -1131,12 +1219,16 @@ class Quiz(models.Model):
         if not quiz.exists():
             raise UserError("Quiz not found.")
 
+        # Keep scoring aligned with the question set served by the preview.
+        quiz._sync_inherited_questions()
+
         token_data = self._decode_quiz_token(quiz_token) if quiz_token else None
         filter_payload = self._normalize_quiz_filter_payload(token_data or {})
         has_active_filters = any([
             token_data and token_data.get('question_count'),
             token_data and token_data.get('option_count'),
             filter_payload['filter_tag_ids'],
+            filter_payload['filter_exclude_tag_ids'],
             filter_payload['filter_subject_ids'],
             filter_payload['filter_min_attempts'] is not None,
             filter_payload['filter_max_attempts'] is not None,

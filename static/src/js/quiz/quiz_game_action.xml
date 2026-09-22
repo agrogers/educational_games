@@ -96,7 +96,7 @@
                             <span class="quiz-layout-label"><t t-esc="getAnswerColumnButtonLabel()"/></span>
                         </button>
                         <button class="quiz-font-btn quiz-layout-btn"
-                                title="Clear filters and show all questions"
+                                t-att-title="state.showAllQuestions ? 'Show the configured number of questions' : 'Show all questions'"
                                 t-on-click="resetQuestionFilters">
                             <span class="quiz-layout-label">ALL</span>
                         </button>

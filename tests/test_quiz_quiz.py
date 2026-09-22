@@ -74,6 +74,36 @@ class TestQuizTokenFilters(TransactionCase):
         self.assertIn('Attempts between 2 and 5', payload['filter_summary'])
         self.assertIn('Overall % correct at most 50%', payload['filter_summary'])
 
+    def test_rebuild_quiz_token_keeps_filters_but_clears_question_cap(self):
+        subject_science = self.env['aps.subject'].create({'name': 'Science'})
+        tag_focus = self.env['quiz.tag'].create({'name': 'Focus'})
+        question_keep = self.env['quiz.question'].create({
+            'question_text': 'Keep me',
+            'subject_ids': [(6, 0, [subject_science.id])],
+            'tag_ids': [(6, 0, [tag_focus.id])],
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Scoped Quiz',
+            'question_ids': [(6, 0, [question_keep.id])],
+            'display_question_count': 1,
+            'filter_tag_ids': [(6, 0, [tag_focus.id])],
+            'filter_subject_ids': [(6, 0, [subject_science.id])],
+        })
+
+        token = quiz._build_quiz_token(
+            quiz.id,
+            quiz.display_question_count,
+            quiz.display_option_count,
+            quiz.allow_resubmission,
+            quiz._get_quiz_filter_payload(),
+        )
+        rebuilt = quiz.rebuild_quiz_token(quiz.id, token, question_count=0, option_count=quiz.display_option_count)
+        payload = quiz._decode_quiz_token(rebuilt)
+
+        self.assertEqual(payload['question_count'], 0)
+        self.assertEqual(payload['filter_tag_ids'], [tag_focus.id])
+        self.assertEqual(payload['filter_subject_ids'], [subject_science.id])
+
     def test_student_attempts_and_weighted_score_filters_use_and_logic(self):
         quiz = self.env['quiz.quiz'].create({
             'name': 'Student Filter Quiz',
@@ -693,6 +723,42 @@ class TestQuizInheritQuestions(TransactionCase):
         self.assertIn(q_c.id, quiz_a.question_ids.ids)
         self.assertIn(q_c.id, quiz_a.inherited_question_ids.ids)
 
+    def test_inherited_questions_respect_source_filters(self):
+        """Included quizzes contribute only questions matching their filters."""
+        tag_focus = self.env['quiz.tag'].create({'name': 'Focus'})
+        tag_other = self.env['quiz.tag'].create({'name': 'Other'})
+        q_match = self._make_question('Matching question', tags=[tag_focus])
+        q_excluded = self._make_question('Excluded question', tags=[tag_other])
+        source = self.env['quiz.quiz'].create({
+            'name': 'Filtered source',
+            'question_ids': [(6, 0, [q_match.id, q_excluded.id])],
+            'filter_tag_ids': [(6, 0, [tag_focus.id])],
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Main quiz',
+            'include_other_quizzes': [(6, 0, [source.id])],
+        })
+
+        self.assertEqual(quiz.question_ids.ids, [q_match.id])
+        self.assertEqual(quiz.inherited_question_ids.ids, [q_match.id])
+
+        source.filter_tag_ids = [(6, 0, [tag_other.id])]
+        self.assertEqual(quiz.question_ids.ids, [q_excluded.id])
+
+    def test_inherited_questions_respect_transitive_source_filters(self):
+        """Source filters apply through multiple levels of inheritance."""
+        tag_focus = self.env['quiz.tag'].create({'name': 'Focus'})
+        tag_other = self.env['quiz.tag'].create({'name': 'Other'})
+        q_match = self._make_question('Matching question', tags=[tag_focus])
+        q_excluded = self._make_question('Excluded question', tags=[tag_other])
+        source = self._make_quiz('Source', questions=[q_match, q_excluded], filter_tags=[tag_focus])
+        middle = self._make_quiz('Middle')
+        middle.include_other_quizzes = [(4, source.id)]
+        main = self._make_quiz('Main')
+        main.include_other_quizzes = [(4, middle.id)]
+
+        self.assertEqual(main.question_ids.ids, [q_match.id])
+
     def test_maintenance_sync_repairs_stale_materialized_questions(self):
         question = self._make_question('Stale inherited question')
         source = self._make_quiz('Source', questions=[question])
@@ -767,7 +833,14 @@ class TestQuizFilteredQuestionCount(TransactionCase):
             q.subject_ids = [(6, 0, [s.id for s in subjects])]
         return q
 
-    def _make_quiz(self, name, questions=None, filter_tags=None, filter_subjects=None):
+    def _make_quiz(
+        self,
+        name,
+        questions=None,
+        filter_tags=None,
+        filter_subjects=None,
+        exclude_tags=None,
+    ):
         vals = {'name': name}
         if questions:
             vals['question_ids'] = [(6, 0, [q.id for q in questions])]
@@ -775,6 +848,8 @@ class TestQuizFilteredQuestionCount(TransactionCase):
             vals['filter_tag_ids'] = [(6, 0, [t.id for t in filter_tags])]
         if filter_subjects:
             vals['filter_subject_ids'] = [(6, 0, [s.id for s in filter_subjects])]
+        if exclude_tags:
+            vals['filter_exclude_tag_ids'] = [(6, 0, [t.id for t in exclude_tags])]
         return self.env['quiz.quiz'].create(vals)
 
     def test_question_count_with_no_filters_counts_all(self):
@@ -790,6 +865,40 @@ class TestQuizFilteredQuestionCount(TransactionCase):
         q_without_tag = self._make_question('Untagged', tags=[tag_b])
         quiz = self._make_quiz('Quiz', questions=[q_with_tag, q_without_tag], filter_tags=[tag_a])
         self.assertEqual(quiz.question_count, 1)
+
+    def test_question_count_excludes_questions_by_tag(self):
+        tag_exclude = self.env['quiz.tag'].create({'name': 'Exclude'})
+        tag_keep = self.env['quiz.tag'].create({'name': 'Keep'})
+        q_excluded = self._make_question('Excluded', tags=[tag_exclude])
+        q_kept = self._make_question('Kept', tags=[tag_keep])
+        quiz = self._make_quiz(
+            'Quiz',
+            questions=[q_excluded, q_kept],
+            exclude_tags=[tag_exclude],
+        )
+        self.assertEqual(quiz.question_count, 1)
+        self.assertEqual(quiz._filtered_questions().ids, [q_kept.id])
+
+    def test_inherited_questions_respect_excluded_source_tag(self):
+        tag_exclude = self.env['quiz.tag'].create({'name': 'Exclude'})
+        tag_keep = self.env['quiz.tag'].create({'name': 'Keep'})
+        q_excluded = self._make_question('Excluded', tags=[tag_exclude])
+        q_kept = self._make_question('Kept', tags=[tag_keep])
+        source = self._make_quiz(
+            'Source',
+            questions=[q_excluded, q_kept],
+            exclude_tags=[tag_exclude],
+        )
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Main',
+            'include_other_quizzes': [(6, 0, [source.id])],
+        })
+
+        self.assertEqual(quiz.question_ids.ids, [q_kept.id])
+        self.assertEqual(quiz.inherited_question_ids.ids, [q_kept.id])
+
+        source.filter_exclude_tag_ids = [(5, 0, 0)]
+        self.assertEqual(set(quiz.question_ids.ids), {q_excluded.id, q_kept.id})
 
     def test_question_count_filtered_by_subject(self):
         subject_a = self.env['aps.subject'].create({'name': 'Maths'})

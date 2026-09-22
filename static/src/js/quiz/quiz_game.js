@@ -201,6 +201,7 @@ export class QuizGame extends Component {
             // null | 'not_known' | 'not_tried' — filters displayed questions
             // to a specific progress category from the header legend.
             progressFilter: null,
+            showAllQuestions: false,
             // Blur mode for answers: 0 = off, 1 = blur enabled
             blurMode: 0,
             // Per-question reveal tracking: { [questionId]: true } when all answers are unblurred
@@ -460,10 +461,23 @@ export class QuizGame extends Component {
     }
 
     async resetQuestionFilters() {
-        const launchParams = this._getCurrentLaunchParams({ quiz_token: null });
-        this.quizToken = null;
-        this.questionCount = 0;
-        this.optionCount = 0;
+        // Toggle the display cap while preserving the quiz's real filters.
+        const showAllQuestions = !this.state.showAllQuestions;
+        const nextToken = await this.orm.call(
+            "quiz.quiz",
+            "rebuild_quiz_token",
+            [
+                this.quizId,
+                this.quizToken,
+                showAllQuestions ? 0 : null,
+                null,
+                this.state.allowResubmission,
+            ],
+        );
+        const launchParams = this._getCurrentLaunchParams({ quiz_token: nextToken });
+        this.quizToken = nextToken;
+        this.questionCount = showAllQuestions ? 0 : null;
+        this.state.showAllQuestions = showAllQuestions;
         this.state.questionOrderMode = "random";
         this.state.progressFilter = null;
         this.state.retakeMode = false;
@@ -478,7 +492,10 @@ export class QuizGame extends Component {
         this._persistLaunchParams(this._getLaunchStorageKey(), launchParams);
         this._syncActionRouteState(launchParams);
         await this.loadQuiz();
-        this.notification.add("Filters cleared. Showing all questions.", { type: "info" });
+        this.notification.add(
+            showAllQuestions ? "Showing all questions." : "Showing the configured number of questions.",
+            { type: "info" },
+        );
     }
 
     toggleQuestionOrder() {
