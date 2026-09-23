@@ -360,7 +360,7 @@ class QuizQuestion(models.Model):
 
     def write(self, vals):
         result = super().write(vals)
-        if 'all_quiz_ids' in vals:
+        if {'all_quiz_ids', 'tag_ids', 'subject_ids'}.intersection(vals):
             self._resync_quizzes_that_include_us()
         return result
 

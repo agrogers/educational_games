@@ -462,6 +462,8 @@ export class QuizGame extends Component {
 
     async resetQuestionFilters() {
         // Toggle the display cap while preserving the quiz's real filters.
+        // In ALL mode the student-based filters (min/max attempts, weighted
+        // score, exclude answered days) are bypassed via the signed token.
         const showAllQuestions = !this.state.showAllQuestions;
         const nextToken = await this.orm.call(
             "quiz.quiz",
@@ -472,6 +474,7 @@ export class QuizGame extends Component {
                 showAllQuestions ? 0 : null,
                 null,
                 this.state.allowResubmission,
+                showAllQuestions,
             ],
         );
         const launchParams = this._getCurrentLaunchParams({ quiz_token: nextToken });
@@ -493,7 +496,9 @@ export class QuizGame extends Component {
         this._syncActionRouteState(launchParams);
         await this.loadQuiz();
         this.notification.add(
-            showAllQuestions ? "Showing all questions." : "Showing the configured number of questions.",
+            showAllQuestions
+                ? "Showing all questions (student filters ignored)."
+                : "Showing the filtered question selection.",
             { type: "info" },
         );
     }

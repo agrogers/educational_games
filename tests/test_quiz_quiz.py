@@ -5,6 +5,45 @@ from odoo import fields
 from odoo.tests.common import TransactionCase
 
 
+class TestQuizStudentAccess(TransactionCase):
+
+    def test_student_can_load_and_submit_quiz_without_quiz_write_access(self):
+        question = self.env['quiz.question'].create({
+            'question_text': 'Student access question',
+        })
+        answer = self.env['quiz.answer'].create({
+            'question_id': question.id,
+            'answer_text': 'Correct answer',
+            'is_correct': True,
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Student access quiz',
+            'question_ids': [(6, 0, [question.id])],
+        })
+        teacher_group = self.env.ref('aps_sis.group_aps_teacher')
+        admin_user = self.env.ref('base.user_admin')
+        student = self.env['res.users'].search([
+            ('active', '=', True),
+            ('id', '!=', admin_user.id),
+            ('groups_id', 'not in', [teacher_group.id]),
+        ], limit=1)
+        if not student:
+            self.skipTest('A non-teacher demo user is required for this ACL test.')
+
+        self.assertFalse(student.has_group('aps_sis.group_aps_teacher'))
+        student_quiz = quiz.with_user(student)
+
+        payload = student_quiz.get_quiz_for_student(quiz.id)
+        result = student_quiz.submit_quiz_answers(
+            quiz.id,
+            {str(question.id): [answer.id]},
+        )
+
+        self.assertEqual(payload['id'], quiz.id)
+        self.assertIn('score', result)
+        self.assertIn('results', result)
+
+
 class TestQuizBulkAddCheck(TransactionCase):
 
     def test_bulk_check_stages_questions_and_requests_reload(self):
@@ -670,6 +709,34 @@ class TestQuizInheritQuestions(TransactionCase):
         self.assertEqual(
             set(quiz.inherited_question_ids.ids),
             {q_initial.id, q_later.id},
+        )
+
+    def test_question_metadata_changes_resync_inherited_questions(self):
+        tag = self.env['quiz.tag'].create({'name': 'Focus'})
+        subject = self.env['aps.subject'].create({'name': 'Science'})
+        tagged_question = self._make_question('Tagged question')
+        subject_question = self._make_question('Subject question')
+        tagged_source = self.env['quiz.quiz'].create({
+            'name': 'Tagged source',
+            'question_ids': [(6, 0, [tagged_question.id])],
+            'filter_tag_ids': [(6, 0, [tag.id])],
+        })
+        subject_source = self.env['quiz.quiz'].create({
+            'name': 'Subject source',
+            'question_ids': [(6, 0, [subject_question.id])],
+            'filter_subject_ids': [(6, 0, [subject.id])],
+        })
+        quiz = self._make_quiz('Main')
+        quiz.include_other_quizzes = [(6, 0, [tagged_source.id, subject_source.id])]
+
+        self.assertEqual(quiz.question_ids, self.env['quiz.question'])
+
+        tagged_question.tag_ids = [(4, tag.id)]
+        subject_question.subject_ids = [(4, subject.id)]
+
+        self.assertEqual(
+            set(quiz.question_ids.ids),
+            {tagged_question.id, subject_question.id},
         )
 
     def test_no_duplicate_questions_when_own_and_inherited_overlap(self):

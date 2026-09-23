@@ -729,12 +729,13 @@ class Quiz(models.Model):
         secret = (config.get('database.secret') or self.env.cr.dbname or 'odoo').encode()
         return hmac.new(secret, payload_json.encode(), hashlib.sha256).digest()
 
-    def _build_quiz_token(self, quiz_id, question_count=0, option_count=0, allow_resubmission=False, filter_payload=None):
+    def _build_quiz_token(self, quiz_id, question_count=0, option_count=0, allow_resubmission=False, filter_payload=None, bypass_student_filters=False):
         payload = {
             'quiz_id': int(quiz_id),
             'question_count': max(0, int(question_count or 0)),
             'option_count': max(0, int(option_count or 0)),
             'allow_resubmission': bool(allow_resubmission),
+            'bypass_student_filters': bool(bypass_student_filters),
         }
         payload.update(self._normalize_quiz_filter_payload(filter_payload))
         payload_json = json.dumps(payload, separators=(',', ':'), sort_keys=True)
@@ -759,18 +760,24 @@ class Quiz(models.Model):
                 'question_count': max(0, int(payload.get('question_count') or 0)),
                 'option_count': max(0, int(payload.get('option_count') or 0)),
                 'allow_resubmission': bool(payload.get('allow_resubmission')),
+                'bypass_student_filters': bool(payload.get('bypass_student_filters')),
                 **filter_payload,
             }
         except Exception:
             return None
 
     @api.model
-    def rebuild_quiz_token(self, quiz_id, current_token=None, question_count=None, option_count=None, allow_resubmission=None):
+    def rebuild_quiz_token(self, quiz_id, current_token=None, question_count=None, option_count=None, allow_resubmission=None, bypass_student_filters=None):
         """Return a token with the same filter scope but a different display cap.
 
         This is used by the quiz client when the user clicks "ALL" to clear only
         the display_question_count cap while keeping the quiz's real Tag/Subject
-        filters intact.
+        filters intact.  When ``bypass_student_filters`` is True the student
+        performance filters (min/max attempts, weighted score, exclude answered
+        days) are also ignored so every question in the static scope is shown.
+
+        :param bypass_student_filters: bool or None.  None preserves the value
+            decoded from ``current_token``; otherwise the given value is used.
         """
         quiz_id = int(quiz_id or 0)
         if not quiz_id:
@@ -792,12 +799,16 @@ class Quiz(models.Model):
         next_allow_resubmission = bool(
             allow_resubmission if allow_resubmission is not None else (decoded.get('allow_resubmission') if decoded else False)
         )
+        next_bypass_student_filters = bool(
+            bypass_student_filters if bypass_student_filters is not None else (decoded.get('bypass_student_filters') if decoded else False)
+        )
 
         payload = {
             'quiz_id': quiz_id,
             'question_count': next_question_count,
             'option_count': next_option_count,
             'allow_resubmission': next_allow_resubmission,
+            'bypass_student_filters': next_bypass_student_filters,
             **filter_payload,
         }
         return quiz._build_quiz_token(
@@ -806,6 +817,7 @@ class Quiz(models.Model):
             next_option_count,
             next_allow_resubmission,
             payload,
+            next_bypass_student_filters,
         )
 
     @api.depends(
@@ -1060,12 +1072,8 @@ class Quiz(models.Model):
         if not quiz.exists():
             raise UserError("Quiz not found.")
 
-        # Inherited questions are materialized in question_ids for fast access.
-        # Synchronize here as well as on writes so quizzes created before
-        # inherited filters were configured cannot serve stale unfiltered data.
-        quiz._sync_inherited_questions()
-
         allow_resubmission = False
+        bypass_student_filters = False
 
         # Signed token mode: trust only values encoded in the token.
         if quiz_token:
@@ -1075,6 +1083,7 @@ class Quiz(models.Model):
             q_limit = token_data['question_count']
             o_limit = token_data['option_count']
             allow_resubmission = token_data['allow_resubmission']
+            bypass_student_filters = token_data['bypass_student_filters']
             filter_payload = self._normalize_quiz_filter_payload(token_data)
         else:
             # Unsigned URL parameters are intentionally ignored so students
@@ -1091,10 +1100,19 @@ class Quiz(models.Model):
         student_stats = self._get_student_question_attempt_stats(effective_questions, self.env.user)
         progress_summary = self._build_student_progress_summary(quiz, filter_payload, student_stats)
 
-        all_questions = [
-            question for question in all_questions
-            if self._question_matches_filter_payload(question, filter_payload, student_stats)
-        ]
+        if bypass_student_filters:
+            # "ALL" mode: ignore every student-based filter (min/max attempts,
+            # weighted score, student attempts, exclude answered days) and show
+            # every question in the static scope (tags / exclude tags / subjects).
+            all_questions = [
+                question for question in all_questions
+                if self._question_matches_static_scope(question, filter_payload)
+            ]
+        else:
+            all_questions = [
+                question for question in all_questions
+                if self._question_matches_filter_payload(question, filter_payload, student_stats)
+            ]
 
         if q_limit > 0 and q_limit < len(all_questions):
             all_questions = rng.sample(all_questions, q_limit)
@@ -1218,9 +1236,6 @@ class Quiz(models.Model):
         quiz = self.browse(int(quiz_id))
         if not quiz.exists():
             raise UserError("Quiz not found.")
-
-        # Keep scoring aligned with the question set served by the preview.
-        quiz._sync_inherited_questions()
 
         token_data = self._decode_quiz_token(quiz_token) if quiz_token else None
         filter_payload = self._normalize_quiz_filter_payload(token_data or {})
