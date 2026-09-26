@@ -2,7 +2,115 @@ import uuid
 from datetime import timedelta
 
 from odoo import fields
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
+
+
+class TestQuizQuestionMerge(TransactionCase):
+
+    def _create_answer(self, question, text, is_correct):
+        return self.env['quiz.answer'].create({
+            'question_id': question.id,
+            'answer_text': text,
+            'is_correct': is_correct,
+        })
+
+    def test_merge_maps_responses_to_keeper_answers_by_correctness(self):
+        keep = self.env['quiz.question'].create({'question_text': 'Keeper question'})
+        duplicate = self.env['quiz.question'].create({'question_text': 'Duplicate question'})
+        keep_correct = self._create_answer(keep, 'Keeper correct', True)
+        keep_wrong = self._create_answer(keep, 'Keeper wrong', False)
+        duplicate_correct = self._create_answer(duplicate, 'Duplicate correct', True)
+        duplicate_wrong = self._create_answer(duplicate, 'Duplicate wrong', False)
+        keep_quiz = self.env['quiz.quiz'].create({'name': 'Keeper quiz'})
+        duplicate_quiz = self.env['quiz.quiz'].create({'name': 'Duplicate quiz'})
+        subject_one = self.env['aps.subject'].create({'name': 'Merge subject one'})
+        subject_two = self.env['aps.subject'].create({'name': 'Merge subject two'})
+        keep.write({
+            'quiz_id': keep_quiz.id,
+            'subject_ids': [(6, 0, [subject_one.id])],
+        })
+        duplicate.write({
+            'quiz_id': duplicate_quiz.id,
+            'subject_ids': [(6, 0, [subject_two.id])],
+        })
+        student = self.env.user
+        responses = self.env['quiz.response'].create([
+            {
+                'quiz_id': duplicate_quiz.id,
+                'question_id': duplicate.id,
+                'answer_id': duplicate_correct.id,
+                'user_id': student.id,
+                'is_correct': True,
+            },
+            {
+                'quiz_id': duplicate_quiz.id,
+                'question_id': duplicate.id,
+                'answer_id': duplicate_wrong.id,
+                'user_id': student.id,
+                'is_correct': False,
+            },
+        ])
+
+        (keep | duplicate).action_merge_questions()
+
+        self.assertFalse(duplicate.exists())
+        self.assertEqual(set(keep.answer_ids.ids), {keep_correct.id, keep_wrong.id})
+        self.assertEqual(set(responses.mapped('question_id').ids), {keep.id})
+        self.assertEqual(set(responses.mapped('answer_id').ids), {keep_correct.id, keep_wrong.id})
+        self.assertEqual(set(responses.mapped('is_correct')), {False, True})
+        self.assertEqual(set(keep.all_quiz_ids.ids), {keep_quiz.id, duplicate_quiz.id})
+        self.assertEqual(set(keep.subject_ids.ids), {subject_one.id, subject_two.id})
+
+    def test_merge_rejects_missing_answer_correctness_before_mutation(self):
+        keep = self.env['quiz.question'].create({'question_text': 'Keeper question'})
+        duplicate = self.env['quiz.question'].create({'question_text': 'Duplicate question'})
+        self._create_answer(keep, 'Keeper correct', True)
+        duplicate_wrong = self._create_answer(duplicate, 'Duplicate wrong', False)
+        quiz = self.env['quiz.quiz'].create({'name': 'Unmappable merge quiz'})
+        response = self.env['quiz.response'].create({
+            'quiz_id': quiz.id,
+            'question_id': duplicate.id,
+            'answer_id': duplicate_wrong.id,
+            'user_id': self.env.user.id,
+            'is_correct': False,
+        })
+
+        with self.assertRaises(UserError):
+            (keep | duplicate).action_merge_questions()
+
+        self.assertTrue(duplicate.exists())
+        self.assertEqual(response.question_id, duplicate)
+        self.assertEqual(response.answer_id, duplicate_wrong)
+
+
+class TestQuizQuestionEmbeddings(TransactionCase):
+
+    def test_comparison_text_is_plain_and_labels_answer_correctness(self):
+        question = self.env['quiz.question'].create({
+            'question_text': '<p>What is <strong>gravity</strong>?</p>',
+            'marks': 2,
+        })
+        self.env['quiz.answer'].create([
+            {
+                'question_id': question.id,
+                'answer_text': '<p>A force</p>',
+                'is_correct': True,
+            },
+            {
+                'question_id': question.id,
+                'answer_text': '<p>A colour</p>',
+                'is_correct': False,
+            },
+        ])
+
+        comparison_text = self.env['quiz.question.embedding.service']._question_comparison_text(question)
+
+        self.assertIn('gravity', comparison_text)
+        self.assertIn('Correct answer: A force', comparison_text)
+        self.assertIn('Incorrect answer: A colour', comparison_text)
+        self.assertIn('Marks: 2', comparison_text)
+        self.assertNotIn('<p>', comparison_text)
 
 
 class TestQuizStudentAccess(TransactionCase):
@@ -60,6 +168,52 @@ class TestQuizBulkAddCheck(TransactionCase):
         self.assertEqual(quiz.bulk_add_question_ids.ids, [question.id])
         self.assertEqual(action['tag'], 'display_notification')
         self.assertEqual(action['params']['next'], {'type': 'ir.actions.client', 'tag': 'reload'})
+
+
+class TestQuizProgressSummaryBatch(TransactionCase):
+
+    def test_progress_summaries_are_scoped_to_the_current_user(self):
+        question = self.env['quiz.question'].create({
+            'question_text': 'Question for progress summary',
+        })
+        correct_answer = self.env['quiz.answer'].create({
+            'question_id': question.id,
+            'answer_text': 'Correct',
+            'is_correct': True,
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Progress Summary Quiz',
+            'question_ids': [(6, 0, [question.id])],
+        })
+        other_user = self.env['res.users'].create({
+            'name': 'Other Quiz Student',
+            'login': 'other-quiz-progress-student',
+            'groups_id': [(6, 0, [self.env.ref('base.group_user').id])],
+        })
+        response_model = self.env['quiz.response']
+        for _attempt in range(2):
+            response_model.create({
+                'quiz_id': quiz.id,
+                'question_id': question.id,
+                'answer_id': correct_answer.id,
+                'user_id': other_user.id,
+                'attempt_token': uuid.uuid4().hex,
+                'is_correct': True,
+            })
+
+        summaries = self.env['quiz.quiz'].get_student_progress_summaries([
+            quiz.id,
+            quiz.id,
+            'invalid',
+            999999999,
+        ])
+        other_summaries = self.env['quiz.quiz'].with_user(
+            other_user
+        ).get_student_progress_summaries([quiz.id])
+
+        self.assertEqual(set(summaries), {str(quiz.id)})
+        self.assertEqual(summaries[str(quiz.id)]['not_tried_questions'], 1)
+        self.assertEqual(other_summaries[str(quiz.id)]['known_questions'], 1)
 
 
 class TestQuizTokenFilters(TransactionCase):

@@ -7,10 +7,11 @@
     'author': 'Your Name',
     'website': '',
     'license': 'LGPL-3',
-    'depends': ['base', 'web', 'mail', 'aps_sis', 'aui_enhancements'],
+    'depends': ['base', 'web', 'mail', 'aps_sis', 'aui_enhancements', 'aps_ai'],
     'data': [
         'security/ir.model.access.csv',
         'data/quiz_cron.xml',
+        'data/quiz_ai_tools.xml',
         'views/quiz_actions.xml',
         'views/quiz_quiz_views.xml',
         'views/quiz_tag_views.xml',

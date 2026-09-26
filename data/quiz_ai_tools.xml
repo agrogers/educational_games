@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="tool_find_likely_duplicate_quiz_questions" model="aps.ai.tool">
+            <field name="name">Find Likely Duplicate Quiz Questions</field>
+            <field name="technical_name">find_likely_duplicate_quiz_questions</field>
+            <field name="description">
+                Find semantically similar quiz questions using embeddings. Returns a bounded list of candidates for review; similarity is advisory and does not prove duplication.
+            </field>
+            <field name="tool_type">python</field>
+            <field name="capability">read</field>
+            <field name="handler_key">find_likely_duplicate_quiz_questions</field>
+            <field name="permission_group_ids" eval="[(6, 0, [ref('aps_sis.group_aps_teacher'), ref('aps_sis.group_aps_manager'), ref('base.group_system')])]"/>
+            <field name="parameter_ids" eval="[(0, 0, {'name': 'question_id', 'description': 'ID of the source quiz question.', 'parameter_type': 'integer', 'required': True}), (0, 0, {'name': 'quiz_id', 'description': 'Optional quiz ID to restrict candidates to that quiz.', 'parameter_type': 'integer', 'required': False}), (0, 0, {'name': 'limit', 'description': 'Maximum number of candidates to return (hard-capped at 8).', 'parameter_type': 'integer', 'required': False, 'default_value': '8'})]"/>
+        </record>
+        <record id="tool_merge_confirmed_quiz_question_pair" model="aps.ai.tool">
+            <field name="name">Merge Confirmed Quiz Question Pair</field>
+            <field name="technical_name">merge_confirmed_quiz_question_pair</field>
+            <field name="description">
+                Merge one reviewed duplicate question into the explicitly selected keeper. Keep the keeper's answer options and remap duplicate responses to keeper options of matching correctness. This operation deletes the duplicate question.
+            </field>
+            <field name="tool_type">python</field>
+            <field name="capability">write</field>
+            <field name="handler_key">merge_confirmed_quiz_question_pair</field>
+            <field name="requires_confirmation" eval="True"/>
+            <field name="permission_group_ids" eval="[(6, 0, [ref('aps_sis.group_aps_teacher'), ref('aps_sis.group_aps_manager'), ref('base.group_system')])]"/>
+            <field name="parameter_ids" eval="[(0, 0, {'name': 'keep_question_id', 'description': 'ID of the question to retain, including its wording and answer options.', 'parameter_type': 'integer', 'required': True}), (0, 0, {'name': 'merge_question_id', 'description': 'ID of the duplicate question to delete after responses are remapped.', 'parameter_type': 'integer', 'required': True})]"/>
+        </record>
+    </data>
+</odoo>

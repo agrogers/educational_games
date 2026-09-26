@@ -94,12 +94,12 @@ class Quiz(models.Model):
     )
     display_question_count = fields.Integer(
         string='Questions to Show',
-        default=0,
+        default=10,
         help='Number of questions to display to the student. 0 = show all questions.',
     )
     display_option_count = fields.Integer(
         string='Options to Show',
-        default=0,
+        default=4,
         help=(
             'Number of answer options to show per question. '
             'The correct answer is always included; remaining slots are filled randomly. '
@@ -108,7 +108,7 @@ class Quiz(models.Model):
     )
     allow_resubmission = fields.Boolean(
         string='Allow Resubmission',
-        default=False,
+        default=True,
         help=(
             'If enabled, students can retake the quiz and save each attempt as '
             'a new submission. The "Submit Quiz" button changes to '
@@ -154,6 +154,7 @@ class Quiz(models.Model):
     filter_max_pct_correct = fields.Char(
         string='Max % Correct',
         help='Only include questions whose overall % correct is at or below this value. Use this to focuse on questions the whole class is having difficulties with.',
+        default=80,
     )
     filter_student_weighted_score_pct = fields.Char(
         string="Student's Weighted Score %",
@@ -165,6 +166,8 @@ class Quiz(models.Model):
     filter_student_attempts = fields.Char(
         string="Student's Attempts",
         help='Only consider excluding a question when the student has attempted it at least this many times.',
+        default=2,
+
     )
     filter_exclude_answered_days = fields.Char(
         string='Exclude Answered In Previous Days',
@@ -1735,6 +1738,31 @@ class Quiz(models.Model):
 
         result.sort(key=lambda x: (x['user_name'] or '').lower())
         return result
+
+    @api.model
+    def get_student_progress_summaries(self, quiz_ids):
+        """Return mastery summaries for the current user, keyed by quiz ID."""
+        requested_ids = []
+        for value in quiz_ids or []:
+            try:
+                quiz_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if quiz_id > 0 and quiz_id not in requested_ids:
+                requested_ids.append(quiz_id)
+
+        summaries = {}
+        for quiz in self.browse(requested_ids).exists():
+            student_stats = quiz._get_student_question_attempt_stats(
+                quiz.question_ids,
+                self.env.user,
+            )
+            summaries[str(quiz.id)] = quiz._build_student_progress_summary(
+                quiz,
+                quiz._get_quiz_filter_payload(),
+                student_stats,
+            )
+        return summaries
 
     @api.model
     def submit_memory_reveal_result(

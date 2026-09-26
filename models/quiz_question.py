@@ -1,7 +1,8 @@
 from collections import defaultdict
 from datetime import timedelta
-from odoo import models, fields, api
+from odoo import _, models, fields, api
 from odoo.exceptions import UserError
+from odoo.tools import html2plaintext
 
 
 class QuizQuestion(models.Model):
@@ -10,6 +11,7 @@ class QuizQuestion(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'quiz_id, sequence, id'
 
+    display_name = fields.Char(compute='_compute_display_name', store=True)
     quiz_id = fields.Many2one('quiz.quiz', string='Primary Quiz', ondelete='set null')
     all_quiz_ids = fields.Many2many(
         'quiz.quiz',
@@ -102,6 +104,12 @@ class QuizQuestion(models.Model):
         readonly=True,
         help='Percentage of answer selections in the last hour that were correct.',
     )
+
+    @api.depends('question_text', 'sequence')
+    def _compute_display_name(self):
+        for record in self:
+            plain_text = ' '.join(html2plaintext(record.question_text or '').split())
+            record.display_name = plain_text[:80] if plain_text else f'Question #{record.sequence}'
 
     @api.depends('answer_ids.is_correct')
     def _compute_correct_answer_count(self):
@@ -218,53 +226,66 @@ class QuizQuestion(models.Model):
         keep = questions[:1]
         dispose = questions[1:]
 
-        # Collect tags and quizzes from disposed questions to merge
+        # Collect memberships before deleting the disposed questions.
         all_tags = keep.tag_ids | dispose.mapped('tag_ids')
-        all_quizzes = keep.all_quiz_ids | dispose.mapped('all_quiz_ids')
+        all_quizzes = (
+            keep.all_quiz_ids
+            | dispose.mapped('all_quiz_ids')
+            | keep.quiz_id
+            | dispose.mapped('quiz_id')
+        )
+        all_subjects = keep.subject_ids | dispose.mapped('subject_ids')
 
-        # Move incorrect answers from disposed questions to kept question.
-        # Correct answers from disposed questions are discarded — the kept
-        # question already has its own correct answer(s).
-        incorrect_answers = self.env['quiz.answer'].search([
-            ('question_id', 'in', dispose.ids),
-            ('is_correct', '=', False),
-        ])
-        if incorrect_answers:
-            incorrect_answers.write({'question_id': keep.id})
+        keeper_answers = keep.answer_ids.sorted(key=lambda answer: (answer.sequence, answer.id))
+        keeper_answer_by_correctness = {}
+        for answer in keeper_answers:
+            keeper_answer_by_correctness.setdefault(answer.is_correct, answer)
 
-        # Re-point responses that selected a disposed correct answer to the
-        # kept question's correct answer, so student scores are preserved.
-        disposed_correct = self.env['quiz.answer'].search([
-            ('question_id', 'in', dispose.ids),
-            ('is_correct', '=', True),
-        ])
-        kept_correct = keep.answer_ids.filtered('is_correct')
-        if disposed_correct and kept_correct:
-            # Use the first correct answer on the kept question as the target.
-            target_answer = kept_correct[:1]
-            resp_to_remap = self.env['quiz.response'].search([
-                ('answer_id', 'in', disposed_correct.ids),
-            ])
-            if resp_to_remap:
-                resp_to_remap.write({'answer_id': target_answer.id})
-
-        # Move remaining responses from disposed questions to kept question.
-        # These point to incorrect answers (already moved) or to correct
-        # answers that no longer exist (already remapped above).
+        disposed_answers = dispose.mapped('answer_ids')
         responses = self.env['quiz.response'].search([
             ('question_id', 'in', dispose.ids),
         ])
-        if responses:
-            responses.write({'question_id': keep.id})
+        response_answers = responses.mapped('answer_id')
+        if response_answers - disposed_answers:
+            raise UserError(_('Some responses refer to answer options outside the questions being merged.'))
+        missing_correctness = {
+            answer.is_correct
+            for answer in response_answers
+            if answer.is_correct not in keeper_answer_by_correctness
+        }
+        if missing_correctness:
+            missing_labels = ', '.join(
+                _('correct') if is_correct else _('incorrect')
+                for is_correct in sorted(missing_correctness)
+            )
+            raise UserError(_(
+                'The kept question needs at least one answer option for each type being '
+                'merged. Missing: %s.'
+            ) % missing_labels)
+
+        answer_mapping = {
+            answer.id: keeper_answer_by_correctness[answer.is_correct].id
+            for answer in response_answers
+        }
+        responses_by_keeper_answer = defaultdict(list)
+        for response in responses:
+            responses_by_keeper_answer[answer_mapping[response.answer_id.id]].append(response.id)
+
+        for answer_id, response_ids in responses_by_keeper_answer.items():
+            self.env['quiz.response'].browse(response_ids).write({
+                'question_id': keep.id,
+                'answer_id': answer_id,
+            })
 
         # Update kept question with merged tags and quizzes
         keep.write({
             'tag_ids': [(6, 0, all_tags.ids)],
             'all_quiz_ids': [(6, 0, all_quizzes.ids)],
+            'subject_ids': [(6, 0, all_subjects.ids)],
         })
 
-        # Delete disposed questions (their answers and responses are now
-        # owned by the kept question, so they won't cascade-delete)
+        # Responses now point only to keeper answers, so deleting duplicates
+        # cannot cascade-delete their response history.
         dispose.unlink()
 
         # Recompute stats for the kept question
@@ -278,7 +299,7 @@ class QuizQuestion(models.Model):
                 'message': (
                     f'Kept "{keep.display_name or keep.id}". '
                     f'Merged {len(dispose)} question(s), '
-                    f'{len(incorrect_answers)} answer(s), '
+                    f'{len(disposed_answers)} answer option(s), '
                     f'and {len(responses)} response(s).'
                 ),
                 'sticky': False,
@@ -351,6 +372,7 @@ class QuizQuestion(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
+        self.env['quiz.question.embedding.service']._invalidate_question_ids(records.ids)
         records._resync_quizzes_that_include_us()
         # Auto-create default self-assessment answers for memory_reveal questions
         for rec in records:
@@ -360,6 +382,8 @@ class QuizQuestion(models.Model):
 
     def write(self, vals):
         result = super().write(vals)
+        if {'question_text', 'marks', 'allow_multiple'}.intersection(vals):
+            self.env['quiz.question.embedding.service']._invalidate_question_ids(self.ids)
         if {'all_quiz_ids', 'tag_ids', 'subject_ids'}.intersection(vals):
             self._resync_quizzes_that_include_us()
         return result

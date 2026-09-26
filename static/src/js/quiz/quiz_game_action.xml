@@ -172,36 +172,27 @@
 
                             <div class="quiz-question-wrap"
                                  t-att-data-question-id="question.id"
-                                   t-att-data-image-viewer-model="'quiz.question'"
-                                   t-att-data-image-viewer-id="question.id"
+                                 t-att-data-image-viewer-model="'quiz.question'"
+                                 t-att-data-image-viewer-id="question.id"
                                  t-on-click="() => this.setActiveQuestion(question.id)">
-
-                                <!-- Question number badge (top-left) -->
                                 <div class="quiz-q-num">
                                     <t t-esc="question_index + 1"/>
                                 </div>
-
-                                <!-- Question card -->
                                 <div t-attf-class="quiz-question-card {{ cardStatus }} {{ this.isQuestionBlurred(question.id) ? 'quiz-card-blur' : '' }}"
                                      t-on-click="() => this.unblurQuestion(question.id)">
-
-                                    <!-- Result circle badge (top-right, after submission or check) -->
                                     <div t-if="showResult"
                                          t-attf-class="quiz-result-circle {{ qResult.is_correct ? 'result-correct' : 'result-incorrect' }}">
-                                        <t t-if="qResult.is_correct">✓</t>
-                                        <t t-else="">✗</t>
+                                        <t t-if="qResult.is_correct">&#10003;</t>
+                                        <t t-else="">&#10007;</t>
                                     </div>
-
-                                    <!-- Question text + marks badge + teacher Check button -->
                                     <div class="d-flex align-items-start gap-2 mb-3">
                                         <div t-out="question.question_text" class="quiz-question-text flex-grow-1"
-                                            t-att-data-image-viewer-model="'quiz.question'"
-                                            t-att-data-image-viewer-id="question.id"
-                                            t-att-data-image-viewer-field="'question_text'"
+                                             t-att-data-image-viewer-model="'quiz.question'"
+                                             t-att-data-image-viewer-id="question.id"
+                                             t-att-data-image-viewer-field="'question_text'"
                                              t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
                                         <div class="d-flex flex-column gap-1 flex-shrink-0 mt-1">
-                                            <span t-if="question.allow_multiple"
-                                                  class="quiz-badge-multi">Multi</span>
+                                            <span t-if="question.allow_multiple" class="quiz-badge-multi">Multi</span>
                                             <div class="quiz-badge-row">
                                                 <span t-attf-class="quiz-badge-student-score {{ question.student_attempt_count > 0 ? (question.student_weighted_score_pct >= 80 ? 'score-band-blue' : question.student_weighted_score_pct >= 60 ? 'score-band-green' : question.student_weighted_score_pct >= 40 ? 'score-band-yellow' : question.student_weighted_score_pct >= 20 ? 'score-band-orange' : 'score-band-red') : '' }}"
                                                       t-att-title="'Your weighted score / attempts'">
@@ -211,7 +202,6 @@
                                                     <t t-esc="question.marks"/> mark<t t-if="question.marks !== 1">s</t>
                                                 </span>
                                             </div>
-                                            <!-- Check button: only for teachers, before the question is checked/submitted -->
                                             <button t-if="state.isTeacher and !question.checked and !state.submitted"
                                                     class="quiz-btn-check btn btn-sm"
                                                     t-on-click.stop="() => this.checkAnswer(question)">
@@ -219,20 +209,15 @@
                                             </button>
                                         </div>
                                     </div>
-
-                                    <!-- Answer options -->
                                     <div t-attf-class="quiz-answer-grid quiz-answer-grid-{{ state.answerColumns }}">
                                         <t t-set="cardBackImg" t-value="question.cardBackUrl"/>
                                         <t t-foreach="question.answers" t-as="answer" t-key="answer.id">
-                                            <t t-set="isSelected"  t-value="question.selected_answers.includes(answer.id)"/>
-                                            <t t-set="ansResult"   t-value="qResult and qResult.answers.find(a => a.id === answer.id)"/>
-                                            <t t-set="isCorrect"   t-value="ansResult and ansResult.is_correct"/>
+                                            <t t-set="isSelected" t-value="question.selected_answers.includes(answer.id)"/>
+                                            <t t-set="ansResult" t-value="qResult and qResult.answers.find(a => a.id === answer.id)"/>
+                                            <t t-set="isCorrect" t-value="ansResult and ansResult.is_correct"/>
                                             <t t-set="wasSelected" t-value="ansResult and ansResult.was_selected"/>
-                                            <t t-set="ansStats"    t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
-                                            <!-- After reveal: wrong answers flip to back; correct stay front.
-                                                 Before reveal: non-selected flip when any answer is chosen. -->
+                                            <t t-set="ansStats" t-value="question.checked and question.totalRespondents > 0 and question.responseStats and question.responseStats[answer.id]"/>
                                             <t t-set="cardFlipped" t-value="showResult ? isCorrect : (isSelected and question.selected_answers.length > 0)"/>
-
                                             <div t-on-click.stop="() => this.toggleAnswer(question, answer)"
                                                  t-attf-class="quiz-answer-item
                                                      {{ !showResult ? 'quiz-answer-option' : '' }}
@@ -393,93 +378,6 @@
                     </main><!-- /quiz-questions-area -->
                 </div><!-- /quiz-body -->
             </div><!-- /quiz content -->
-        </div>
-    </t>
-
-    <!-- ── Reusable progress bar component ── -->
-    <!-- Props: summary (Object), progressFilter (String, optional), onFilter (Function, optional) -->
-    <t t-name="quiz_game.QuizProgressBar" owl="1">
-        <div t-if="props.summary and props.summary.progress_text"
-             class="quiz-progress-summary">
-            <p class="mb-2 quiz-progress-text">
-                <t t-esc="props.summary.progress_text"/>
-            </p>
-            <div class="quiz-progress-bar" aria-hidden="true">
-                <div t-if="props.summary.known_questions"
-                     class="quiz-progress-segment quiz-progress-known"
-                     t-att-style="'flex-basis:' + this.getWidth('known_questions') + '%'"
-                     t-att-title="this.getSegmentTitle('known_questions', 'Known')"
-                     t-att-aria-label="this.getSegmentTitle('known_questions', 'Known')"/>
-                <div t-if="props.summary.not_known_questions"
-                     class="quiz-progress-segment quiz-progress-not-known"
-                     t-att-style="'flex-basis:' + this.getWidth('not_known_questions') + '%'"
-                     t-att-title="this.getSegmentTitle('not_known_questions', 'Learning')"
-                     t-att-aria-label="this.getSegmentTitle('not_known_questions', 'Learning')"/>
-                <t t-if="props.summary.student_attempt_threshold !== 1">
-                    <div t-if="props.summary.new_above_threshold"
-                         class="quiz-progress-segment quiz-progress-new-above"
-                        t-att-style="'flex-basis:' + this.getWidth('new_above_threshold') + '%'"
-                        t-att-title="this.getSegmentTitle('new_above_threshold', 'New above threshold')"
-                        t-att-aria-label="this.getSegmentTitle('new_above_threshold', 'New above threshold')"/>
-                    <div t-if="props.summary.new_below_threshold"
-                         class="quiz-progress-segment quiz-progress-new-below"
-                        t-att-style="'flex-basis:' + this.getWidth('new_below_threshold') + '%'"
-                        t-att-title="this.getSegmentTitle('new_below_threshold', 'New below threshold')"
-                        t-att-aria-label="this.getSegmentTitle('new_below_threshold', 'New below threshold')"/>
-                </t>
-                <div t-if="props.summary.not_tried_questions"
-                     class="quiz-progress-segment quiz-progress-not-tried"
-                     t-att-style="'flex-basis:' + this.getWidth('not_tried_questions') + '%'"
-                     t-att-title="this.getSegmentTitle('not_tried_questions', 'Not tried')"
-                     t-att-aria-label="this.getSegmentTitle('not_tried_questions', 'Not tried')"/>
-            </div>
-            <div class="quiz-progress-legend mt-1">
-                <span>
-                    <span class="quiz-progress-key quiz-progress-known"></span>
-                    Known (<t t-esc="props.summary.known_questions"/>)
-                </span>
-                <t t-if="props.onFilter">
-                    <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'not_known' ? 'quiz-progress-legend-active' : '' }}"
-                          title="Click to show only these questions"
-                          t-on-click="() => props.onFilter('not_known')">
-                        <span class="quiz-progress-key quiz-progress-not-known"></span>Learning (<t t-esc="props.summary.not_known_questions"/>)
-                    </span>
-                    <t t-if="props.summary.student_attempt_threshold !== 1">
-                        <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'new_above_threshold' ? 'quiz-progress-legend-active' : '' }}"
-                              title="Click to show only these questions"
-                              t-on-click="() => props.onFilter('new_above_threshold')">
-                            <span class="quiz-progress-key quiz-progress-new-above"></span>✓ New (<t t-esc="props.summary.new_above_threshold"/>)
-                        </span>
-                        <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'new_below_threshold' ? 'quiz-progress-legend-active' : '' }}"
-                              title="Click to show only these questions"
-                              t-on-click="() => props.onFilter('new_below_threshold')">
-                            <span class="quiz-progress-key quiz-progress-new-below"></span>✗ New (<t t-esc="props.summary.new_below_threshold"/>)
-                        </span>
-                    </t>
-                    <span t-attf-class="quiz-progress-legend-btn {{ props.progressFilter === 'not_tried' ? 'quiz-progress-legend-active' : '' }}"
-                          title="Click to show only these questions"
-                          t-on-click="() => props.onFilter('not_tried')">
-                        <span class="quiz-progress-key quiz-progress-not-tried"></span>Not tried (<t t-esc="props.summary.not_tried_questions"/>)
-                    </span>
-                </t>
-                <t t-else="">
-                    <span>
-                        <span class="quiz-progress-key quiz-progress-not-known"></span>
-                        Learning (<t t-esc="props.summary.not_known_questions"/>)
-                    </span>
-                    <t t-if="props.summary.student_attempt_threshold !== 1">
-                        <span>
-                            <span class="quiz-progress-key quiz-progress-new-above"></span>✓ New (<t t-esc="props.summary.new_above_threshold"/>)
-                        </span>
-                        <span>
-                            <span class="quiz-progress-key quiz-progress-new-below"></span>✗ New (<t t-esc="props.summary.new_below_threshold"/>)
-                        </span>
-                    </t>
-                    <span>
-                        <span class="quiz-progress-key quiz-progress-not-tried"></span>Not tried (<t t-esc="props.summary.not_tried_questions"/>)
-                    </span>
-                </t>
-            </div>
         </div>
     </t>
 

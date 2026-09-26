@@ -46,3 +46,26 @@ class QuizAnswer(models.Model):
         readonly=True,
         help='Percentage of question attempts in the last hour where this option was selected.',
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        answers = super().create(vals_list)
+        self.env['quiz.question.embedding.service']._invalidate_question_ids(
+            answers.mapped('question_id').ids,
+        )
+        return answers
+
+    def write(self, vals):
+        previous_question_ids = self.mapped('question_id').ids
+        result = super().write(vals)
+        if {'question_id', 'answer_text', 'is_correct', 'sequence', 'marks'}.intersection(vals):
+            self.env['quiz.question.embedding.service']._invalidate_question_ids(
+                previous_question_ids + self.mapped('question_id').ids,
+            )
+        return result
+
+    def unlink(self):
+        question_ids = self.mapped('question_id').ids
+        result = super().unlink()
+        self.env['quiz.question.embedding.service']._invalidate_question_ids(question_ids)
+        return result

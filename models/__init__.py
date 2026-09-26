@@ -5,6 +5,8 @@ from . import quiz_utils
 from . import quiz_tag
 from . import quiz_answer
 from . import quiz_question
+from . import quiz_question_embedding
+from . import quiz_question_ai_tools
 from . import quiz_response
 from . import quiz_preference
 from . import quiz_tag_wizard

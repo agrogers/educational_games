@@ -10,5 +10,14 @@
             <field name="interval_type">days</field>
             <field name="active" eval="True"/>
         </record>
+        <record id="ir_cron_quiz_question_embedding_index" model="ir.cron">
+            <field name="name">Index Quiz Questions for Semantic Search</field>
+            <field name="model_id" ref="model_quiz_question"/>
+            <field name="state">code</field>
+            <field name="code">model.env['quiz.question.embedding.service']._cron_index_pending_questions()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>
