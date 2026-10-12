@@ -1,7 +1,7 @@
 ﻿from collections import Counter
 from datetime import timedelta
 
-from odoo import api, models
+from odoo import api, fields, models
 
 
 class Quiz(models.Model):
@@ -303,4 +303,3 @@ class Quiz(models.Model):
             'student_weighted_threshold': student_weighted_threshold,
             'progress_text': progress_text,
         }
-
