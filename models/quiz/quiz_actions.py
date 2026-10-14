@@ -102,6 +102,20 @@ class Quiz(models.Model):
             'context': quiz_params,
         }
 
+    def action_open_filtered_question_list(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Question List',
+            'res_model': 'quiz.question',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', self.filtered_question_ids.ids)],
+            'context': {
+                'search_default_all_quiz_ids': self.id,
+            },
+            'target': 'current',
+        }
+
     def action_open_create_resource_wizard(self):
         self.ensure_one()
         quiz_id = self._origin.id or (self.id if isinstance(self.id, int) else 0)

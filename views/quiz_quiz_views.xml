@@ -136,9 +136,10 @@
                             <div class="mb-2">
                                 <button name="%(educational_games.action_quiz_question_import)d" string="Import Questions" type="action" class="btn btn-secondary" icon="fa-upload" context="{'default_quiz_id': id}"/>
                                 <span class="me-2 border-start d-inline-block" style="height: 1.5em; vertical-align: middle;"/>
-                                <button name="%(educational_games.action_quiz_question_list)d" string="Open Questions List" type="action" class="btn btn-secondary" icon="fa-external-link" context="{'search_default_all_quiz_ids': id}"/>
+                                <button name="%(educational_games.action_quiz_question_list)d" string="Unfiltered Question List" type="action" class="btn btn-secondary" icon="fa-external-link" context="{'search_default_all_quiz_ids': id}"/>
+                                <button name="action_open_filtered_question_list" string="Question List" type="object" class="btn btn-secondary" icon="fa-filter"/>
                             </div>
-                            <field name="question_ids" context="{'default_quiz_id': id}">
+                            <field name="filtered_question_ids" readonly="1">
                                 <list string="Questions">
                                     <field name="id" string="ID" optional="show"/>
                                     <field name="sequence" widget="handle" optional="hide"/>

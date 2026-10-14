@@ -1322,7 +1322,7 @@ class TestQuizInheritQuestions(TransactionCase):
 
 
 class TestQuizFilteredQuestionCount(TransactionCase):
-    """Tests that question_count and total_marks respect filter_tag_ids and filter_subject_ids."""
+    """Tests that filtered question pools respect quiz-wide filters."""
 
     def _make_question(self, text, tags=None, subjects=None, marks=1):
         q = self.env['quiz.question'].create({'question_text': text, 'marks': marks})
@@ -1364,6 +1364,7 @@ class TestQuizFilteredQuestionCount(TransactionCase):
         q_without_tag = self._make_question('Untagged', tags=[tag_b])
         quiz = self._make_quiz('Quiz', questions=[q_with_tag, q_without_tag], filter_tags=[tag_a])
         self.assertEqual(quiz.question_count, 1)
+        self.assertEqual(quiz.filtered_question_ids.ids, [q_with_tag.id])
 
     def test_question_count_excludes_questions_by_tag(self):
         tag_exclude = self.env['quiz.tag'].create({'name': 'Exclude'})
@@ -1377,6 +1378,7 @@ class TestQuizFilteredQuestionCount(TransactionCase):
         )
         self.assertEqual(quiz.question_count, 1)
         self.assertEqual(quiz._filtered_questions().ids, [q_kept.id])
+        self.assertEqual(quiz.filtered_question_ids.ids, [q_kept.id])
 
     def test_inherited_questions_respect_excluded_source_tag(self):
         tag_exclude = self.env['quiz.tag'].create({'name': 'Exclude'})
@@ -1406,6 +1408,7 @@ class TestQuizFilteredQuestionCount(TransactionCase):
         q_no_match = self._make_question('English Q', subjects=[subject_b])
         quiz = self._make_quiz('Quiz', questions=[q_match, q_no_match], filter_subjects=[subject_a])
         self.assertEqual(quiz.question_count, 1)
+        self.assertEqual(quiz.filtered_question_ids.ids, [q_match.id])
 
     def test_question_count_filtered_by_tag_and_subject(self):
         tag = self.env['quiz.tag'].create({'name': 'Tag'})
@@ -1421,6 +1424,41 @@ class TestQuizFilteredQuestionCount(TransactionCase):
             filter_subjects=[subject],
         )
         self.assertEqual(quiz.question_count, 1)
+
+    def test_filtered_question_list_applies_class_performance_filters(self):
+        q_matching = self._make_question('Matching')
+        q_below_minimum = self._make_question('Too few attempts')
+        q_above_maximum = self._make_question('Too many attempts')
+        q_too_easy = self._make_question('Too easy')
+        for question, attempts, pct_correct in (
+            (q_matching, 3, 55.0),
+            (q_below_minimum, 1, 55.0),
+            (q_above_maximum, 6, 55.0),
+            (q_too_easy, 3, 75.0),
+        ):
+            question.write({
+                'attempt_count': attempts,
+                'pct_correct_all': pct_correct,
+            })
+
+        quiz = self._make_quiz(
+            'Filtered Quiz',
+            questions=[q_matching, q_below_minimum, q_above_maximum, q_too_easy],
+        )
+        quiz.write({
+            'filter_min_attempts': '2',
+            'filter_max_attempts': '5',
+            'filter_max_pct_correct': '60',
+        })
+
+        self.assertEqual(quiz.filtered_question_ids.ids, [q_matching.id])
+        self.assertEqual(
+            set(quiz.question_ids.ids),
+            {q_matching.id, q_below_minimum.id, q_above_maximum.id, q_too_easy.id},
+        )
+        action = quiz.action_open_filtered_question_list()
+        self.assertEqual(action['domain'], [('id', 'in', [q_matching.id])])
+        self.assertEqual(action['context']['search_default_all_quiz_ids'], quiz.id)
 
     def test_total_marks_filtered_by_tag(self):
         tag = self.env['quiz.tag'].create({'name': 'Tag'})

@@ -49,6 +49,11 @@ class Quiz(models.Model):
         'question_id',
         string='Questions',
     )
+    filtered_question_ids = fields.Many2many(
+        'quiz.question',
+        string='Matching Questions',
+        compute='_compute_filtered_question_ids',
+    )
     include_other_quizzes = fields.Many2many(
         'quiz.quiz',
         'quiz_quiz_include_rel',
@@ -209,10 +214,16 @@ class Quiz(models.Model):
         'question_ids',
         'question_ids.tag_ids',
         'question_ids.subject_ids',
+        'question_ids.attempt_count',
+        'question_ids.pct_correct_all',
         'inherited_question_ids',
         'include_other_quizzes',
+        'filter_tag_ids',
         'filter_exclude_tag_ids',
         'filter_subject_ids',
+        'filter_min_attempts',
+        'filter_max_attempts',
+        'filter_max_pct_correct',
     )
     def _compute_question_count(self):
         for record in self:
@@ -223,18 +234,41 @@ class Quiz(models.Model):
         'question_ids.marks',
         'question_ids.tag_ids',
         'question_ids.subject_ids',
+        'question_ids.attempt_count',
+        'question_ids.pct_correct_all',
         'inherited_question_ids',
         'include_other_quizzes',
+        'filter_tag_ids',
         'filter_exclude_tag_ids',
         'filter_subject_ids',
+        'filter_min_attempts',
+        'filter_max_attempts',
+        'filter_max_pct_correct',
     )
     def _compute_total_marks(self):
         for record in self:
             questions = record._filtered_questions()
             record.total_marks = sum(q.marks for q in questions)
 
+    @api.depends(
+        'question_ids',
+        'question_ids.tag_ids',
+        'question_ids.subject_ids',
+        'question_ids.attempt_count',
+        'question_ids.pct_correct_all',
+        'filter_tag_ids',
+        'filter_exclude_tag_ids',
+        'filter_subject_ids',
+        'filter_min_attempts',
+        'filter_max_attempts',
+        'filter_max_pct_correct',
+    )
+    def _compute_filtered_question_ids(self):
+        for record in self:
+            record.filtered_question_ids = record._filtered_questions()
+
     def _filtered_questions(self):
-        """Return question_ids filtered by filter_tag_ids and filter_subject_ids."""
+        """Return linked questions matching the quiz-wide filters."""
         questions = self.question_ids
         if self.filter_tag_ids:
             tag_ids = set(self.filter_tag_ids.ids)
@@ -247,6 +281,19 @@ class Quiz(models.Model):
         if self.filter_subject_ids:
             subject_ids = set(self.filter_subject_ids.ids)
             questions = questions.filtered(lambda q: subject_ids.intersection(q.subject_ids.ids))
+
+        min_attempts = self._sanitize_nonnegative_int(self.filter_min_attempts)
+        if min_attempts:
+            questions = questions.filtered(lambda q: q.attempt_count >= min_attempts)
+
+        max_attempts = self._sanitize_nonnegative_int(self.filter_max_attempts)
+        if max_attempts:
+            questions = questions.filtered(lambda q: q.attempt_count <= max_attempts)
+
+        max_pct_correct = self._sanitize_nonnegative_int(self.filter_max_pct_correct)
+        if max_pct_correct:
+            questions = questions.filtered(lambda q: q.pct_correct_all <= max_pct_correct)
+
         return questions
 
     def write(self, vals):
