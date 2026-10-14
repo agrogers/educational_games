@@ -190,6 +190,7 @@
                                              t-att-data-image-viewer-model="'quiz.question'"
                                              t-att-data-image-viewer-id="question.id"
                                              t-att-data-image-viewer-field="'question_text'"
+                                             t-att-data-aui-page-reference-format="state.quiz.show_page_numbers === false ? 'masked' : null"
                                              t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
                                         <div class="d-flex flex-column gap-1 flex-shrink-0 mt-1">
                                             <span t-if="question.allow_multiple" class="quiz-badge-multi">Multi</span>
@@ -264,6 +265,7 @@
                                                        t-att-data-image-viewer-model="'quiz.answer'"
                                                        t-att-data-image-viewer-id="answer.id"
                                                        t-att-data-image-viewer-field="'answer_text'"
+                                                       t-att-data-aui-page-reference-format="state.quiz.show_page_numbers === false ? 'masked' : null"
                                                        t-att-style="'font-size:' + state.fontSizeEm + 'em'"/>
 
                                                 <!-- ── Percentage-pie stats (teacher Check view) ── -->

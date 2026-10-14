@@ -6,7 +6,7 @@ class Quiz(models.Model):
     _inherit = 'quiz.quiz'
 
     def _sync_inherited_questions(self):
-        """Sync question_ids to include questions from include_other_quizzes.
+        """Sync question_ids to include questions from directly included quizzes.
 
         inherited_question_ids tracks which questions were auto-added so we
         know which ones to remove safely when an included quiz is removed.
@@ -14,22 +14,13 @@ class Quiz(models.Model):
         added are removed from question_ids.
         """
         for quiz in self.exists():
-            visited_quiz_ids = set()
             new_inherited_ids = set()
 
-            def _collect(q):
-                if q.id in visited_quiz_ids:
-                    return
-                visited_quiz_ids.add(q.id)
-                # Apply each included quiz's static filters before its
-                # questions are inherited.  Runtime/student filters are
-                # still applied by the quiz that is ultimately played.
-                new_inherited_ids.update(q._filtered_questions().ids)
-                for included in q.include_other_quizzes:
-                    _collect(included)
-
             for included in quiz.include_other_quizzes:
-                _collect(included)
+                # Apply each included quiz's static filters before its
+                # effective question set is inherited. Its inherited
+                # questions are already part of that set.
+                new_inherited_ids.update(included._filtered_questions().ids)
 
             current_question_ids = set(quiz.question_ids.ids)
             old_inherited_ids = set(quiz.inherited_question_ids.ids)
@@ -181,6 +172,5 @@ class Quiz(models.Model):
         quizzes = self.sudo().search([])
         quizzes._sync_inherited_questions()
         return True
-
 
 

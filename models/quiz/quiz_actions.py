@@ -102,6 +102,31 @@ class Quiz(models.Model):
             'context': quiz_params,
         }
 
+    def action_open_create_resource_wizard(self):
+        self.ensure_one()
+        quiz_id = self._origin.id or (self.id if isinstance(self.id, int) else 0)
+        if not quiz_id:
+            raise UserError("Please save the quiz before creating a resource.")
+        if not self.quiz_url_params:
+            raise UserError("The quiz URL is not available. Please save the quiz and try again.")
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Create Resource',
+            'res_model': 'quiz.resource.create.wizard',
+            'view_mode': 'form',
+            'views': [(
+                self.env.ref(
+                    'educational_games.view_quiz_resource_create_wizard_form'
+                ).id,
+                'form',
+            )],
+            'target': 'new',
+            'context': {
+                'default_quiz_id': quiz_id,
+            },
+        }
+
     def action_delete_all_questions(self):
         """Delete all questions (and their cascaded answers) for this quiz.
 
@@ -240,4 +265,3 @@ class Quiz(models.Model):
 
         new_sub = original.copy(defaults)
         return new_sub.id
-

@@ -52,9 +52,12 @@ class Quiz(models.Model):
 
         effective_questions = quiz.question_ids
         all_questions = list(effective_questions)
+        subject_scope = quiz._get_student_subject_scope(self.env.user)
 
         student_stats = self._get_student_question_attempt_stats(effective_questions, self.env.user)
-        progress_summary = self._build_student_progress_summary(quiz, filter_payload, student_stats)
+        progress_summary = self._build_student_progress_summary(
+            quiz, filter_payload, student_stats, self.env.user
+        )
 
         if bypass_student_filters:
             # "ALL" mode: ignore every student-based filter (min/max attempts,
@@ -62,12 +65,16 @@ class Quiz(models.Model):
             # every question in the static scope (tags / exclude tags / subjects).
             all_questions = [
                 question for question in all_questions
-                if self._question_matches_static_scope(question, filter_payload)
+                if self._question_matches_static_scope(
+                    question, filter_payload, subject_scope
+                )
             ]
         else:
             all_questions = [
                 question for question in all_questions
-                if self._question_matches_filter_payload(question, filter_payload, student_stats)
+                if self._question_matches_filter_payload(
+                    question, filter_payload, student_stats, subject_scope
+                )
             ]
 
         if q_limit > 0 and q_limit < len(all_questions):
@@ -162,6 +169,7 @@ class Quiz(models.Model):
             'id': quiz.id,
             'name': quiz.name,
             'quiz_type': quiz.quiz_type,
+            'show_page_numbers': quiz.show_page_numbers,
             'total_marks': displayed_marks,
             'allow_resubmission': allow_resubmission,
             'filter_summary': quiz._build_filter_summary(filter_payload),
@@ -195,6 +203,7 @@ class Quiz(models.Model):
 
         token_data = self._decode_quiz_token(quiz_token) if quiz_token else None
         filter_payload = self._normalize_quiz_filter_payload(token_data or {})
+        subject_scope = quiz._get_student_subject_scope(self.env.user)
         has_active_filters = any([
             token_data and token_data.get('question_count'),
             token_data and token_data.get('option_count'),
@@ -206,7 +215,7 @@ class Quiz(models.Model):
             filter_payload['filter_max_pct_correct'] is not None,
             filter_payload['filter_student_weighted_score_pct'] is not None,
             filter_payload['filter_student_attempts'] is not None,
-        ])
+        ]) or subject_scope is not None
 
         score = 0
         results = []
@@ -221,7 +230,18 @@ class Quiz(models.Model):
         }
         submitted_ids = {int(question_id) for question_id in submitted_answers}
         effective_questions = quiz.question_ids
-        questions_to_score = effective_questions.filtered(lambda q: q.id in submitted_ids) if submitted_ids else effective_questions.browse([])
+        questions_to_score = (
+            effective_questions.filtered(
+                lambda question: (
+                    question.id in submitted_ids
+                    and self._question_matches_student_subject_scope(
+                        question, subject_scope
+                    )
+                )
+            )
+            if submitted_ids
+            else effective_questions.browse([])
+        )
 
         for question in questions_to_score:
             q_id = str(question.id)
@@ -290,7 +310,9 @@ class Quiz(models.Model):
             }
             for question, stats in ((question, student_stats.get(question.id, {'attempt_count': 0, 'weighted_score_pct': None, 'last_answered_at': None})) for question in effective_questions)
         }
-        student_progress_summary = self._build_student_progress_summary(quiz, filter_payload, student_stats)
+        student_progress_summary = self._build_student_progress_summary(
+            quiz, filter_payload, student_stats, self.env.user
+        )
 
         # â”€â”€ Per-question response stats for teacher users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         is_teacher = (
@@ -347,6 +369,4 @@ class Quiz(models.Model):
             'student_question_stats': student_question_stats,
             'student_progress_summary': student_progress_summary,
         }
-
-
 

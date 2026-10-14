@@ -160,9 +160,50 @@ class Quiz(models.Model):
 
         return stats
 
-    def _question_matches_filter_payload(self, question, filter_payload, student_stats=None):
+    def _get_student_subject_ids(self, user=None):
+        user = user or self.env.user
+        if not user.partner_id:
+            return set()
+
+        students = self.env['aps.student'].sudo().with_context(
+            active_test=False,
+        ).search([
+            ('partner_id', '=', user.partner_id.id),
+        ])
+        if not students:
+            return set()
+
+        enrollments = self.env['aps.student.class'].sudo().with_context(
+            active_test=False,
+        ).search([
+            ('student_id', 'in', students.ids),
+            ('state', '!=', 'withdrawn'),
+        ])
+        return set(enrollments.mapped('class_id.subject_id').ids)
+
+    def _get_student_subject_scope(self, user=None):
+        self.ensure_one()
+        quiz_subject_ids = set(self.subject_ids.ids)
+        student_subject_ids = self._get_student_subject_ids(user)
+        if not quiz_subject_ids or not student_subject_ids:
+            return None
+        return quiz_subject_ids.intersection(student_subject_ids)
+
+    @staticmethod
+    def _question_matches_student_subject_scope(question, subject_scope):
+        return (
+            subject_scope is None
+            or bool(subject_scope.intersection(question.subject_ids.ids))
+        )
+
+    def _question_matches_filter_payload(
+        self, question, filter_payload, student_stats=None, subject_scope=None
+    ):
         filter_payload = self._normalize_quiz_filter_payload(filter_payload)
         student_stats = student_stats or {}
+
+        if not self._question_matches_student_subject_scope(question, subject_scope):
+            return False
 
         if filter_payload['filter_tag_ids']:
             if not set(filter_payload['filter_tag_ids']).intersection(question.tag_ids.ids):
@@ -217,8 +258,11 @@ class Quiz(models.Model):
 
         return True
 
-    def _question_matches_static_scope(self, question, filter_payload):
+    def _question_matches_static_scope(self, question, filter_payload, subject_scope=None):
         filter_payload = self._normalize_quiz_filter_payload(filter_payload)
+
+        if not self._question_matches_student_subject_scope(question, subject_scope):
+            return False
 
         if filter_payload['filter_tag_ids']:
             if not set(filter_payload['filter_tag_ids']).intersection(question.tag_ids.ids):
@@ -233,12 +277,17 @@ class Quiz(models.Model):
 
         return True
 
-    def _build_student_progress_summary(self, quiz, filter_payload, student_stats):
+    def _build_student_progress_summary(self, quiz, filter_payload, student_stats, user=None):
         filter_payload = self._normalize_quiz_filter_payload(filter_payload)
         student_attempt_threshold = filter_payload['filter_student_attempts']
         student_weighted_threshold = filter_payload['filter_student_weighted_score_pct'] or 80
 
-        scoped_questions = quiz.question_ids.filtered(lambda question: self._question_matches_static_scope(question, filter_payload))
+        subject_scope = quiz._get_student_subject_scope(user)
+        scoped_questions = quiz.question_ids.filtered(
+            lambda question: self._question_matches_static_scope(
+                question, filter_payload, subject_scope
+            )
+        )
         total_possible_questions = len(scoped_questions)
 
         known_questions = 0           # attempts â‰¥ threshold AND score â‰¥ threshold

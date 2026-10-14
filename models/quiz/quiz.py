@@ -106,6 +106,11 @@ class Quiz(models.Model):
             '0 = show all options.'
         ),
     )
+    show_page_numbers = fields.Boolean(
+        string='Show Page Numbers',
+        default=True,
+        help='When disabled, page numbers in question and answer text are masked (for example, p123 appears as p---).',
+    )
     allow_resubmission = fields.Boolean(
         string='Allow Resubmission',
         default=True,
@@ -154,10 +159,11 @@ class Quiz(models.Model):
     filter_max_pct_correct = fields.Char(
         string='Max % Correct',
         help='Only include questions whose overall % correct is at or below this value. Use this to focuse on questions the whole class is having difficulties with.',
-        default=80,
+        
     )
     filter_student_weighted_score_pct = fields.Char(
         string="Student's Weighted Score %",
+        default=80,
         help=(
             'Exclude a question when the student has reached at least this weighted score percentage. '
             'Most recent attempt has weight 1, next 1/2, next 1/3, and so on.'

@@ -7,3 +7,4 @@ from . import quiz_student
 from . import quiz_statistics
 from . import quiz_memory
 from . import image_memory
+from . import quiz_resource_wizard

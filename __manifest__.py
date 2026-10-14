@@ -14,6 +14,7 @@
         'data/quiz_ai_tools.xml',
         'views/quiz_actions.xml',
         'views/quiz_quiz_views.xml',
+        'views/quiz_resource_wizard_views.xml',
         'views/quiz_tag_views.xml',
         'views/quiz_question_views.xml',
         'views/quiz_question_import_wizard_views.xml',

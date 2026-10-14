@@ -115,6 +115,32 @@ class TestQuizQuestionEmbeddings(TransactionCase):
 
 class TestQuizStudentAccess(TransactionCase):
 
+    def test_show_page_numbers_defaults_to_true_and_is_returned_to_player(self):
+        question = self.env['quiz.question'].create({
+            'question_text': '<p>Read p123</p>',
+        })
+        answer = self.env['quiz.answer'].create({
+            'question_id': question.id,
+            'answer_text': '<p>Answer from p456</p>',
+            'is_correct': True,
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Page Number Visibility Quiz',
+            'question_ids': [(6, 0, [question.id])],
+        })
+
+        self.assertTrue(quiz.show_page_numbers)
+        visible_payload = quiz.get_quiz_for_student(quiz.id)
+        self.assertTrue(visible_payload['show_page_numbers'])
+        self.assertEqual(visible_payload['questions'][0]['question_text'], question.question_text)
+        self.assertEqual(visible_payload['questions'][0]['answers'][0]['answer_text'], answer.answer_text)
+
+        quiz.show_page_numbers = False
+        masked_payload = quiz.get_quiz_for_student(quiz.id)
+        self.assertFalse(masked_payload['show_page_numbers'])
+        self.assertEqual(masked_payload['questions'][0]['question_text'], question.question_text)
+        self.assertEqual(masked_payload['questions'][0]['answers'][0]['answer_text'], answer.answer_text)
+
     def test_student_can_load_and_submit_quiz_without_quiz_write_access(self):
         question = self.env['quiz.question'].create({
             'question_text': 'Student access question',
@@ -776,6 +802,247 @@ class TestQuizSubmissionScoring(TransactionCase):
         self.assertEqual(result['student_question_stats'][str(question_1.id)]['attempt_count'], 2)
 
 
+class TestQuizStudentSubjectScope(TransactionCase):
+
+    def _make_student(self, login):
+        user = self.env['res.users'].create({
+            'name': login,
+            'login': login,
+            'groups_id': [(6, 0, [self.env.ref('base.group_user').id])],
+        })
+        student = self.env['aps.student'].create({
+            'partner_id': user.partner_id.id,
+        })
+        return user, student
+
+    def _enroll(self, student, subject, state='enrolled', active=True):
+        school_class = self.env['aps.class'].create({
+            'name': f'{subject.name} Class',
+            'subject_id': subject.id,
+            'active': active,
+        })
+        return self.env['aps.student.class'].create({
+            'student_id': student.id,
+            'class_id': school_class.id,
+            'state': state,
+            'active': active,
+            'start_date': '2023-01-01',
+            'end_date': '2023-12-31',
+        })
+
+    def test_question_delivery_submission_and_progress_bars_share_subject_scope(self):
+        biology_1 = self.env['aps.subject'].create({'name': 'Biology 1'})
+        biology_2 = self.env['aps.subject'].create({'name': 'Biology 2'})
+        biology_3 = self.env['aps.subject'].create({'name': 'Biology 3'})
+        user, student = self._make_student('biology-subject-scope-student')
+        self._enroll(student, biology_1, state='finished', active=False)
+        self._enroll(student, biology_2, state='withdrawn')
+
+        question_eligible = self.env['quiz.question'].create({
+            'question_text': 'Shared biology subject',
+            'subject_ids': [(6, 0, [biology_1.id, biology_2.id])],
+        })
+        question_other_quiz_subjects = self.env['quiz.question'].create({
+            'question_text': 'Other quiz subjects only',
+            'subject_ids': [(6, 0, [biology_2.id, biology_3.id])],
+        })
+        question_withdrawn_subject = self.env['quiz.question'].create({
+            'question_text': 'Withdrawn subject only',
+            'subject_ids': [(6, 0, [biology_2.id])],
+        })
+        questions = (
+            question_eligible,
+            question_other_quiz_subjects,
+            question_withdrawn_subject,
+        )
+        answers = {
+            question.id: self.env['quiz.answer'].create({
+                'question_id': question.id,
+                'answer_text': 'Correct answer',
+                'is_correct': True,
+            })
+            for question in questions
+        }
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Biology Subject Scope Quiz',
+            'subject_ids': [(6, 0, [biology_1.id, biology_2.id, biology_3.id])],
+            'question_ids': [(6, 0, [question.id for question in questions])],
+        })
+        token = quiz._build_quiz_token(
+            quiz.id,
+            filter_payload=quiz._get_quiz_filter_payload(),
+            bypass_student_filters=True,
+        )
+        student_quiz = self.env['quiz.quiz'].with_user(user)
+        payload = student_quiz.get_quiz_for_student(quiz.id, quiz_token=token)
+
+        self.assertEqual(
+            [question['id'] for question in payload['questions']],
+            [question_eligible.id],
+        )
+        self.assertEqual(
+            payload['student_progress_summary']['total_possible_questions'],
+            1,
+        )
+
+        result = student_quiz.submit_quiz_answers(
+            quiz.id,
+            {
+                str(question.id): [answers[question.id].id]
+                for question in questions
+            },
+            quiz_token=token,
+        )
+        self.assertEqual(
+            [entry['question_id'] for entry in result['results']],
+            [question_eligible.id],
+        )
+
+        student_statistics = quiz.get_quiz_student_statistics(quiz.id)
+        student_summary = next(
+            entry['progress_summary']
+            for entry in student_statistics
+            if entry['user_id'] == user.id
+        )
+        self.assertEqual(student_summary['total_possible_questions'], 1)
+
+    def test_missing_quiz_or_student_subjects_preserves_existing_visibility(self):
+        subject = self.env['aps.subject'].create({'name': 'Unmatched subject'})
+        quiz_subjects_user, student_with_subject = self._make_student(
+            'quiz-subjects-missing-student'
+        )
+        self._enroll(student_with_subject, subject)
+        no_student_subject_user, _student_without_subject = self._make_student(
+            'student-subjects-missing-student'
+        )
+        question = self.env['quiz.question'].create({
+            'question_text': 'Question outside any common subject',
+            'subject_ids': [(6, 0, [subject.id])],
+        })
+        quiz_with_subjects = self.env['quiz.quiz'].create({
+            'name': 'Quiz With Subject',
+            'subject_ids': [(6, 0, [subject.id])],
+            'question_ids': [(6, 0, [question.id])],
+        })
+        quiz_without_subjects = self.env['quiz.quiz'].create({
+            'name': 'Quiz Without Subjects',
+            'question_ids': [(6, 0, [question.id])],
+        })
+
+        student_missing_subject_payload = self.env['quiz.quiz'].with_user(
+            no_student_subject_user
+        ).get_quiz_for_student(quiz_with_subjects.id)
+        quiz_missing_subject_payload = self.env['quiz.quiz'].with_user(
+            quiz_subjects_user
+        ).get_quiz_for_student(quiz_without_subjects.id)
+
+        self.assertEqual(
+            [item['id'] for item in student_missing_subject_payload['questions']],
+            [question.id],
+        )
+        self.assertEqual(
+            [item['id'] for item in quiz_missing_subject_payload['questions']],
+            [question.id],
+        )
+
+    def test_nonempty_but_disjoint_quiz_and_student_subjects_matches_nothing(self):
+        quiz_subject = self.env['aps.subject'].create({'name': 'Quiz subject'})
+        student_subject = self.env['aps.subject'].create({'name': 'Student subject'})
+        user, student = self._make_student('disjoint-subjects-student')
+        self._enroll(student, student_subject)
+        question = self.env['quiz.question'].create({
+            'question_text': 'Quiz subject question',
+            'subject_ids': [(6, 0, [quiz_subject.id])],
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Disjoint Subjects Quiz',
+            'subject_ids': [(6, 0, [quiz_subject.id])],
+            'question_ids': [(6, 0, [question.id])],
+        })
+
+        payload = self.env['quiz.quiz'].with_user(user).get_quiz_for_student(
+            quiz.id
+        )
+
+        self.assertEqual(payload['questions'], [])
+        self.assertEqual(
+            payload['student_progress_summary']['total_possible_questions'],
+            0,
+        )
+
+
+class TestQuizResourceCreation(TransactionCase):
+
+    def test_quiz_form_opens_resource_creation_dialog(self):
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Resource Dialog Quiz',
+        })
+
+        action = quiz.action_open_create_resource_wizard()
+
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'quiz.resource.create.wizard')
+        self.assertEqual(action['target'], 'new')
+        self.assertEqual(action['context']['default_quiz_id'], quiz.id)
+
+    def test_wizard_creates_quiz_supporting_resource(self):
+        resource_type = self.env['aps.resource.types'].create({
+            'name': 'Quiz',
+        })
+        parent = self.env['aps.resources'].create({
+            'name': 'Course Unit',
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Algebra Quiz',
+            'display_question_count': 17,
+        })
+        quiz_url = quiz.quiz_url_params
+        wizard = self.env['quiz.resource.create.wizard'].create({
+            'quiz_id': quiz.id,
+            'parent_resource_id': parent.id,
+        })
+
+        action = wizard.action_create_resource()
+
+        created_resource = parent.supporting_resource_ids.filtered(
+            lambda resource: resource.name == 'Quiz'
+        )
+        self.assertEqual(action['type'], 'ir.actions.act_window_close')
+        self.assertEqual(parent.has_supporting_resources, 'yes')
+        self.assertEqual(len(created_resource), 1)
+        self.assertEqual(created_resource.type_id, resource_type)
+        self.assertEqual(created_resource.supporting_parent_ids, parent)
+        self.assertEqual(created_resource.url, quiz_url)
+        self.assertEqual(created_resource.marks, 17)
+        self.assertEqual(created_resource.has_question, 'yes')
+        self.assertIn(
+            'This is a quiz task. Your score will be updated here automatically.',
+            created_resource.question,
+        )
+
+    def test_missing_quiz_resource_type_fails_without_mutating_parent(self):
+        self.assertFalse(
+            self.env['aps.resource.types'].search([('name', '=', 'Quiz')])
+        )
+        parent = self.env['aps.resources'].create({
+            'name': 'Course Unit Without Quiz Type',
+        })
+        quiz = self.env['quiz.quiz'].create({
+            'name': 'Quiz Without Resource Type',
+        })
+        wizard = self.env['quiz.resource.create.wizard'].create({
+            'quiz_id': quiz.id,
+            'parent_resource_id': parent.id,
+        })
+        resource_count = self.env['aps.resources'].search_count([])
+
+        with self.assertRaises(UserError):
+            wizard.action_create_resource()
+
+        self.assertEqual(parent.has_supporting_resources, 'no')
+        self.assertEqual(self.env['aps.resources'].search_count([]), resource_count)
+
+
 class TestQuizInheritQuestions(TransactionCase):
     """Tests for include_other_quizzes: question inheritance and circular reference guard."""
 
@@ -966,19 +1233,30 @@ class TestQuizInheritQuestions(TransactionCase):
         source.filter_tag_ids = [(6, 0, [tag_other.id])]
         self.assertEqual(quiz.question_ids.ids, [q_excluded.id])
 
-    def test_inherited_questions_respect_transitive_source_filters(self):
-        """Source filters apply through multiple levels of inheritance."""
+    def test_inherited_questions_use_direct_source_filtered_set(self):
+        """A quiz inherits the filtered effective questions of its direct source."""
         tag_focus = self.env['quiz.tag'].create({'name': 'Focus'})
         tag_other = self.env['quiz.tag'].create({'name': 'Other'})
-        q_match = self._make_question('Matching question', tags=[tag_focus])
-        q_excluded = self._make_question('Excluded question', tags=[tag_other])
-        source = self._make_quiz('Source', questions=[q_match, q_excluded], filter_tags=[tag_focus])
-        middle = self._make_quiz('Middle')
+        q_match = self._make_question('Matching question')
+        q_excluded = self._make_question('Excluded question')
+        q_match.tag_ids = [(4, tag_focus.id)]
+        q_excluded.tag_ids = [(4, tag_other.id)]
+        source = self._make_quiz('Source', questions=[q_match, q_excluded])
+        middle = self.env['quiz.quiz'].create({
+            'name': 'Middle',
+            'filter_tag_ids': [(6, 0, [tag_focus.id])],
+        })
         middle.include_other_quizzes = [(4, source.id)]
         main = self._make_quiz('Main')
         main.include_other_quizzes = [(4, middle.id)]
 
-        self.assertEqual(main.question_ids.ids, [q_match.id])
+        self.assertEqual(set(middle._filtered_questions().ids), {q_match.id})
+        self.assertEqual(set(main.question_ids.ids), {q_match.id})
+        self.assertEqual(set(main.inherited_question_ids.ids), {q_match.id})
+
+        middle.filter_tag_ids = [(6, 0, [tag_other.id])]
+        self.assertEqual(set(main.question_ids.ids), {q_excluded.id})
+        self.assertEqual(set(main.inherited_question_ids.ids), {q_excluded.id})
 
     def test_maintenance_sync_repairs_stale_materialized_questions(self):
         question = self._make_question('Stale inherited question')

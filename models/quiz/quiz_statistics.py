@@ -343,7 +343,9 @@ class Quiz(models.Model):
         result = []
         for user in users:
             student_stats = quiz._get_student_question_attempt_stats(quiz.question_ids, user)
-            progress = quiz._build_student_progress_summary(quiz, filter_payload, student_stats)
+            progress = quiz._build_student_progress_summary(
+                quiz, filter_payload, student_stats, user
+            )
             result.append({
                 'user_id': user.id,
                 'user_name': user.name or '',
@@ -375,7 +377,7 @@ class Quiz(models.Model):
                 quiz,
                 quiz._get_quiz_filter_payload(),
                 student_stats,
+                self.env.user,
             )
         return summaries
-
 
