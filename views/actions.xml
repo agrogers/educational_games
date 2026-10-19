@@ -1,15 +1,18 @@
 <odoo>
     <record id="action_student_game" model="ir.actions.client">
+        <field name="path">classroom-challenge</field>
         <field name="name">Student Game</field>
         <field name="tag">action_student_game_js</field>
     </record>
 
     <record id="action_lonely_s_game" model="ir.actions.client">
+        <field name="path">lonely-s</field>
         <field name="name">Lonely S</field>
         <field name="tag">action_lonely_s_game_js</field>
     </record>
 
     <record id="action_binary_conversions" model="ir.actions.client">
+        <field name="path">binary-conversions</field>
         <field name="name">Binary Conversions</field>
         <field name="tag">action_binary_conversions_js</field>
     </record>
@@ -37,6 +40,7 @@
         </record>
     -->
     <record id="action_binary_adder_original" model="ir.actions.client">
+        <field name="path">binary-adder</field>
         <field name="name">Binary Adder</field>
         <field name="tag">action_html_game_wrapper_js</field>
         <field name="context">{

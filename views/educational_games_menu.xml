@@ -13,11 +13,13 @@
     <menuitem id="menu_educational_games_dashboard" name="Dashboard" parent="educational_games_menu" action="action_educational_games_dashboard" sequence="1" groups="aps_sis.group_aps_manager"/>
 
     <record id="action_student_game" model="ir.actions.client" forcecreate="1">
+        <field name="path">classroom-challenge</field>
         <field name="name">Classroom Challenge</field>
         <field name="tag">action_student_game_js</field>
     </record>
 
     <record id="action_lonely_s_game" model="ir.actions.client" forcecreate="1">
+        <field name="path">lonely-s</field>
         <field name="name">Lonely S</field>
         <field name="tag">action_lonely_s_game_js</field>
     </record>

@@ -667,6 +667,7 @@
     </record>
 
     <record id="action_quiz_response_list" model="ir.actions.act_window">
+        <field name="path">quiz-responses</field>
         <field name="name">Quiz Responses</field>
         <field name="res_model">quiz.response</field>
         <field name="view_mode">list,form</field>
