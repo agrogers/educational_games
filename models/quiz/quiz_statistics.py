@@ -334,7 +334,7 @@ class Quiz(models.Model):
             raise UserError("Quiz not found.")
 
         responses = self.env['quiz.response'].sudo().search(
-            [('quiz_id', '=', quiz.id)],
+            [('question_id', 'in', quiz.question_ids.ids)],
         )
         users = responses.mapped('user_id')
 
@@ -380,4 +380,3 @@ class Quiz(models.Model):
                 self.env.user,
             )
         return summaries
-

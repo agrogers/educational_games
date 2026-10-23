@@ -1082,6 +1082,34 @@ class TestQuizInheritQuestions(TransactionCase):
         self.assertEqual(quiz.question_count, 1)
         self.assertEqual(quiz.total_marks, question.marks)
 
+    def test_source_quiz_statistics_include_responses_from_including_quizzes(self):
+        question = self._make_question('Inherited question with response')
+        parent = self._make_quiz('Parent Quiz', questions=[question])
+        child = self._make_quiz('Child Quiz')
+        child.include_other_quizzes = [(4, parent.id)]
+        answer = self.env['quiz.answer'].create({
+            'question_id': question.id,
+            'answer_text': 'Correct answer',
+            'is_correct': True,
+        })
+        self.env['quiz.response'].create({
+            'quiz_id': child.id,
+            'question_id': question.id,
+            'answer_id': answer.id,
+            'user_id': self.env.user.id,
+            'is_correct': True,
+            'attempt_token': 'child-quiz-attempt',
+        })
+
+        statistics = parent.get_quiz_student_statistics(parent.id)
+
+        self.assertEqual(len(statistics), 1)
+        self.assertEqual(statistics[0]['user_id'], self.env.user.id)
+        self.assertEqual(
+            statistics[0]['progress_summary']['new_above_threshold'],
+            1,
+        )
+
     def test_question_count_includes_inherited_questions(self):
         q1 = self._make_question('Own')
         q2 = self._make_question('Inherited')
