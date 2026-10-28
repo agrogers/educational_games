@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="educational_games_dashboard.DashboardTemplate" owl="1">
-        <div class="o_action_manager o_content h-100 overflow-auto eg-dashboard">
+        <div class="o_action_manager o_content wallpaper h-100 overflow-auto eg-dashboard">
 
             <!-- Header -->
             <div class="eg-dashboard-header d-flex align-items-center justify-content-between px-4 py-3">

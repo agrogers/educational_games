@@ -254,9 +254,22 @@ export class QuizGame extends Component {
                     option_count: this.optionCount,
                 }
             );
+            const cardBackConfig = await this.orm.call(
+                "res.users",
+                "get_aui_wallpaper_config",
+                []
+            );
+            const economyCardBacks = Array.isArray(cardBackConfig.economyCardBacks)
+                ? cardBackConfig.economyCardBacks.filter((url) => typeof url === "string" && url)
+                : [];
+            const cardBackPool = cardBackConfig.economyCardBackUser
+                ? (economyCardBacks.length
+                    ? economyCardBacks
+                    : ["/ar_class_economy/static/src/img/card_default.jpg"])
+                : null;
             this._shuffleArray(quizData.questions);
             // Add reactive selected-answer tracking to each question
-            const sharedCardBack = this._randomCardBackUrl();
+            const sharedCardBack = this._randomCardBackUrl(cardBackPool);
             quizData.questions.forEach((q, index) => {
                 q.randomOrderIndex = index;
                 q.selected_answers = [];
@@ -268,7 +281,7 @@ export class QuizGame extends Component {
                 q.recentRespondents = 0;
                 // Assign card-back image: random per question or shared across all.
                 q.cardBackUrl = this.state.randomCardBacks
-                    ? this._randomCardBackUrl()
+                    ? this._randomCardBackUrl(cardBackPool)
                     : sharedCardBack;
                 // Mark HTML strings as safe for t-out rendering
                 q.question_text = markup(q.question_text || "");
@@ -315,8 +328,8 @@ export class QuizGame extends Component {
     }
 
     /** Pick a random card-back image URL from the pool. */
-    _randomCardBackUrl() {
-        const images = [
+    _randomCardBackUrl(images = null) {
+        const defaultImages = [
             "/educational_games/static/src/img/card_backs/card_feather.jpg",
             "/educational_games/static/src/img/card_backs/card_rainbow.jpg",
             "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMm5wOW04ZGJ6ZnR2azJpY2QzOHdzNmJ1bTFwcTU3NzU1M3liZDJ6ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/aMMWn9Ogf3UOI/giphy.gif",
@@ -336,7 +349,8 @@ export class QuizGame extends Component {
             "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcG5uajZjYWVpc2R5NG0wZmpyaGJ3YWlhbWdhOG91bmNsYzNlcW04cyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ckAsLajQY6HxYHYRDX/giphy.gif", /** Surf **/
             
         ];
-        return images[Math.floor(Math.random() * images.length)];
+        const cardBacks = images || defaultImages;
+        return cardBacks[Math.floor(Math.random() * cardBacks.length)];
     }
 
     /**
@@ -1211,4 +1225,3 @@ export class QuizGame extends Component {
 }
 
 registry.category("actions").add("action_quiz_game_js", QuizGame);
-
