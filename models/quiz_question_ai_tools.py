@@ -43,7 +43,7 @@ def merge_confirmed_quiz_question_pair(env, _tool, arguments):
     response_count = env['quiz.response'].search_count([
         ('question_id', '=', duplicate.id),
     ])
-    answer_count = len(keep.answer_ids)
+    answer_count = len(keep.answer_ids.filtered(lambda answer: not answer.internal_kind))
     with env.cr.savepoint():
         Question.browse([keep_id, duplicate_id]).action_merge_questions()
     return {

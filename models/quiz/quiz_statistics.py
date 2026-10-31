@@ -265,7 +265,8 @@ class Quiz(models.Model):
         if not question.exists() or question.id not in quiz.question_ids.ids:
             raise UserError("Question not found in this quiz.")
 
-        correct_ids = set(question.answer_ids.filtered('is_correct').ids)
+        playable_answers = question.answer_ids.filtered(lambda answer: not answer.internal_kind)
+        correct_ids = set(playable_answers.filtered('is_correct').ids)
 
         # â”€â”€ Response statistics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         cutoff = fields.Datetime.now() - timedelta(hours=1)
@@ -289,7 +290,7 @@ class Quiz(models.Model):
         recent_by_ans = Counter(r.answer_id.id for r in recent_responses)
 
         response_stats = {}
-        for a in question.answer_ids:
+        for a in playable_answers:
             a_total = total_by_ans.get(a.id, 0)
             a_recent = recent_by_ans.get(a.id, 0)
             response_stats[str(a.id)] = {
@@ -312,7 +313,7 @@ class Quiz(models.Model):
                     'answer_text': a.answer_text or '',
                     'is_correct': a.is_correct,
                 }
-                for a in question.answer_ids
+                for a in playable_answers
             ],
             'response_stats': response_stats,
             'show_dual': show_dual,

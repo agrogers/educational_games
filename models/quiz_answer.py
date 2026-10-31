@@ -19,6 +19,15 @@ class QuizAnswer(models.Model):
     sequence = fields.Integer(string='Sequence', default=10)
     answer_text = fields.Html(string='Answer Option', required=True, sanitize=True)
     is_correct = fields.Boolean(string='Correct Answer', default=False)
+    internal_kind = fields.Selection(
+        [('flashcard_failure', 'Flash Card')], readonly=True, copy=False, index=True,
+    )
+    _sql_constraints = [
+        ('internal_answer_unique', 'UNIQUE(question_id, internal_kind)',
+         'Only one internal response option of each kind is allowed per question.'),
+        ('internal_answer_incorrect', 'CHECK(internal_kind IS NULL OR NOT is_correct)',
+         'An internal response option cannot be a correct answer.'),
+    ]
     marks = fields.Integer(
         string='Marks',
         default=0,

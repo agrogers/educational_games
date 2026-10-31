@@ -37,6 +37,14 @@ class QuizResponse(models.Model):
         string='Correct Answer',
         help='Whether the selected answer option is a correct answer.',
     )
+    source = fields.Selection(
+        [('quiz', 'Quiz'), ('flashcard', 'Flashcard')],
+        default='quiz', required=True, index=True, copy=False,
+    )
+    attempt_outcome = fields.Selection(
+        [('correct', 'Correct'), ('incorrect', 'Incorrect')], copy=False,
+        help='Whole-question outcome saved at submission time; empty for legacy responses.',
+    )
     result_label = fields.Selection(
         [
             ('correct', 'Correct'),

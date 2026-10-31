@@ -90,6 +90,7 @@ class Quiz(models.Model):
                 domain=[
                     ('question_id', 'in', question_ids),
                     ('is_correct', '=', False),
+                    ('answer_id.internal_kind', '=', False),
                 ],
                 fields=['question_id', 'answer_id'],
                 groupby=['question_id', 'answer_id'],
@@ -102,7 +103,7 @@ class Quiz(models.Model):
 
         questions = []
         for question in all_questions:
-            all_answers = list(question.answer_ids)
+            all_answers = list(question.answer_ids.filtered(lambda answer: not answer.internal_kind))
             question_student_stats = student_stats.get(
                 question.id,
                 {'attempt_count': 0, 'weighted_score_pct': None},
@@ -246,7 +247,10 @@ class Quiz(models.Model):
         for question in questions_to_score:
             q_id = str(question.id)
             selected_ids = set(submitted_answers.get(q_id) or [])
-            correct_ids = set(question.answer_ids.filtered('is_correct').ids)
+            playable_answers = question.answer_ids.filtered(lambda answer: not answer.internal_kind)
+            if not selected_ids.issubset(set(playable_answers.ids)):
+                raise UserError('An answer is not a selectable option for this question.')
+            correct_ids = set(playable_answers.filtered('is_correct').ids)
 
             if selected_ids:
                 attempted_question_count += 1
@@ -263,7 +267,7 @@ class Quiz(models.Model):
                     'is_correct': a.is_correct,
                     'was_selected': a.id in selected_ids,
                 }
-                for a in question.answer_ids
+                for a in playable_answers
             ]
             results.append({
                 'question_id': question.id,
@@ -282,6 +286,7 @@ class Quiz(models.Model):
         response_vals = []
         attempt_tokens = {result['question_id']: uuid.uuid4().hex for result in results}
         for r in results:
+            r['attempt_token'] = attempt_tokens[r['question_id']]
             for a in r['answers']:
                 if a['was_selected']:
                     response_vals.append({
@@ -291,9 +296,11 @@ class Quiz(models.Model):
                         'user_id': self.env.user.id,
                         'attempt_token': attempt_tokens[r['question_id']],
                         'is_correct': a['is_correct'],
+                        'attempt_outcome': 'correct' if r['is_correct'] else 'incorrect',
                     })
         if response_vals:
             self.env['quiz.response'].sudo().create(response_vals)
+            self._after_question_attempts(quiz, results)
 
         # Recompute stored stats on affected questions and their answers.
         # Use sudo() because students do not have write access to quiz.question
@@ -369,4 +376,8 @@ class Quiz(models.Model):
             'student_question_stats': student_question_stats,
             'student_progress_summary': student_progress_summary,
         }
+
+    def _after_question_attempts(self, quiz, results):
+        """Extension hook for persisted question attempts in this transaction."""
+        return None
 

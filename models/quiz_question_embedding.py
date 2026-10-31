@@ -25,7 +25,7 @@ class QuizQuestionEmbeddingService(models.AbstractModel):
     @api.model
     def _question_comparison_text(self, question):
         parts = [html2plaintext(question.question_text or '').strip()]
-        for answer in question.answer_ids.sorted(key=lambda item: (item.sequence, item.id)):
+        for answer in question.answer_ids.filtered(lambda item: not item.internal_kind).sorted(key=lambda item: (item.sequence, item.id)):
             answer_text = html2plaintext(answer.answer_text or '').strip()
             if answer_text:
                 label = _('Correct answer') if answer.is_correct else _('Incorrect answer')
@@ -44,7 +44,7 @@ class QuizQuestionEmbeddingService(models.AbstractModel):
     @api.model
     def _question_payload(self, question):
         answer_options = []
-        for answer in question.answer_ids.sorted(key=lambda item: (item.sequence, item.id))[:8]:
+        for answer in question.answer_ids.filtered(lambda item: not item.internal_kind).sorted(key=lambda item: (item.sequence, item.id))[:8]:
             answer_options.append({
                 'text': html2plaintext(answer.answer_text or '').strip()[:150],
                 'is_correct': bool(answer.is_correct),
