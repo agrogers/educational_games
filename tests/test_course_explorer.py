@@ -82,6 +82,18 @@ class TestCourseExplorerQuizProgress(TransactionCase):
         self.assertEqual(progress['quizAnsweredQuestionCount'], 2)
         self.assertEqual(progress['quizProgress'], 50.0)
 
+    def test_chemistry_tag_is_not_treated_as_chapter_tag(self):
+        resource_tag = self.env['aps.resource.tags'].create({'name': 'Chemistry'})
+        self.resource.write({'tag_ids': [(4, resource_tag.id)]})
+        question_tag = self.env['quiz.tag'].create({'name': 'Chemistry'})
+        self.env['quiz.question'].create({
+            'question_text': 'Chemistry question',
+            'subject_ids': [(6, 0, [self.subject.id])],
+            'tag_ids': [(6, 0, [question_tag.id])],
+        })
+
+        self.assertEqual(self._progress()['quizQuestionCount'], 2)
+
     def test_no_matching_questions_completes_quiz_half(self):
         self.resource.write({'tag_ids': [(5, 0, 0)]})
         progress = self._progress()

@@ -36,11 +36,11 @@ class EducationalGamesCourseExplorer(models.Model):
         resource_tags = {}
         subject_ids = set()
         for resource in resources:
-            chapter_names = {
-                self._normalise_tag_name(tag.name)
-                for tag in resource.tag_ids
-                if self._normalise_tag_name(tag.name).startswith('ch')
-            }
+            chapter_names = set()
+            for tag in resource.tag_ids:
+                tag_name = self._normalise_tag_name(tag.name)
+                if tag_name.startswith('ch') and tag_name[2:3].isdigit():
+                    chapter_names.add(tag_name)
             resource_tags[resource.id] = chapter_names
             subject_ids.update(resource.subjects.ids)
 
