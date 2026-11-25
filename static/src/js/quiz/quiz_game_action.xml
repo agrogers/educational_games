@@ -373,7 +373,7 @@
                             </div>
                         </div>
 
-                        <div t-if="state.quiz.filter_summary" class="quiz-filter-summary">
+                        <div t-if="state.isTeacher and state.quiz.filter_summary" class="quiz-filter-summary">
                             <t t-esc="state.quiz.filter_summary"/>
                         </div>
 
